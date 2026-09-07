@@ -5,6 +5,16 @@ const adminSchema = new mongoose.Schema(
   {
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true }, // hashed
+    role: {
+      type: String,
+      enum: ["ADMIN", "HEAD_COACH"],
+      default: "ADMIN",
+    },
+    team: {
+      // For HEAD_COACH: which team they manage
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true }
 );
