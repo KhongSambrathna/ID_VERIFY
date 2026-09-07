@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "../api/axios";
-
-const FILE_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+import { resolveFileUrl } from "../utils/fileUrl";
 
 const STATUS_LABEL = {
   verified: { icon: "✅", text: "Verified athlete", cls: "verified" },
@@ -38,7 +37,7 @@ export default function VerifyPage() {
               style={{ margin: "0 auto 14px" }}
               src={
                 athlete.photoUrl
-                  ? `${FILE_BASE}${athlete.photoUrl}`
+                  ? resolveFileUrl(athlete.photoUrl)
                   : "https://placehold.co/90x110?text=Photo"
               }
               alt={athlete.fullName}

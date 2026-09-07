@@ -35,7 +35,7 @@ export default function AllCardsPage() {
     <div className="container" style={{ paddingBottom: 60 }}>
       <div className="dash-header no-print">
         <h2>All ID cards ({filtered.length})</h2>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div className="dash-actions">
           <Link to="/admin" className="link-btn">
             ← Back to dashboard
           </Link>
@@ -45,7 +45,7 @@ export default function AllCardsPage() {
         </div>
       </div>
 
-      <div className="no-print" style={{ display: "flex", gap: 16, marginBottom: 24 }}>
+      <div className="no-print filter-row">
         <div className="field" style={{ marginBottom: 0, minWidth: 180 }}>
           <label>Filter by team</label>
           <select value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)}>

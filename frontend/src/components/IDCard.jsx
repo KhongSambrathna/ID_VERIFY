@@ -1,4 +1,6 @@
-const FILE_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+import { useRef, useState } from "react";
+import html2canvas from "html2canvas";
+import { resolveFileUrl } from "../utils/fileUrl";
 
 function formatDob(dob) {
   if (!dob) return null;
@@ -10,9 +12,33 @@ function formatDob(dob) {
 }
 
 export default function IDCard({ athlete, hideActions }) {
+  const cardRef = useRef(null);
+  const [saving, setSaving] = useState(false);
+
   if (!athlete) return null;
 
   const dob = formatDob(athlete.dateOfBirth);
+
+  const saveAsJpg = async () => {
+    if (!cardRef.current) return;
+    setSaving(true);
+    try {
+      const canvas = await html2canvas(cardRef.current, {
+        useCORS: true,
+        scale: 3, // higher resolution than the on-screen card
+        backgroundColor: "#ffffff",
+      });
+      const link = document.createElement("a");
+      link.download = `${athlete.verifyId || athlete.fullName || "id-card"}.jpg`;
+      link.href = canvas.toDataURL("image/jpeg", 0.95);
+      link.click();
+    } catch (err) {
+      console.error("Failed to save card as JPG:", err);
+      alert("Couldn't save the card as an image. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="id-card-print-page">
@@ -21,11 +47,19 @@ export default function IDCard({ athlete, hideActions }) {
           <button className="btn btn-primary" onClick={() => window.print()}>
             Export / Print card
           </button>
+          <button
+            className="btn btn-outline card-jpg-btn"
+            style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
+            onClick={saveAsJpg}
+            disabled={saving}
+          >
+            {saving ? "Saving…" : "Save as JPG"}
+          </button>
         </div>
       )}
 
       <div className="id-card-wrap">
-        <div className="id-card">
+        <div className="id-card" ref={cardRef}>
           <div className="id-card-top">
             <div className="org">
               <span className="en">Countryside Football ID Verify</span>
@@ -37,9 +71,10 @@ export default function IDCard({ athlete, hideActions }) {
           <div className="id-card-photo-wrap">
             <img
               className="id-card-photo"
+              crossOrigin="anonymous"
               src={
                 athlete.photoUrl
-                  ? `${FILE_BASE}${athlete.photoUrl}`
+                  ? resolveFileUrl(athlete.photoUrl)
                   : "https://placehold.co/74x90?text=Photo"
               }
               alt={athlete.fullName}
@@ -94,7 +129,7 @@ export default function IDCard({ athlete, hideActions }) {
 
           {athlete.qrCodeUrl && (
             <div className="id-card-qr-corner">
-              <img src={`${FILE_BASE}${athlete.qrCodeUrl}`} alt="Verification QR code" />
+              <img crossOrigin="anonymous" src={resolveFileUrl(athlete.qrCodeUrl)} alt="Verification QR code" />
               <div className="scan-label">Scan</div>
             </div>
           )}

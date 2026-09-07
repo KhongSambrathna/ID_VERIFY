@@ -53,7 +53,7 @@ export default function AdminDashboard() {
     <div className="container dash-body">
       <div className="dash-header">
         <h2>Athlete records</h2>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div className="dash-actions">
           <Link to="/admin/cards" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
             Export all cards
           </Link>
@@ -63,7 +63,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="field" style={{ maxWidth: 340, marginBottom: 20 }}>
+      <div className="field search-field">
         <input
           placeholder="Search by name, team, role, or ID…"
           value={search}
@@ -75,69 +75,71 @@ export default function AdminDashboard() {
       {error && <p className="error-text">{error}</p>}
 
       {!loading && !error && (
-        <table className="athletes">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Role</th>
-              <th>Team</th>
-              <th>Available</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((a) => (
-              <tr key={a._id}>
-                <td>{a.verifyId}</td>
-                <td>{a.fullName}</td>
-                <td>{a.role || "—"}</td>
-                <td>{a.team || "—"}</td>
-                <td>
-                  <span className={`badge ${a.isAvailable ? "verified" : "rejected"}`}>
-                    {a.isAvailable ? "Available" : "Not available"}
-                  </span>
-                </td>
-                <td>
-                  <span className={`badge ${a.status}`}>{a.status}</span>
-                </td>
-                <td>
-                  <Link className="link-btn" to={`/admin/athlete/${a._id}`}>
-                    View card
-                  </Link>
-                  {a.status !== "verified" ? (
-                    <button className="link-btn" onClick={() => setStatus(a._id, "verified")}>
-                      Verify
-                    </button>
-                  ) : (
-                    <button className="link-btn" onClick={() => setStatus(a._id, "unverified")}>
-                      Unverify
-                    </button>
-                  )}
-                  <button
-                    className="link-btn"
-                    onClick={() => setAvailable(a._id, !a.isAvailable)}
-                  >
-                    {a.isAvailable ? "Mark unavailable" : "Mark available"}
-                  </button>
-                  <button className="link-btn" onClick={() => remove(a._id)}>
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
+        <div className="table-scroll">
+          <table className="athletes">
+            <thead>
               <tr>
-                <td colSpan={7} style={{ textAlign: "center", color: "#777" }}>
-                  {athletes.length === 0
-                    ? "No athletes yet — add your first one."
-                    : "No matches for your search."}
-                </td>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Team</th>
+                <th>Available</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.map((a) => (
+                <tr key={a._id}>
+                  <td data-label="ID">{a.verifyId}</td>
+                  <td data-label="Name">{a.fullName}</td>
+                  <td data-label="Role">{a.role || "—"}</td>
+                  <td data-label="Team">{a.team || "—"}</td>
+                  <td data-label="Available">
+                    <span className={`badge ${a.isAvailable ? "verified" : "rejected"}`}>
+                      {a.isAvailable ? "Available" : "Not available"}
+                    </span>
+                  </td>
+                  <td data-label="Status">
+                    <span className={`badge ${a.status}`}>{a.status}</span>
+                  </td>
+                  <td data-label="Actions" className="actions-cell">
+                    <Link className="link-btn" to={`/admin/athlete/${a._id}`}>
+                      View card
+                    </Link>
+                    {a.status !== "verified" ? (
+                      <button className="link-btn" onClick={() => setStatus(a._id, "verified")}>
+                        Verify
+                      </button>
+                    ) : (
+                      <button className="link-btn" onClick={() => setStatus(a._id, "unverified")}>
+                        Unverify
+                      </button>
+                    )}
+                    <button
+                      className="link-btn"
+                      onClick={() => setAvailable(a._id, !a.isAvailable)}
+                    >
+                      {a.isAvailable ? "Mark unavailable" : "Mark available"}
+                    </button>
+                    <button className="link-btn" onClick={() => remove(a._id)}>
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: "center", color: "#777" }}>
+                    {athletes.length === 0
+                      ? "No athletes yet — add your first one."
+                      : "No matches for your search."}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

@@ -65,6 +65,8 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 20px;
 }
 .navbar .brand {
   font-family: var(--font-display);
@@ -77,11 +79,17 @@ a {
 .navbar .brand span {
   color: var(--gold);
 }
+.navbar nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
 .navbar nav a {
   color: #d6dce6;
   text-decoration: none;
   margin-left: 24px;
   font-size: 15px;
+  white-space: nowrap;
 }
 .navbar nav a:hover {
   color: white;
@@ -238,9 +246,33 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.dash-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.filter-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
 }
 .dash-body {
   padding-bottom: 60px;
+}
+.search-field {
+  max-width: 340px;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 table.athletes {
@@ -264,6 +296,9 @@ table.athletes th {
 }
 table.athletes tr:last-child td {
   border-bottom: none;
+}
+table.athletes .actions-cell {
+  white-space: nowrap;
 }
 
 .badge {
@@ -292,6 +327,7 @@ table.athletes tr:last-child td {
 .id-card-actions {
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
   margin-bottom: 20px;
 }
 
@@ -509,4 +545,120 @@ table.athletes tr:last-child td {
 @media (max-width: 720px) {
   .hero h1 { font-size: 38px; }
   .features .grid { grid-template-columns: 1fr; }
+}
+
+/* ---------- Mobile layout ---------- */
+@media (max-width: 640px) {
+  .container {
+    padding: 0 16px;
+  }
+
+  .navbar {
+    padding: 14px 0;
+  }
+  .navbar .container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .navbar nav a:first-child {
+    margin-left: 0;
+  }
+
+  .hero {
+    padding: 50px 0 60px;
+    text-align: center;
+  }
+  .hero h1 {
+    font-size: 30px;
+    max-width: 100%;
+  }
+  .hero p {
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .hero .cta-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .hero .cta-row .btn {
+    text-align: center;
+  }
+
+  .card {
+    padding: 24px 20px;
+  }
+
+  .dash-header {
+    padding: 20px 0 6px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dash-actions {
+    flex-direction: column;
+  }
+  .dash-actions .btn,
+  .dash-actions .link-btn {
+    text-align: center;
+    width: 100%;
+  }
+  .search-field {
+    max-width: 100%;
+  }
+  .filter-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .filter-row .field {
+    min-width: 0 !important;
+    width: 100%;
+  }
+
+  /* Stack the athletes table into cards instead of a horizontal-scroll grid */
+  table.athletes thead {
+    display: none;
+  }
+  table.athletes,
+  table.athletes tbody,
+  table.athletes tr,
+  table.athletes td {
+    display: block;
+    width: 100%;
+  }
+  table.athletes tr {
+    padding: 10px 14px 12px;
+    border-bottom: 6px solid var(--cream);
+  }
+  table.athletes tr:last-child {
+    border-bottom: none;
+  }
+  table.athletes td {
+    border-bottom: none;
+    padding: 6px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  table.athletes td[data-label]::before {
+    content: attr(data-label);
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 12px;
+    color: #777;
+    flex-shrink: 0;
+  }
+  table.athletes td.actions-cell {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 6px 14px;
+    padding-top: 10px;
+  }
+  table.athletes td.actions-cell::before {
+    content: none;
+  }
+  table.athletes td.actions-cell .link-btn {
+    margin-right: 0;
+  }
 }
