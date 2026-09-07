@@ -26,7 +26,9 @@ async function run() {
 
     const oldId = athlete.verifyId;
     athlete.verifyId = await generateShortId();
-    athlete.qrCodeUrl = await generateAthleteQR(athlete.verifyId);
+    const qr = await generateAthleteQR(athlete.verifyId);
+    athlete.qrCodeUrl = qr.url;
+    athlete.qrCodePublicId = qr.publicId;
     await athlete.save();
 
     console.log(`Updated "${athlete.fullName}": ${oldId} -> ${athlete.verifyId}`);

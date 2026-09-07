@@ -1,6 +1,8 @@
 const Athlete = require("../models/Athlete");
 const generateAthleteQR = require("../utils/generateQR");
 const generateShortId = require("../utils/generateShortId");
+const uploadBufferToCloudinary = require("../utils/uploadToCloudinary");
+const cloudinary = require("../config/cloudinary");
 
 // POST /api/athletes  (admin, multipart/form-data: photo, documents[])
 exports.createAthlete = async (req, res) => {
@@ -32,18 +34,30 @@ exports.createAthlete = async (req, res) => {
     });
 
     if (req.files?.photo?.[0]) {
-      athlete.photoUrl = `/uploads/${req.files.photo[0].filename}`;
+      const { url, publicId } = await uploadBufferToCloudinary(req.files.photo[0].buffer, {
+        folder: "athlete-verify/photos",
+        resourceType: "image",
+      });
+      athlete.photoUrl = url;
+      athlete.photoPublicId = publicId;
     }
 
     if (req.files?.documents?.length) {
-      athlete.supportingDocuments = req.files.documents.map((f) => ({
-        label: f.originalname,
-        fileUrl: `/uploads/${f.filename}`,
-      }));
+      athlete.supportingDocuments = await Promise.all(
+        req.files.documents.map(async (f) => {
+          const { url, publicId, resourceType } = await uploadBufferToCloudinary(f.buffer, {
+            folder: "athlete-verify/documents",
+            resourceType: "auto", // handles both images and PDFs
+          });
+          return { label: f.originalname, fileUrl: url, publicId, resourceType };
+        })
+      );
     }
 
     // generate the QR code that points to this athlete's public verify page
-    athlete.qrCodeUrl = await generateAthleteQR(athlete.verifyId);
+    const qr = await generateAthleteQR(athlete.verifyId);
+    athlete.qrCodeUrl = qr.url;
+    athlete.qrCodePublicId = qr.publicId;
 
     await athlete.save();
     res.status(201).json(athlete);
@@ -92,6 +106,29 @@ exports.deleteAthlete = async (req, res) => {
   try {
     const athlete = await Athlete.findByIdAndDelete(req.params.id);
     if (!athlete) return res.status(404).json({ message: "Athlete not found" });
+
+    // best-effort cleanup of the associated Cloudinary assets — failures here
+    // shouldn't block the delete response, so just log them
+    const cleanupJobs = [];
+    if (athlete.photoPublicId) {
+      cleanupJobs.push(cloudinary.uploader.destroy(athlete.photoPublicId));
+    }
+    if (athlete.qrCodePublicId) {
+      cleanupJobs.push(cloudinary.uploader.destroy(athlete.qrCodePublicId));
+    }
+    (athlete.supportingDocuments || []).forEach((doc) => {
+      if (doc.publicId) {
+        cleanupJobs.push(
+          cloudinary.uploader.destroy(doc.publicId, { resource_type: doc.resourceType || "image" })
+        );
+      }
+    });
+    Promise.allSettled(cleanupJobs).then((results) => {
+      results.forEach((r) => {
+        if (r.status === "rejected") console.warn("Cloudinary cleanup failed:", r.reason?.message);
+      });
+    });
+
     res.json({ message: "Athlete deleted" });
   } catch (err) {
     res.status(500).json({ message: err.message });

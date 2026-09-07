@@ -25,11 +25,14 @@ const athleteSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-    photoUrl: { type: String }, // path to uploaded photo
+    photoUrl: { type: String }, // Cloudinary secure_url of the uploaded photo
+    photoPublicId: { type: String }, // Cloudinary public_id (needed to delete/replace it)
     supportingDocuments: [
       {
         label: { type: String }, // e.g. "National ID copy", "Birth certificate"
-        fileUrl: { type: String },
+        fileUrl: { type: String }, // Cloudinary secure_url
+        publicId: { type: String }, // Cloudinary public_id
+        resourceType: { type: String, default: "image" }, // "image" or "raw" — needed to delete correctly
       },
     ],
     status: {
@@ -38,7 +41,8 @@ const athleteSchema = new mongoose.Schema(
       enum: ["unverified", "verified"],
       default: "unverified",
     },
-    qrCodeUrl: { type: String }, // path to generated QR code image
+    qrCodeUrl: { type: String }, // Cloudinary secure_url of the generated QR code
+    qrCodePublicId: { type: String }, // Cloudinary public_id of the QR code
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
   },
   { timestamps: true }

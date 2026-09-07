@@ -31,6 +31,11 @@ Edit `.env`:
 - `MONGO_URI` — your local or Atlas connection string
 - `JWT_SECRET` — any long random string
 - `PUBLIC_BASE_URL` — leave as `http://localhost:5173` for local dev
+- `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` —
+  sign up free at https://cloudinary.com, then copy these three values from
+  your Dashboard home page. All athlete photos, supporting documents, and QR
+  codes are stored on Cloudinary (not on local disk), so uploads persist even
+  when your host restarts or redeploys.
 
 Start the API:
 ```bash
@@ -109,6 +114,8 @@ git push -u origin main
    - `MONGO_URI` — your Atlas connection string
    - `JWT_SECRET` — your secret
    - `PORT` — `5000` (Render sets `PORT` itself too, but this is harmless)
+   - `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` —
+     same values as your local `.env`
    - `PUBLIC_BASE_URL` — set this **after** step 5.3, once you know your
      frontend's live URL (e.g. `https://your-app.vercel.app`)
 5. Click **Create Web Service**. Render will build and give you a URL like
@@ -119,11 +126,8 @@ git push -u origin main
 
 From now on, every push to `main` automatically redeploys the backend.
 
-⚠️ **Free tier disk is not permanent.** Uploaded photos/documents/QR codes in
-`backend/uploads/` will be wiped whenever Render restarts or redeploys your
-service. For a live production site, swap file storage for a free tier of
-**Cloudinary** or **Firebase Storage** instead of local disk. Fine to skip for
-now if you're just testing the deploy — just know uploads can disappear.
+Photos, documents, and QR codes are stored on Cloudinary's free tier, so
+they're unaffected by Render restarts/redeploys — no extra setup needed here.
 
 ### 5.3 Deploy the frontend — Vercel (free)
 
@@ -171,8 +175,9 @@ minute or two — no manual steps needed after this point.
 ## 6. Notes on free services
 
 - **Database:** MongoDB Atlas (free 512MB cluster) — already set up
-- **File storage:** local disk works for local dev; use Cloudinary or Firebase
-  Storage free tier for a permanent production deploy (see 5.2 note above)
+- **File storage:** Cloudinary (free tier, ~25GB storage/bandwidth) — photos,
+  supporting documents, and QR codes all live here, so nothing is lost when
+  your backend host restarts or redeploys
 - **Hosting:** Render (backend) + Vercel (frontend), both free tiers, both
   above
 
@@ -180,10 +185,11 @@ minute or two — no manual steps needed after this point.
 
 Built: landing page, admin login (JWT), admin dashboard (search, filter,
 verify/unverify, availability toggle, delete), add-athlete form with photo +
-multi-document upload, auto-generated short ID + QR code per athlete,
-printable bilingual ID card (5.4×8.5cm, exportable to A4), bulk export with
-team/role filters, public verify page.
+multi-document upload (stored on Cloudinary), auto-generated short ID + QR
+code per athlete (also on Cloudinary), printable bilingual ID card
+(5.4×8.5cm, exportable to A4 or as a JPG image), bulk export with team/role
+filters, public verify page.
 
-Worth adding next: persistent cloud file storage (Cloudinary), pagination on
-the dashboard for large rosters, editing an existing athlete's details, and
-per-admin roles if more than one person will manage records.
+Worth adding next: pagination on the dashboard for large rosters, editing an
+existing athlete's details, and per-admin roles if more than one person will
+manage records.
