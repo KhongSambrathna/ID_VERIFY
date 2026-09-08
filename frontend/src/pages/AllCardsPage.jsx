@@ -1,9 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import html2canvas from "html2canvas";
+import JSZip from "jszip";
 import api from "../api/axios";
 import IDCard from "../components/IDCard";
 
 const ROLE_OPTIONS = ["PLAYER", "ASSISTAN COACH", "HEAD COACH", "TECHNICAL", "MEDIC"];
+
+function sanitizeFilename(s) {
+  return (s || "card")
+    .toString()
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, "_");
+}
 
 export default function AllCardsPage() {
   const [athletes, setAthletes] = useState([]);
@@ -11,6 +21,8 @@ export default function AllCardsPage() {
   const [error, setError] = useState("");
   const [teamFilter, setTeamFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [exportingPng, setExportingPng] = useState(false);
+  const gridRef = useRef(null);
 
   useEffect(() => {
     api
@@ -31,6 +43,68 @@ export default function AllCardsPage() {
     return true;
   });
 
+  // Captures every currently-filtered card as its own separate PNG (not one
+  // combined image) — a single card downloads directly, multiple cards are
+  // bundled into one ZIP so the browser isn't asked to save a pile of files
+  // at once.
+  const exportPng = async () => {
+    if (!gridRef.current || filtered.length === 0) return;
+    setExportingPng(true);
+    try {
+      const cardNodes = gridRef.current.querySelectorAll(".id-card");
+      const count = Math.min(cardNodes.length, filtered.length);
+      const files = [];
+
+      for (let i = 0; i < count; i++) {
+        const canvas = await html2canvas(cardNodes[i], {
+          useCORS: true,
+          scale: 3, // higher resolution than the on-screen card
+          backgroundColor: "#ffffff",
+        });
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+        if (!blob) continue;
+        const athlete = filtered[i];
+        const name = `${sanitizeFilename(athlete?.verifyId)}_${sanitizeFilename(athlete?.fullName)}.png`;
+        files.push({ name, blob });
+      }
+
+      if (files.length === 0) {
+        alert("Nothing to export.");
+        return;
+      }
+
+      if (files.length === 1) {
+        const url = URL.createObjectURL(files[0].blob);
+        const link = document.createElement("a");
+        link.download = files[0].name;
+        link.href = url;
+        link.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const zip = new JSZip();
+        files.forEach(({ name, blob }) => zip.file(name, blob));
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+
+        const nameParts = ["id-cards"];
+        if (teamFilter !== "all") nameParts.push(teamFilter);
+        if (roleFilter !== "all") nameParts.push(roleFilter);
+        nameParts.push(new Date().toISOString().slice(0, 10));
+
+        const url = URL.createObjectURL(zipBlob);
+        const link = document.createElement("a");
+        link.download = `${sanitizeFilename(nameParts.join("-"))}.zip`;
+        link.href = url;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Couldn't export cards as PNG. Please try again.");
+    } finally {
+      setExportingPng(false);
+    }
+  };
+
   return (
     <div className="container" style={{ paddingBottom: 60 }}>
       <div className="dash-header no-print">
@@ -41,6 +115,14 @@ export default function AllCardsPage() {
           </Link>
           <button className="btn btn-primary" onClick={() => window.print()}>
             Export / Print selected
+          </button>
+          <button
+            className="btn btn-outline"
+            style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
+            onClick={exportPng}
+            disabled={exportingPng || filtered.length === 0}
+          >
+            {exportingPng ? "Exporting…" : "Export PNG"}
           </button>
         </div>
       </div>
@@ -76,7 +158,7 @@ export default function AllCardsPage() {
         <p>No athletes match this filter.</p>
       )}
 
-      <div className="cards-grid">
+      <div className="cards-grid" ref={gridRef}>
         {filtered.map((a) => (
           <IDCard key={a._id} athlete={a} hideActions />
         ))}
