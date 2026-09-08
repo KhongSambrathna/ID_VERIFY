@@ -630,6 +630,60 @@ table.athletes .actions-cell {
   margin-bottom: 6px;
 }
 
+/* ---------- Public search page ---------- */
+.search-page-wrap {
+  align-items: flex-start;
+  padding-top: 60px;
+}
+.search-page-card {
+  max-width: 520px;
+}
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+.search-result-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  text-decoration: none;
+  color: inherit;
+}
+.search-result-row:hover {
+  background: var(--cream);
+  border-color: var(--gold);
+}
+.search-result-photo {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #eee;
+  flex-shrink: 0;
+}
+.search-result-info {
+  flex: 1;
+  min-width: 0;
+}
+.search-result-info .name {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.search-result-info .meta {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: #777;
+}
+
 @media (max-width: 720px) {
   .hero h1 { font-size: 38px; }
   .features .grid { grid-template-columns: 1fr; }

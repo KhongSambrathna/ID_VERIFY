@@ -174,6 +174,32 @@ exports.deleteAthlete = async (req, res) => {
   }
 };
 
+// GET /api/athletes/search?q=...  (PUBLIC) — find a player by name or ID number,
+// for anyone whose QR scanner isn't cooperating. Only non-sensitive fields are
+// returned here; the fuller record still lives behind /verify/:verifyId.
+exports.searchAthletes = async (req, res) => {
+  try {
+    const q = (req.query.q || "").trim();
+    if (q.length < 2) {
+      return res.status(400).json({ message: "Type at least 2 characters to search" });
+    }
+
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(escaped, "i");
+
+    const athletes = await Athlete.find({
+      $or: [{ fullName: pattern }, { khmerName: pattern }, { verifyId: pattern }],
+    })
+      .select("verifyId fullName khmerName team role status isAvailable photoUrl")
+      .sort({ fullName: 1 })
+      .limit(20);
+
+    res.json(athletes);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // GET /api/athletes/verify/:verifyId  (PUBLIC - what the QR code scan opens)
 exports.verifyAthlete = async (req, res) => {
   try {

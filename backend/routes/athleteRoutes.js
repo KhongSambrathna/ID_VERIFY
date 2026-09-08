@@ -9,10 +9,13 @@ const {
   updateAthlete,
   deleteAthlete,
   verifyAthlete,
+  searchAthletes,
 } = require("../controllers/athleteController");
 
 // Public - this is what the QR code links to. No login required.
 router.get("/verify/:verifyId", verifyAthlete);
+// Public - lets anyone find a player by name or ID without scanning anything.
+router.get("/search", searchAthletes);
 
 // Admin only, below this line — Head Coach accounts use /api/coach/* instead,
 // which is scoped to just their own team's roster.

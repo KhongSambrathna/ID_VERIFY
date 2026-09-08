@@ -11,7 +11,10 @@ export default function Landing() {
             organizers can confirm identity in seconds.
           </p>
           <div className="cta-row">
-            <a href="/login" className="btn btn-primary">
+            <a href="/search" className="btn btn-primary">
+              Find a player
+            </a>
+            <a href="/login" className="btn btn-outline">
               Admin sign in
             </a>
             <a href="#how" className="btn btn-outline">

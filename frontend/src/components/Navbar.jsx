@@ -12,6 +12,7 @@ export default function Navbar() {
           Countryside <span>Football ID Verify</span>
         </Link>
         <nav>
+          <Link to="/search">Find a player</Link>
           {isAuthed ? (
             <>
               <Link to={isAdmin ? "/admin" : "/coach"}>Dashboard</Link>

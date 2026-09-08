@@ -9,6 +9,7 @@ import EditAthlete from "./pages/EditAthlete";
 import AthleteCardPage from "./pages/AthleteCardPage";
 import AllCardsPage from "./pages/AllCardsPage";
 import VerifyPage from "./pages/VerifyPage";
+import SearchPage from "./pages/SearchPage";
 import CoachDashboard from "./pages/CoachDashboard";
 import AdminUsers from "./pages/AdminUsers";
 
@@ -20,6 +21,7 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/verify/:verifyId" element={<VerifyPage />} />
+        <Route path="/search" element={<SearchPage />} />
         <Route
           path="/admin"
           element={
