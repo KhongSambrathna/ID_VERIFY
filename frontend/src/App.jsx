@@ -14,6 +14,7 @@ import AboutUs from "./pages/AboutUs";
 import CoachDashboard from "./pages/CoachDashboard";
 import AdminUsers from "./pages/AdminUsers";
 import AdminSponsors from "./pages/AdminSponsors";
+import AdminMatchDay from "./pages/AdminMatchDay";
 
 export default function App() {
   return (
@@ -78,6 +79,14 @@ export default function App() {
           element={
             <ProtectedRoute role="ADMIN">
               <AdminSponsors />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/matchday"
+          element={
+            <ProtectedRoute role="ADMIN">
+              <AdminMatchDay />
             </ProtectedRoute>
           }
         />

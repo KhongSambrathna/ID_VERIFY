@@ -69,7 +69,8 @@ exports.createAthlete = async (req, res) => {
 // GET /api/athletes  (admin - list all, for the dashboard)
 exports.getAllAthletes = async (req, res) => {
   try {
-    const athletes = await Athlete.find().sort({ createdAt: -1 });
+    const filter = req.query.team ? { team: req.query.team } : {};
+    const athletes = await Athlete.find(filter).sort({ createdAt: -1 });
     res.json(athletes);
   } catch (err) {
     res.status(500).json({ message: err.message });

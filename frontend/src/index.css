@@ -1173,6 +1173,219 @@ table.athletes .actions-cell {
   color: #555;
 }
 
+/* ---------- Match day: squad list ---------- */
+.picker-meta {
+  font-weight: 400;
+  color: #888;
+  font-size: 12.5px;
+}
+.squad-count-note {
+  font-size: 13px;
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+.squad-count-note.ok {
+  color: #2e7d3f;
+}
+.squad-count-note.warn {
+  color: #b26a00;
+}
+
+/* Off-canvas printable roster sheet captured by html2canvas for JPG/PDF export */
+.squad-export-sheet {
+  width: 760px;
+  background: #ffffff;
+  padding: 32px;
+  font-family: var(--font-body, sans-serif);
+}
+.squad-export-header {
+  text-align: center;
+  border-bottom: 2px solid var(--navy);
+  padding-bottom: 14px;
+  margin-bottom: 20px;
+}
+.squad-export-title {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #888;
+}
+.squad-export-team {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--navy);
+  margin-top: 4px;
+}
+.squad-export-name {
+  font-size: 15px;
+  color: #555;
+  margin-top: 2px;
+}
+.squad-export-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 20px;
+}
+.squad-export-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  break-inside: avoid;
+}
+.squad-export-num {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--gold);
+  width: 18px;
+  flex-shrink: 0;
+  text-align: right;
+}
+.squad-export-photo {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  background: #eee;
+  flex-shrink: 0;
+}
+.squad-export-info {
+  min-width: 0;
+}
+.squad-export-name-en {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+.squad-export-name-kh {
+  margin: 0;
+  font-family: var(--font-khmer-body);
+  font-size: 12.5px;
+  color: #555;
+}
+.squad-export-meta {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: #777;
+}
+
+/* ---------- Match day: pitch formation board ---------- */
+.pitch-board {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  aspect-ratio: 68 / 100;
+  background: repeating-linear-gradient(
+    to bottom,
+    #2c7a3f 0,
+    #2c7a3f 40px,
+    #2a7339 40px,
+    #2a7339 80px
+  );
+  border: 3px solid #ffffff;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 0 auto;
+  user-select: none;
+  touch-action: none;
+}
+.pitch-halfway-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.85);
+}
+.pitch-center-circle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 18%;
+  aspect-ratio: 1 / 1;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.pitch-box {
+  position: absolute;
+  left: 20%;
+  width: 60%;
+  height: 14%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-top: none;
+}
+.pitch-box-top {
+  top: 0;
+  border-top: none;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.85);
+}
+.pitch-box-bottom {
+  bottom: 0;
+  border-bottom: none;
+}
+.pitch-goal {
+  position: absolute;
+  left: 38%;
+  width: 24%;
+  height: 5%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+}
+.pitch-goal-top {
+  top: 0;
+  border-top: none;
+}
+.pitch-goal-bottom {
+  bottom: 0;
+  border-bottom: none;
+}
+.pitch-token {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: grab;
+  width: 74px;
+}
+.pitch-token:active {
+  cursor: grabbing;
+}
+.pitch-token img {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #fff;
+  background: #ddd;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.pitch-token-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  text-align: center;
+  line-height: 1.15;
+  max-width: 74px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .squad-export-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ---------- Admin: Trusted-by logo manager ---------- */
 .sponsor-manage-list {
   display: flex;
