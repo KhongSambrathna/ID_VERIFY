@@ -15,6 +15,8 @@ import CoachDashboard from "./pages/CoachDashboard";
 import AdminUsers from "./pages/AdminUsers";
 import AdminSponsors from "./pages/AdminSponsors";
 import AdminMatchDay from "./pages/AdminMatchDay";
+import AdminShop from "./pages/AdminShop";
+import ShopPage from "./pages/ShopPage";
 
 export default function App() {
   return (
@@ -25,6 +27,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/verify/:verifyId" element={<VerifyPage />} />
         <Route path="/search" element={<SearchPage />} />
+        <Route path="/shop" element={<ShopPage />} />
         <Route path="/about" element={<AboutUs />} />
         <Route
           path="/admin"
@@ -87,6 +90,14 @@ export default function App() {
           element={
             <ProtectedRoute role="ADMIN">
               <AdminMatchDay />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/shop"
+          element={
+            <ProtectedRoute role="ADMIN">
+              <AdminShop />
             </ProtectedRoute>
           }
         />

@@ -63,6 +63,9 @@ export default function AdminDashboard() {
           <Link to="/admin/matchday" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
             Match day
           </Link>
+          <Link to="/admin/shop" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
+            Shop
+          </Link>
           <Link to="/admin/cards" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
             Export all cards
           </Link>
