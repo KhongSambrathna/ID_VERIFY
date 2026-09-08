@@ -34,6 +34,11 @@ export default function AdminDashboard() {
     load();
   };
 
+  const approve = async (id) => {
+    await api.put(`/athletes/${id}/approve`);
+    load();
+  };
+
   const remove = async (id) => {
     if (!confirm("Delete this athlete record?")) return;
     await api.delete(`/athletes/${id}`);
@@ -48,6 +53,8 @@ export default function AdminDashboard() {
           .filter(Boolean)
           .some((field) => field.toLowerCase().includes(q))
       );
+
+  const pendingCount = athletes.filter((a) => a.approvalStatus === "pending").length;
 
   return (
     <div className="container dash-body">
@@ -75,6 +82,13 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {pendingCount > 0 && (
+        <p className="help-text" style={{ color: "var(--navy)", fontWeight: 600 }}>
+          {pendingCount} record{pendingCount > 1 ? "s" : ""} pending approval — hidden from public search and QR
+          verify until approved.
+        </p>
+      )}
+
       <div className="field search-field">
         <input
           placeholder="Search by name, team, role, or ID…"
@@ -97,6 +111,7 @@ export default function AdminDashboard() {
                 <th>Team</th>
                 <th>Available</th>
                 <th>Status</th>
+                <th>Approval</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -115,6 +130,13 @@ export default function AdminDashboard() {
                   <td data-label="Status">
                     <span className={`badge ${a.status}`}>{a.status}</span>
                   </td>
+                  <td data-label="Approval">
+                    {a.approvalStatus === "pending" ? (
+                      <span className="badge rejected">Pending</span>
+                    ) : (
+                      <span className="badge verified">Approved</span>
+                    )}
+                  </td>
                   <td data-label="Actions" className="actions-cell">
                     <Link className="link-btn" to={`/admin/athlete/${a._id}`}>
                       View card
@@ -122,6 +144,11 @@ export default function AdminDashboard() {
                     <Link className="link-btn" to={`/admin/athlete/${a._id}/edit`}>
                       Edit
                     </Link>
+                    {a.approvalStatus === "pending" && (
+                      <button className="link-btn" onClick={() => approve(a._id)}>
+                        Approve
+                      </button>
+                    )}
                     {a.status !== "verified" ? (
                       <button className="link-btn" onClick={() => setStatus(a._id, "verified")}>
                         Verify
@@ -145,7 +172,7 @@ export default function AdminDashboard() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", color: "#777" }}>
+                  <td colSpan={8} style={{ textAlign: "center", color: "#777" }}>
                     {athletes.length === 0
                       ? "No athletes yet — add your first one."
                       : "No matches for your search."}

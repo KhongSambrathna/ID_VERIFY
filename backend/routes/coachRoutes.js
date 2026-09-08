@@ -27,7 +27,7 @@ function canAccessTeam(req, team) {
 router.get("/my-team", requireAuth, requireRole("HEAD_COACH"), async (req, res) => {
   try {
     const athletes = await Athlete.find({ team: req.adminTeam }).select(
-      "fullName khmerName dateOfBirth gender photoUrl team role verifyId _id isAvailable"
+      "fullName khmerName dateOfBirth gender photoUrl team role verifyId _id isAvailable approvalStatus"
     );
     res.json(athletes);
   } catch (err) {

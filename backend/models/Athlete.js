@@ -41,6 +41,18 @@ const athleteSchema = new mongoose.Schema(
       enum: ["unverified", "verified"],
       default: "unverified",
     },
+    approvalStatus: {
+      // Publishing gate for Head-Coach-submitted data. Records an Admin
+      // creates/edits stay "approved" (immediately public) as before. Any
+      // Add or Update made by a Head Coach flips this to "pending" — hidden
+      // from public search/verify — until an Admin reviews it and approves
+      // (PUT /api/athletes/:id/approve). This is separate from `status`
+      // above, which is the athlete's own ID-verification badge, not a
+      // data-publishing gate.
+      type: String,
+      enum: ["pending", "approved"],
+      default: "approved",
+    },
     qrCodeUrl: { type: String }, // Cloudinary secure_url of the generated QR code
     qrCodePublicId: { type: String }, // Cloudinary public_id of the QR code
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },

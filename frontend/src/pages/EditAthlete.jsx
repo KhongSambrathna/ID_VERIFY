@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import api from "../api/axios";
 import TeamSelect from "../components/TeamSelect";
 import { resolveFileUrl } from "../utils/fileUrl";
+import { useAuth } from "../context/AuthContext";
 
 function toDateInputValue(dob) {
   if (!dob) return "";
@@ -14,6 +15,7 @@ function toDateInputValue(dob) {
 export default function EditAthlete() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isHeadCoach } = useAuth();
 
   const [form, setForm] = useState(null); // null until the record loads
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState(null);
@@ -56,7 +58,7 @@ export default function EditAthlete() {
       await api.put(`/athletes/${id}`, data, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      navigate(`/admin/athlete/${id}`);
+      navigate(isHeadCoach ? "/coach" : `/admin/athlete/${id}`);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to save changes");
     } finally {
@@ -84,10 +86,18 @@ export default function EditAthlete() {
     <div className="container" style={{ paddingBottom: 60 }}>
       <div className="dash-header">
         <h2>Edit athlete</h2>
-        <Link to={`/admin/athlete/${id}`} className="link-btn">
-          ← Back to record
-        </Link>
+        {!isHeadCoach && (
+          <Link to={`/admin/athlete/${id}`} className="link-btn">
+            ← Back to record
+          </Link>
+        )}
       </div>
+      {isHeadCoach && (
+        <p className="help-text" style={{ maxWidth: 640 }}>
+          Saving changes sends this record back to <strong>Pending</strong> — an Admin needs to
+          re-approve it before it's public again.
+        </p>
+      )}
       <form className="card" style={{ maxWidth: 640 }} onSubmit={handleSubmit}>
         <div className="field">
           <label>Full name</label>
@@ -109,7 +119,14 @@ export default function EditAthlete() {
             <option value="other">Other</option>
           </select>
         </div>
-        <TeamSelect value={form.team} onChange={(team) => setForm({ ...form, team })} required />
+        {isHeadCoach ? (
+          <div className="field">
+            <label>Team</label>
+            <input value={form.team} disabled />
+          </div>
+        ) : (
+          <TeamSelect value={form.team} onChange={(team) => setForm({ ...form, team })} required />
+        )}
         <div className="field">
           <label>Role</label>
           <select value={form.role} onChange={update("role")}>

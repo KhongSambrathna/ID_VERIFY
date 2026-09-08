@@ -4,19 +4,33 @@ const generateShortId = require("../utils/generateShortId");
 const uploadBufferToCloudinary = require("../utils/uploadToCloudinary");
 const cloudinary = require("../config/cloudinary");
 
-// POST /api/athletes  (admin, multipart/form-data: photo, documents[])
+function toBool(value) {
+  if (typeof value === "boolean") return value;
+  return value === "true" || value === true;
+}
+
+// POST /api/athletes  (admin or head coach, multipart/form-data: photo, documents[])
+// A Head Coach can only register players for their own team, and whatever
+// they submit starts out as approvalStatus "pending" — hidden from public
+// search/verify — until an Admin approves it. Admin-created records stay
+// "approved" (the schema default), same as before this feature existed.
 exports.createAthlete = async (req, res) => {
   try {
+    const isHeadCoach = req.adminRole === "HEAD_COACH";
     const {
       fullName,
       khmerName,
       dateOfBirth,
       gender,
-      team,
       role,
       address,
       isAvailable,
     } = req.body;
+
+    const team = isHeadCoach ? req.adminTeam : req.body.team;
+    if (isHeadCoach && !team) {
+      return res.status(400).json({ message: "Your account has no team set — contact an admin" });
+    }
 
     const verifyId = await generateShortId();
 
@@ -30,6 +44,7 @@ exports.createAthlete = async (req, res) => {
       role,
       address,
       isAvailable: isAvailable === "false" ? false : true,
+      approvalStatus: isHeadCoach ? "pending" : "approved",
       createdBy: req.adminId,
     });
 
@@ -66,10 +81,13 @@ exports.createAthlete = async (req, res) => {
   }
 };
 
-// GET /api/athletes  (admin - list all, for the dashboard)
+// GET /api/athletes  (admin - list all, for the dashboard; head coach - only
+// their own team, regardless of any ?team= they pass, so they can't browse
+// other teams' rosters through this endpoint)
 exports.getAllAthletes = async (req, res) => {
   try {
-    const filter = req.query.team ? { team: req.query.team } : {};
+    const isHeadCoach = req.adminRole === "HEAD_COACH";
+    const filter = isHeadCoach ? { team: req.adminTeam } : req.query.team ? { team: req.query.team } : {};
     const athletes = await Athlete.find(filter).sort({ createdAt: -1 });
     res.json(athletes);
   } catch (err) {
@@ -77,11 +95,14 @@ exports.getAllAthletes = async (req, res) => {
   }
 };
 
-// GET /api/athletes/:id  (admin - single record for editing)
+// GET /api/athletes/:id  (admin - any record; head coach - only their own team's)
 exports.getAthleteById = async (req, res) => {
   try {
     const athlete = await Athlete.findById(req.params.id);
     if (!athlete) return res.status(404).json({ message: "Athlete not found" });
+    if (req.adminRole === "HEAD_COACH" && athlete.team !== req.adminTeam) {
+      return res.status(403).json({ message: "Access denied" });
+    }
     res.json(athlete);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -89,8 +110,10 @@ exports.getAthleteById = async (req, res) => {
 };
 
 // PUT /api/athletes/:id  (admin - full edit form, or a quick partial update
-// like { status } / { isAvailable } from the dashboard buttons)
-const EDITABLE_FIELDS = [
+// like { status } / { isAvailable } from the dashboard buttons; head coach -
+// only their own team's players, and cannot move a player to another team
+// or touch the ID-verification `status` badge — that stays admin-only)
+const ADMIN_EDITABLE_FIELDS = [
   "fullName",
   "khmerName",
   "dateOfBirth",
@@ -100,18 +123,20 @@ const EDITABLE_FIELDS = [
   "address",
   "status",
 ];
-
-function toBool(value) {
-  if (typeof value === "boolean") return value;
-  return value === "true" || value === true;
-}
+const HEAD_COACH_EDITABLE_FIELDS = ["fullName", "khmerName", "dateOfBirth", "gender", "role", "address"];
 
 exports.updateAthlete = async (req, res) => {
   try {
     const athlete = await Athlete.findById(req.params.id);
     if (!athlete) return res.status(404).json({ message: "Athlete not found" });
 
-    EDITABLE_FIELDS.forEach((field) => {
+    const isHeadCoach = req.adminRole === "HEAD_COACH";
+    if (isHeadCoach && athlete.team !== req.adminTeam) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const editableFields = isHeadCoach ? HEAD_COACH_EDITABLE_FIELDS : ADMIN_EDITABLE_FIELDS;
+    editableFields.forEach((field) => {
       if (req.body[field] !== undefined) athlete[field] = req.body[field];
     });
     if (req.body.isAvailable !== undefined) {
@@ -134,6 +159,14 @@ exports.updateAthlete = async (req, res) => {
       }
     }
 
+    // Any Head Coach edit — to an already-approved record or still a pending
+    // one — sends it back to "pending" for another Admin review before it's
+    // public again. Admin edits never touch approvalStatus; approving is its
+    // own explicit action (see approveAthlete below).
+    if (isHeadCoach) {
+      athlete.approvalStatus = "pending";
+    }
+
     await athlete.save();
     res.json(athlete);
   } catch (err) {
@@ -141,11 +174,30 @@ exports.updateAthlete = async (req, res) => {
   }
 };
 
-// DELETE /api/athletes/:id  (admin)
+// PUT /api/athletes/:id/approve  (admin only) — the explicit "make this
+// Head-Coach-submitted record public" action.
+exports.approveAthlete = async (req, res) => {
+  try {
+    const athlete = await Athlete.findById(req.params.id);
+    if (!athlete) return res.status(404).json({ message: "Athlete not found" });
+    athlete.approvalStatus = "approved";
+    await athlete.save();
+    res.json(athlete);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// DELETE /api/athletes/:id  (admin - any record; head coach - only their own team's)
 exports.deleteAthlete = async (req, res) => {
   try {
+    const existing = await Athlete.findById(req.params.id);
+    if (!existing) return res.status(404).json({ message: "Athlete not found" });
+    if (req.adminRole === "HEAD_COACH" && existing.team !== req.adminTeam) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
     const athlete = await Athlete.findByIdAndDelete(req.params.id);
-    if (!athlete) return res.status(404).json({ message: "Athlete not found" });
 
     // best-effort cleanup of the associated Cloudinary assets — failures here
     // shouldn't block the delete response, so just log them
@@ -175,11 +227,12 @@ exports.deleteAthlete = async (req, res) => {
   }
 };
 
-// GET /api/athletes/check-duplicate?fullName=...&khmerName=...  (admin) —
-// used by the Add-athlete form to warn before registering a player whose
-// name already exists, so the same person doesn't accidentally get a second
-// record. Not a hard block — two different people can share a name — so it
-// just returns whatever near-matches exist and lets the admin decide.
+// GET /api/athletes/check-duplicate?fullName=...&khmerName=...  (admin/head
+// coach) — used by the Add-athlete form to warn before registering a player
+// whose name already exists, so the same person doesn't accidentally get a
+// second record. Not a hard block — two different people can share a name —
+// so it just returns whatever near-matches exist and lets the caller decide.
+// A Head Coach only sees matches within their own team.
 exports.checkDuplicateName = async (req, res) => {
   try {
     const fullName = (req.query.fullName || "").trim();
@@ -193,6 +246,7 @@ exports.checkDuplicateName = async (req, res) => {
 
     const query = { $or: orClauses };
     if (req.query.excludeId) query._id = { $ne: req.query.excludeId };
+    if (req.adminRole === "HEAD_COACH") query.team = req.adminTeam;
 
     const duplicates = await Athlete.find(query)
       .select("fullName khmerName team role verifyId photoUrl")
@@ -207,6 +261,7 @@ exports.checkDuplicateName = async (req, res) => {
 // GET /api/athletes/search?q=...  (PUBLIC) — find a player by name or ID number,
 // for anyone whose QR scanner isn't cooperating. Only non-sensitive fields are
 // returned here; the fuller record still lives behind /verify/:verifyId.
+// Records still pending Admin approval never appear here.
 exports.searchAthletes = async (req, res) => {
   try {
     const q = (req.query.q || "").trim();
@@ -218,6 +273,7 @@ exports.searchAthletes = async (req, res) => {
     const pattern = new RegExp(escaped, "i");
 
     const athletes = await Athlete.find({
+      approvalStatus: "approved",
       $or: [{ fullName: pattern }, { khmerName: pattern }, { verifyId: pattern }],
     })
       .select("verifyId fullName khmerName team role status isAvailable photoUrl")
@@ -231,12 +287,17 @@ exports.searchAthletes = async (req, res) => {
 };
 
 // GET /api/athletes/verify/:verifyId  (PUBLIC - what the QR code scan opens)
+// A record pending Admin approval is treated as not-yet-public here too, so
+// scanning/printing a card before it's approved doesn't expose it.
 exports.verifyAthlete = async (req, res) => {
   try {
     const athlete = await Athlete.findOne({ verifyId: req.params.verifyId }).select(
-      "fullName khmerName dateOfBirth gender team role address status isAvailable photoUrl verifyId createdAt"
+      "fullName khmerName dateOfBirth gender team role address status isAvailable photoUrl verifyId approvalStatus createdAt"
     );
     if (!athlete) return res.status(404).json({ message: "No record found for this ID" });
+    if (athlete.approvalStatus === "pending") {
+      return res.status(404).json({ message: "This record is pending admin approval and isn't public yet" });
+    }
     res.json(athlete);
   } catch (err) {
     res.status(500).json({ message: err.message });

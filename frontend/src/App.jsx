@@ -40,7 +40,7 @@ export default function App() {
         <Route
           path="/admin/new"
           element={
-            <ProtectedRoute role="ADMIN">
+            <ProtectedRoute role={["ADMIN", "HEAD_COACH"]}>
               <AddAthlete />
             </ProtectedRoute>
           }
@@ -56,7 +56,7 @@ export default function App() {
         <Route
           path="/admin/athlete/:id/edit"
           element={
-            <ProtectedRoute role="ADMIN">
+            <ProtectedRoute role={["ADMIN", "HEAD_COACH"]}>
               <EditAthlete />
             </ProtectedRoute>
           }

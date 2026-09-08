@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { resolveFileUrl } from "../utils/fileUrl";
@@ -37,14 +38,30 @@ export default function CoachDashboard() {
     }
   };
 
+  const removeAthlete = async (id) => {
+    if (!confirm("Delete this athlete record?")) return;
+    try {
+      await api.delete(`/athletes/${id}`);
+      loadData();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete athlete");
+    }
+  };
+
   if (loading) return <div className="container"><p>Loading...</p></div>;
   if (error) return <div className="container"><p className="error-text">{error}</p></div>;
+
+  const pendingCount = athletes.filter((a) => a.approvalStatus === "pending").length;
 
   return (
     <div className="container dash-body">
       <div className="dash-header">
         <h2>Coach Dashboard</h2>
-        <p>Pull athletes already registered on your team into a match-day squad list or a pitch formation. Adding new athlete records is admin-only.</p>
+        <p>
+          Add, edit, and manage athletes on your own team. New records and edits go out as{" "}
+          <strong>Pending</strong> until an Admin approves them — they stay hidden from public search and the
+          QR verify page until then.
+        </p>
       </div>
 
       <div className="tabs">
@@ -71,7 +88,14 @@ export default function CoachDashboard() {
       {/* ATHLETES TAB */}
       {activeTab === "athletes" && (
         <div className="tab-content">
-          <h3>Available Athletes</h3>
+          <div className="dash-header" style={{ marginBottom: 12 }}>
+            <h3 style={{ margin: 0 }}>
+              My Team Athletes {pendingCount > 0 && `(${pendingCount} pending approval)`}
+            </h3>
+            <Link to="/admin/new" className="btn btn-primary">
+              + Add athlete
+            </Link>
+          </div>
           {athletes.length === 0 ? (
             <p>No athletes in your team yet.</p>
           ) : (
@@ -98,6 +122,17 @@ export default function CoachDashboard() {
                     <span className={`badge ${athlete.isAvailable ? "verified" : "rejected"}`}>
                       {athlete.isAvailable ? "Available" : "Not available"}
                     </span>
+                    {athlete.approvalStatus === "pending" && (
+                      <span className="badge rejected">Pending approval</span>
+                    )}
+                  </div>
+                  <div className="athlete-status" style={{ marginTop: 8 }}>
+                    <Link className="link-btn" to={`/admin/athlete/${athlete._id}/edit`}>
+                      Edit
+                    </Link>
+                    <button className="link-btn" onClick={() => removeAthlete(athlete._id)}>
+                      Delete
+                    </button>
                   </div>
                 </div>
               ))}

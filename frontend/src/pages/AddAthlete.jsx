@@ -3,14 +3,16 @@ import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import TeamSelect from "../components/TeamSelect";
 import { resolveFileUrl } from "../utils/fileUrl";
+import { useAuth } from "../context/AuthContext";
 
 export default function AddAthlete() {
+  const { isHeadCoach, team: coachTeam } = useAuth();
   const [form, setForm] = useState({
     fullName: "",
     khmerName: "",
     dateOfBirth: "",
     gender: "male",
-    team: "",
+    team: isHeadCoach ? coachTeam || "" : "",
     role: "PLAYER",
     address: "",
     isAvailable: "true",
@@ -76,7 +78,7 @@ export default function AddAthlete() {
       const { data: athlete } = await api.post("/athletes", data, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      navigate(`/admin/athlete/${athlete._id}`);
+      navigate(isHeadCoach ? "/coach" : `/admin/athlete/${athlete._id}`);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to save athlete");
     } finally {
@@ -89,6 +91,12 @@ export default function AddAthlete() {
       <div className="dash-header">
         <h2>Add athlete</h2>
       </div>
+      {isHeadCoach && (
+        <p className="help-text" style={{ maxWidth: 640 }}>
+          This player will be added as <strong>Pending</strong> — an Admin needs to approve the record
+          before it shows up in public search or the QR verify page.
+        </p>
+      )}
       <form className="card" style={{ maxWidth: 640 }} onSubmit={handleSubmit}>
         <div className="field">
           <label>Full name</label>
@@ -136,7 +144,14 @@ export default function AddAthlete() {
             <option value="other">Other</option>
           </select>
         </div>
-        <TeamSelect value={form.team} onChange={(team) => setForm({ ...form, team })} required />
+        {isHeadCoach ? (
+          <div className="field">
+            <label>Team</label>
+            <input value={form.team} disabled />
+          </div>
+        ) : (
+          <TeamSelect value={form.team} onChange={(team) => setForm({ ...form, team })} required />
+        )}
         <div className="field">
           <label>Role</label>
           <select value={form.role} onChange={update("role")}>
