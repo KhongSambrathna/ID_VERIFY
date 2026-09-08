@@ -8,6 +8,15 @@ const STATUS_LABEL = {
   unverified: { icon: "⏳", text: "Not yet verified", cls: "pending" },
 };
 
+function formatDob(dob) {
+  if (!dob) return null;
+  const d = new Date(dob);
+  if (isNaN(d)) return null;
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}-${mm}-${d.getFullYear()}`;
+}
+
 export default function VerifyPage() {
   const { verifyId } = useParams();
   const [athlete, setAthlete] = useState(null);
@@ -43,19 +52,42 @@ export default function VerifyPage() {
               alt={athlete.fullName}
             />
             <div className="status-icon">{STATUS_LABEL[athlete.status].icon}</div>
-            <h2>{athlete.fullName}</h2>
-            {athlete.khmerName && <p>{athlete.khmerName}</p>}
-            <p>
-              {athlete.team} {athlete.role && `· ${athlete.role}`}
+            <h2 style={{ marginBottom: 2 }}>{athlete.fullName}</h2>
+            {athlete.khmerName && <p style={{ margin: "0 0 4px" }}>{athlete.khmerName}</p>}
+            <p className="verify-id" style={{ margin: "0 0 10px" }}>
+              ID: {athlete.verifyId}
             </p>
-            {athlete.address && <p>{athlete.address}</p>}
+
             <span className={`badge ${STATUS_LABEL[athlete.status].cls}`}>
               {STATUS_LABEL[athlete.status].text}
             </span>
-            <div style={{ marginTop: 10 }}>
+            <div style={{ marginTop: 8, marginBottom: 18 }}>
               <span className={`badge ${athlete.isAvailable ? "verified" : "rejected"}`}>
                 {athlete.isAvailable ? "Available" : "Not available"}
               </span>
+            </div>
+
+            <div className="detail-grid" style={{ textAlign: "left" }}>
+              <div className="detail-item">
+                <div className="detail-label">Date of birth</div>
+                <div className="detail-value">{formatDob(athlete.dateOfBirth) || "—"}</div>
+              </div>
+              <div className="detail-item">
+                <div className="detail-label">Gender</div>
+                <div className="detail-value">{athlete.gender || "—"}</div>
+              </div>
+              <div className="detail-item">
+                <div className="detail-label">Team</div>
+                <div className="detail-value">{athlete.team || "—"}</div>
+              </div>
+              <div className="detail-item">
+                <div className="detail-label">Role</div>
+                <div className="detail-value">{athlete.role || "—"}</div>
+              </div>
+              <div className="detail-item detail-item-wide">
+                <div className="detail-label">Address</div>
+                <div className="detail-value">{athlete.address || "—"}</div>
+              </div>
             </div>
           </>
         )}

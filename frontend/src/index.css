@@ -765,6 +765,7 @@ table.athletes .actions-cell {
 }
 .verify-result {
   text-align: center;
+  max-width: 480px;
 }
 .verify-result .status-icon {
   font-size: 44px;
