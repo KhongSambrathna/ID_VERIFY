@@ -127,12 +127,16 @@ export default function IDCard({ athlete, hideActions }) {
             </div>
           </div>
 
-          {athlete.qrCodeUrl && (
-            <div className="id-card-qr-corner">
-              <img crossOrigin="anonymous" src={resolveFileUrl(athlete.qrCodeUrl)} alt="Verification QR code" />
-              <div className="scan-label">Scan</div>
-            </div>
-          )}
+          {/* Every card shares the same QR code — it points to the public
+              search page (id-verify-liart.vercel.app/search) instead of a
+              per-athlete verify link, since the old per-athlete QR depended
+              on PUBLIC_BASE_URL being set correctly and kept breaking.
+              Anyone who scans it can look the player up by name or by the
+              ID number printed above. */}
+          <div className="id-card-qr-corner">
+            <img src="/search-qr.png" alt="Scan to search for a player" />
+            <div className="scan-label">Scan</div>
+          </div>
         </div>
       </div>
     </div>
