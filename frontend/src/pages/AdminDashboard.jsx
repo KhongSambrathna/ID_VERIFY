@@ -110,6 +110,9 @@ export default function AdminDashboard() {
                     <Link className="link-btn" to={`/admin/athlete/${a._id}`}>
                       View card
                     </Link>
+                    <Link className="link-btn" to={`/admin/athlete/${a._id}/edit`}>
+                      Edit
+                    </Link>
                     {a.status !== "verified" ? (
                       <button className="link-btn" onClick={() => setStatus(a._id, "verified")}>
                         Verify

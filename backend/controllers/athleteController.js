@@ -87,14 +87,53 @@ exports.getAthleteById = async (req, res) => {
   }
 };
 
-// PUT /api/athletes/:id  (admin - update record, e.g. approve/reject)
+// PUT /api/athletes/:id  (admin - full edit form, or a quick partial update
+// like { status } / { isAvailable } from the dashboard buttons)
+const EDITABLE_FIELDS = [
+  "fullName",
+  "khmerName",
+  "dateOfBirth",
+  "gender",
+  "team",
+  "role",
+  "address",
+  "status",
+];
+
+function toBool(value) {
+  if (typeof value === "boolean") return value;
+  return value === "true" || value === true;
+}
+
 exports.updateAthlete = async (req, res) => {
   try {
-    const athlete = await Athlete.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+    const athlete = await Athlete.findById(req.params.id);
     if (!athlete) return res.status(404).json({ message: "Athlete not found" });
+
+    EDITABLE_FIELDS.forEach((field) => {
+      if (req.body[field] !== undefined) athlete[field] = req.body[field];
+    });
+    if (req.body.isAvailable !== undefined) {
+      athlete.isAvailable = toBool(req.body.isAvailable);
+    }
+
+    // Optional new photo (multipart edit form) — replaces the old one.
+    if (req.files?.photo?.[0]) {
+      const oldPhotoPublicId = athlete.photoPublicId;
+      const { url, publicId } = await uploadBufferToCloudinary(req.files.photo[0].buffer, {
+        folder: "athlete-verify/photos",
+        resourceType: "image",
+      });
+      athlete.photoUrl = url;
+      athlete.photoPublicId = publicId;
+      if (oldPhotoPublicId) {
+        cloudinary.uploader.destroy(oldPhotoPublicId).catch((err) =>
+          console.warn("Old photo cleanup failed:", err.message)
+        );
+      }
+    }
+
+    await athlete.save();
     res.json(athlete);
   } catch (err) {
     res.status(500).json({ message: err.message });

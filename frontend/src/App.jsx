@@ -5,6 +5,7 @@ import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import AdminDashboard from "./pages/AdminDashboard";
 import AddAthlete from "./pages/AddAthlete";
+import EditAthlete from "./pages/EditAthlete";
 import AthleteCardPage from "./pages/AthleteCardPage";
 import AllCardsPage from "./pages/AllCardsPage";
 import VerifyPage from "./pages/VerifyPage";
@@ -40,6 +41,14 @@ export default function App() {
           element={
             <ProtectedRoute role="ADMIN">
               <AthleteCardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/athlete/:id/edit"
+          element={
+            <ProtectedRoute role="ADMIN">
+              <EditAthlete />
             </ProtectedRoute>
           }
         />

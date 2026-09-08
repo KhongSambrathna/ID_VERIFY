@@ -114,6 +114,13 @@ export default function AthleteCardPage() {
             </div>
 
             <div className="dash-actions" style={{ marginTop: 20 }}>
+              <Link
+                to={`/admin/athlete/${athlete._id}/edit`}
+                className="btn btn-outline"
+                style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
+              >
+                Edit
+              </Link>
               <button className="btn btn-primary" onClick={() => window.print()}>
                 Export / Print card
               </button>

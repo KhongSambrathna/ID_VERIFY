@@ -28,7 +28,11 @@ router.post(
   ]),
   createAthlete
 );
-router.put("/:id", updateAthlete);
+router.put(
+  "/:id",
+  upload.fields([{ name: "photo", maxCount: 1 }]),
+  updateAthlete
+);
 router.delete("/:id", deleteAthlete);
 
 module.exports = router;
