@@ -6,14 +6,17 @@ const adminSchema = new mongoose.Schema(
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true }, // hashed
     role: {
+      // ADMIN can manage every athlete record and create/manage user logins.
+      // HEAD_COACH can only pull athletes already in their own `team` into
+      // lineups — they cannot add/edit/delete athlete records.
       type: String,
       enum: ["ADMIN", "HEAD_COACH"],
       default: "ADMIN",
     },
     team: {
-      // For HEAD_COACH: which team they manage
+      // required for HEAD_COACH accounts — which team's roster they can see.
+      // Should match the `team` value used on Athlete records.
       type: String,
-      default: null,
     },
   },
   { timestamps: true }

@@ -7,6 +7,7 @@ const connectDB = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
 const athleteRoutes = require("./routes/athleteRoutes");
 const coachRoutes = require("./routes/coachRoutes");
+const teamRoutes = require("./routes/teamRoutes");
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api/auth", authRoutes);
 app.use("/api/athletes", athleteRoutes);
 app.use("/api/coach", coachRoutes);
+app.use("/api/teams", teamRoutes);
 
 app.get("/", (req, res) => {
   res.send("Athlete Verification API is running");

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
+import TeamSelect from "../components/TeamSelect";
 
 export default function AddAthlete() {
   const [form, setForm] = useState({
@@ -68,10 +69,7 @@ export default function AddAthlete() {
             <option value="other">Other</option>
           </select>
         </div>
-        <div className="field">
-          <label>Team</label>
-          <input value={form.team} onChange={update("team")} />
-        </div>
+        <TeamSelect value={form.team} onChange={(team) => setForm({ ...form, team })} required />
         <div className="field">
           <label>Role</label>
           <select value={form.role} onChange={update("role")}>

@@ -11,28 +11,24 @@ const {
   verifyAthlete,
 } = require("../controllers/athleteController");
 
-// Public - this is what the QR code links to
+// Public - this is what the QR code links to. No login required.
 router.get("/verify/:verifyId", verifyAthlete);
 
-// Admin/Coach auth required below
-router.use(requireAuth);
+// Admin only, below this line — Head Coach accounts use /api/coach/* instead,
+// which is scoped to just their own team's roster.
+router.use(requireAuth, requireRole("ADMIN"));
 
 router.get("/", getAllAthletes);
 router.get("/:id", getAthleteById);
-
-// Only ADMIN can create athletes
 router.post(
   "/",
-  requireRole("ADMIN"),
   upload.fields([
     { name: "photo", maxCount: 1 },
     { name: "documents", maxCount: 10 },
   ]),
   createAthlete
 );
-
-// Only ADMIN can update/delete athletes
-router.put("/:id", requireRole("ADMIN"), updateAthlete);
-router.delete("/:id", requireRole("ADMIN"), deleteAthlete);
+router.put("/:id", updateAthlete);
+router.delete("/:id", deleteAthlete);
 
 module.exports = router;

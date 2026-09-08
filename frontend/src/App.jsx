@@ -8,6 +8,8 @@ import AddAthlete from "./pages/AddAthlete";
 import AthleteCardPage from "./pages/AthleteCardPage";
 import AllCardsPage from "./pages/AllCardsPage";
 import VerifyPage from "./pages/VerifyPage";
+import CoachDashboard from "./pages/CoachDashboard";
+import AdminUsers from "./pages/AdminUsers";
 
 export default function App() {
   return (
@@ -20,7 +22,7 @@ export default function App() {
         <Route
           path="/admin"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute role="ADMIN">
               <AdminDashboard />
             </ProtectedRoute>
           }
@@ -28,7 +30,7 @@ export default function App() {
         <Route
           path="/admin/new"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute role="ADMIN">
               <AddAthlete />
             </ProtectedRoute>
           }
@@ -36,7 +38,7 @@ export default function App() {
         <Route
           path="/admin/athlete/:id"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute role="ADMIN">
               <AthleteCardPage />
             </ProtectedRoute>
           }
@@ -44,8 +46,24 @@ export default function App() {
         <Route
           path="/admin/cards"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute role="ADMIN">
               <AllCardsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute role="ADMIN">
+              <AdminUsers />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/coach"
+          element={
+            <ProtectedRoute role="HEAD_COACH">
+              <CoachDashboard />
             </ProtectedRoute>
           }
         />

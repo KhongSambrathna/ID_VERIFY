@@ -2,7 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function Navbar() {
-  const { isAuthed, logout } = useAuth();
+  const { isAuthed, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -14,7 +14,8 @@ export default function Navbar() {
         <nav>
           {isAuthed ? (
             <>
-              <Link to="/admin">Dashboard</Link>
+              <Link to={isAdmin ? "/admin" : "/coach"}>Dashboard</Link>
+              {isAdmin && <Link to="/admin/users">Users</Link>}
               <a
                 href="#"
                 onClick={(e) => {

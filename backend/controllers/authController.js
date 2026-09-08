@@ -1,24 +1,47 @@
-const Admin = require("../models/Admin");
 const jwt = require("jsonwebtoken");
+const Admin = require("../models/Admin");
+
+function signToken(admin) {
+  return jwt.sign(
+    { id: admin._id, role: admin.role, team: admin.team || null },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+}
+
+function publicAdmin(admin) {
+  return {
+    id: admin._id,
+    username: admin.username,
+    role: admin.role,
+    team: admin.team || null,
+  };
+}
 
 // POST /api/auth/register
-// NOTE: After creating your first admin account, comment this out or add guard
+// Bootstrap-only: creates the very first admin account on a fresh database.
+// Once at least one account exists, this route refuses — further accounts
+// are created from the admin-only "create user" page (POST /api/auth/users).
 exports.register = async (req, res) => {
   try {
-    const { username, password, role, team } = req.body;
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ message: "Username and password required" });
+    }
 
-    const existingAdmin = await Admin.findOne({ username });
-    if (existingAdmin) return res.status(400).json({ message: "User already exists" });
+    const anyAdminExists = await Admin.exists({});
+    if (anyAdminExists) {
+      return res.status(403).json({
+        message: "An admin account already exists — sign in and create new users from the admin dashboard.",
+      });
+    }
 
-    const admin = new Admin({
-      username,
-      password,
-      role: role || "ADMIN",
-      team: team || null,
-    });
+    const exists = await Admin.findOne({ username });
+    if (exists) return res.status(409).json({ message: "Username already taken" });
 
-    await admin.save();
-    res.status(201).json({ message: "Admin created", username: admin.username });
+    const admin = await Admin.create({ username, password, role: "ADMIN" });
+    const token = signToken(admin);
+    res.status(201).json({ token, admin: publicAdmin(admin) });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -31,29 +54,65 @@ exports.login = async (req, res) => {
     const admin = await Admin.findOne({ username });
     if (!admin) return res.status(401).json({ message: "Invalid credentials" });
 
-    const isMatch = await admin.comparePassword(password);
-    if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
+    const match = await admin.comparePassword(password);
+    if (!match) return res.status(401).json({ message: "Invalid credentials" });
 
-    const token = jwt.sign(
-      {
-        id: admin._id,
-        username: admin.username,
-        role: admin.role,
-        team: admin.team,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = signToken(admin);
+    res.json({ token, admin: publicAdmin(admin) });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
 
-    res.json({
-      token,
-      admin: {
-        id: admin._id,
-        username: admin.username,
-        role: admin.role,
-        team: admin.team,
-      },
+// GET /api/auth/users  (admin only) — list every login account
+exports.listUsers = async (req, res) => {
+  try {
+    const users = await Admin.find().select("username role team createdAt").sort({ createdAt: -1 });
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// POST /api/auth/users  (admin only) — create a Head Coach or another Admin login
+exports.createUser = async (req, res) => {
+  try {
+    const { username, password, role, team } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ message: "Username and password required" });
+    }
+    if (role && !["ADMIN", "HEAD_COACH"].includes(role)) {
+      return res.status(400).json({ message: "Role must be ADMIN or HEAD_COACH" });
+    }
+    if (role === "HEAD_COACH" && !team) {
+      return res.status(400).json({ message: "Team is required for a Head Coach account" });
+    }
+
+    const exists = await Admin.findOne({ username });
+    if (exists) return res.status(409).json({ message: "Username already taken" });
+
+    const user = await Admin.create({
+      username,
+      password,
+      role: role || "ADMIN",
+      team: role === "HEAD_COACH" ? team : undefined,
     });
+
+    res.status(201).json(publicAdmin(user));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// DELETE /api/auth/users/:id  (admin only)
+exports.deleteUser = async (req, res) => {
+  try {
+    if (req.params.id === req.adminId) {
+      return res.status(400).json({ message: "You can't delete your own account while signed in" });
+    }
+    const user = await Admin.findByIdAndDelete(req.params.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json({ message: "User deleted" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

@@ -17,8 +17,8 @@ export default function Login() {
     setLoading(true);
     try {
       const { data } = await api.post("/auth/login", { username, password });
-      login(data.token);
-      navigate("/admin");
+      login(data.token, data.admin);
+      navigate(data.admin?.role === "HEAD_COACH" ? "/coach" : "/admin");
     } catch (err) {
       setError(err.response?.data?.message || "Login failed");
     } finally {
@@ -29,7 +29,7 @@ export default function Login() {
   return (
     <div className="auth-wrap">
       <form className="card" onSubmit={handleSubmit}>
-        <h2>Admin sign in</h2>
+        <h2>Sign in</h2>
         <div className="field">
           <label>Username</label>
           <input value={username} onChange={(e) => setUsername(e.target.value)} required />
@@ -48,8 +48,8 @@ export default function Login() {
           {loading ? "Signing in…" : "Sign in"}
         </button>
         <p className="help-text">
-          No admin account yet? Create one via <code>POST /api/auth/register</code>
-          (see README) — then remove or protect that route.
+          Head coaches sign in here too — use the username and password your
+          admin created for you.
         </p>
       </form>
     </div>

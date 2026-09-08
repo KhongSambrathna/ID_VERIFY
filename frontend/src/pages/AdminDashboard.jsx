@@ -54,6 +54,9 @@ export default function AdminDashboard() {
       <div className="dash-header">
         <h2>Athlete records</h2>
         <div className="dash-actions">
+          <Link to="/admin/users" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
+            Manage users
+          </Link>
           <Link to="/admin/cards" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
             Export all cards
           </Link>

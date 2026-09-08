@@ -239,6 +239,24 @@ a {
   color: #666;
   margin-top: 6px;
 }
+.inline-add-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.inline-add-row input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 14.5px;
+  font-family: var(--font-body);
+  background: #fdfdfb;
+}
+.inline-add-row .btn {
+  padding: 10px 16px;
+  white-space: nowrap;
+}
 
 /* ---------- Dashboard ---------- */
 .dash-header {
@@ -488,6 +506,63 @@ table.athletes .actions-cell {
   display: block;
 }
 
+/* ---------- Plain athlete detail view (View page) ---------- */
+/* Shows the record as normal data — the branded card only appears when
+   exporting (print or Save as JPG), via .card-export-target below. */
+.athlete-detail {
+  max-width: 640px;
+}
+.athlete-detail-top {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+.athlete-detail-photo {
+  width: 96px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #eee;
+  flex-shrink: 0;
+}
+.athlete-detail-badges {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 24px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.detail-item-wide {
+  grid-column: 1 / -1;
+}
+.detail-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #8a8a8a;
+  margin-bottom: 2px;
+}
+.detail-value {
+  font-size: 15px;
+  color: var(--ink);
+}
+
+/* Off-canvas but fully rendered (needed so print + html2canvas can still
+   use it) — moved back on-page only for print media, below. */
+.card-export-target {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+}
+
 @media print {
   @page {
     size: A4;
@@ -502,6 +577,9 @@ table.athletes .actions-cell {
     padding: 0;
     max-width: none;
     margin: 0;
+  }
+  .card-export-target {
+    position: static;
   }
   .cards-grid {
     display: flex;
@@ -615,6 +693,15 @@ table.athletes .actions-cell {
     width: 100%;
   }
 
+  .athlete-detail-top {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
   /* Stack the athletes table into cards instead of a horizontal-scroll grid */
   table.athletes thead {
     display: none;
@@ -661,4 +748,221 @@ table.athletes .actions-cell {
   table.athletes td.actions-cell .link-btn {
     margin-right: 0;
   }
+
+  .athletes-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ---------- Coach dashboard ---------- */
+.tab-content > p:first-of-type {
+  color: #666;
+}
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 22px;
+}
+.tab-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 10px 18px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: #777;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tab-btn.active {
+  color: var(--navy);
+  border-bottom-color: var(--gold);
+}
+
+.athletes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
+}
+.athlete-card {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 14px;
+  text-align: center;
+}
+.athlete-card .athlete-photo {
+  width: 84px;
+  height: 84px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #eee;
+  margin-bottom: 8px;
+}
+.athlete-card h4 {
+  font-size: 15px;
+  margin-bottom: 2px;
+}
+.athlete-card .khmer-name {
+  font-family: var(--font-khmer-body);
+  font-size: 13px;
+  color: #555;
+  margin: 0 0 4px;
+}
+.athlete-card .role {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--navy);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin: 0 0 2px;
+}
+.athlete-card .verify-id,
+.athlete-card .athlete-meta {
+  font-size: 12px;
+  color: #777;
+  margin: 0 0 6px;
+}
+.athlete-card .athlete-status {
+  margin-top: 6px;
+}
+
+.lineup-header,
+.lineup-header-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.lineup-header-card h4 {
+  margin: 0;
+}
+.lineup-form {
+  max-width: 560px;
+  margin-bottom: 24px;
+}
+.selected-count {
+  font-size: 13.5px;
+  color: #666;
+  margin-bottom: 8px;
+}
+.athletes-select {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 8px;
+  margin-bottom: 16px;
+  background: #fdfdfb;
+}
+.athlete-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.athlete-checkbox:hover {
+  background: var(--cream);
+}
+.athlete-checkbox input {
+  margin-right: 6px;
+}
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.small-photo {
+  width: 30px;
+  height: 30px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #eee;
+}
+.form-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.btn-danger {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 13.5px;
+  border: 1px solid var(--bad);
+  background: transparent;
+  color: var(--bad);
+  cursor: pointer;
+}
+.btn-danger:hover {
+  background: #f3d9d4;
+}
+
+.lineups-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.lineup-card {
+  max-width: none;
+}
+.lineup-count {
+  font-size: 13px;
+  color: #777;
+  margin: 0 0 12px;
+}
+.lineup-athletes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lineup-athlete {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lineup-athlete .number {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--gold);
+  width: 20px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.tiny-photo {
+  width: 34px;
+  height: 34px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #eee;
+  flex-shrink: 0;
+}
+.athlete-info .name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.athlete-info .role {
+  margin: 0;
+  font-size: 12.5px;
+  color: #777;
+}
+.lineup-notes {
+  margin-top: 12px;
+  font-size: 13.5px;
+  color: #555;
 }
