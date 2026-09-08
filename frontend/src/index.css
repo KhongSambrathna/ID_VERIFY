@@ -999,6 +999,37 @@ table.athletes .actions-cell {
     border-bottom: none;
   }
 
+  /* Shop storefront — force 2 columns instead of the 1 huge column
+     auto-fill would otherwise produce at phone widths, and shrink the
+     card content to match. */
+  .shop-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding: 14px 0 40px;
+  }
+  .shop-card-body {
+    padding: 10px 10px 12px;
+    gap: 6px;
+  }
+  .shop-card-name {
+    font-size: 13px;
+    line-height: 1.3;
+  }
+  .shop-card-price {
+    font-size: 14px;
+  }
+  .shop-order-btn {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+  .shop-header {
+    padding: 24px 0 6px;
+  }
+  .shop-card .badge {
+    font-size: 11px;
+    padding: 2px 8px;
+  }
+
   .hero {
     padding: 50px 0 60px;
     text-align: center;
@@ -1375,14 +1406,19 @@ table.athletes .actions-cell {
 }
 .squad-export-grid {
   display: grid;
+  /* Always 2 players per row — this sheet is only ever rendered off-canvas
+     at a fixed 760px width (see .squad-export-sheet) for html2canvas/jsPDF
+     to capture, never shown responsively on screen, so it must NOT collapse
+     to 1 column under a mobile-viewport media query (that previously made
+     exports taken from a phone come out one-player-per-row). */
   grid-template-columns: 1fr 1fr;
-  gap: 10px 20px;
+  gap: 12px 20px;
 }
 .squad-export-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px;
+  gap: 12px;
+  padding: 10px;
   border: 1px solid var(--line);
   border-radius: 6px;
   break-inside: avoid;
@@ -1396,8 +1432,8 @@ table.athletes .actions-cell {
   text-align: right;
 }
 .squad-export-photo {
-  width: 46px;
-  height: 46px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   object-fit: cover;
   border: 1px solid var(--line);
@@ -1424,11 +1460,68 @@ table.athletes .actions-cell {
   color: #777;
 }
 
-/* ---------- Match day: pitch formation board ---------- */
+/* ---------- Match day: formation poster ---------- */
+/* The whole card — crest/title header, pitch, footer — is what "Save as
+   JPG" captures, so it reads as a finished poster rather than a bare
+   green rectangle. */
+.formation-poster {
+  max-width: 640px;
+  margin: 0 auto;
+  background: var(--navy-deep);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
+}
+.formation-poster-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px 10px;
+}
+.formation-poster-crest {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.formation-poster-titles {
+  min-width: 0;
+}
+.formation-poster-club {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.formation-poster-team {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+}
+.formation-poster-subtitle {
+  padding: 0 18px 14px;
+  margin: -2px 0 0;
+  color: #c3cbdb;
+  font-size: 13.5px;
+}
+.formation-poster-footer {
+  padding: 10px 18px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8e9bb0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 .pitch-board {
   position: relative;
   width: 100%;
-  max-width: 640px;
   aspect-ratio: 68 / 100;
   background: repeating-linear-gradient(
     to bottom,
@@ -1437,12 +1530,18 @@ table.athletes .actions-cell {
     #2a7339 40px,
     #2a7339 80px
   );
-  border: 3px solid #ffffff;
-  border-radius: 4px;
   overflow: hidden;
-  margin: 0 auto;
   user-select: none;
   touch-action: none;
+}
+/* Soft vignette for depth — sits above the turf, below the player tokens. */
+.pitch-board::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 42%, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.22) 100%);
+  pointer-events: none;
+  z-index: 1;
 }
 .pitch-halfway-line {
   position: absolute;
@@ -1461,6 +1560,21 @@ table.athletes .actions-cell {
   border: 2px solid rgba(255, 255, 255, 0.85);
   border-radius: 50%;
   transform: translate(-50%, -50%);
+}
+.pitch-spot {
+  position: absolute;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  transform: translateX(-50%);
+}
+.pitch-spot-top {
+  top: 11%;
+}
+.pitch-spot-bottom {
+  bottom: 11%;
 }
 .pitch-box {
   position: absolute;
@@ -1502,20 +1616,43 @@ table.athletes .actions-cell {
   align-items: center;
   gap: 3px;
   cursor: grab;
-  width: 74px;
+  width: 76px;
+  z-index: 2;
 }
 .pitch-token:active {
   cursor: grabbing;
 }
+.pitch-token-photo-wrap {
+  position: relative;
+  display: inline-flex;
+}
 .pitch-token img {
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid #fff;
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
   background: #ddd;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
   pointer-events: none;
+}
+.pitch-token-num {
+  position: absolute;
+  bottom: -2px;
+  right: -4px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--gold);
+  color: var(--navy-deep);
+  font-size: 9.5px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #fff;
 }
 .pitch-token-name {
   font-size: 11px;
@@ -1523,17 +1660,14 @@ table.athletes .actions-cell {
   color: #fff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
   text-align: center;
-  line-height: 1.15;
-  max-width: 74px;
+  line-height: 1.3;
+  max-width: 76px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-@media (max-width: 640px) {
-  .squad-export-grid {
-    grid-template-columns: 1fr;
-  }
+  background: rgba(10, 24, 48, 0.55);
+  padding: 1px 6px;
+  border-radius: 8px;
 }
 
 /* ---------- Admin: Trusted-by logo manager ---------- */

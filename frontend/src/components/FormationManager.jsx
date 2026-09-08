@@ -3,7 +3,7 @@ import html2canvas from "html2canvas";
 import api from "../api/axios";
 import { resolveFileUrl } from "../utils/fileUrl";
 
-function PlayerToken({ item, onDrag }) {
+function PlayerToken({ item, index, onDrag }) {
   const a = item.athleteId;
   const tokenRef = useRef(null);
 
@@ -49,28 +49,51 @@ function PlayerToken({ item, onDrag }) {
       onMouseDown={handlePointerDown}
       onTouchStart={handlePointerDown}
     >
-      <img
-        src={a.photoUrl ? resolveFileUrl(a.photoUrl) : "https://placehold.co/60x60?text=Photo"}
-        alt={a.fullName}
-        draggable={false}
-      />
+      <span className="pitch-token-photo-wrap">
+        <img
+          src={a.photoUrl ? resolveFileUrl(a.photoUrl) : "https://placehold.co/60x60?text=Photo"}
+          alt={a.fullName}
+          draggable={false}
+        />
+        <span className="pitch-token-num">{index}</span>
+      </span>
       <span className="pitch-token-name">{a.fullName}</span>
     </div>
   );
 }
 
-function PitchBoard({ boardRef, positions, onDrag }) {
+// The whole poster — club crest/title header, the pitch itself, and a
+// footer strip — captured together by html2canvas so "Save as JPG" produces
+// something postable, not just a bare green rectangle.
+function PitchBoard({ boardRef, posterRef, team, formationName, positions, onDrag }) {
   return (
-    <div className="pitch-board" ref={boardRef}>
-      <div className="pitch-halfway-line" />
-      <div className="pitch-center-circle" />
-      <div className="pitch-box pitch-box-top" />
-      <div className="pitch-box pitch-box-bottom" />
-      <div className="pitch-goal pitch-goal-top" />
-      <div className="pitch-goal pitch-goal-bottom" />
-      {positions.map((item) =>
-        item.athleteId ? <PlayerToken key={item.athleteId._id} item={item} onDrag={onDrag} /> : null
-      )}
+    <div className="formation-poster" ref={posterRef}>
+      <div className="formation-poster-header">
+        <img src="/icon-192.png" alt="" className="formation-poster-crest" />
+        <div className="formation-poster-titles">
+          <div className="formation-poster-club">Countryside Football</div>
+          <div className="formation-poster-team">{team}</div>
+        </div>
+      </div>
+      {formationName && <div className="formation-poster-subtitle">{formationName}</div>}
+
+      <div className="pitch-board" ref={boardRef}>
+        <div className="pitch-halfway-line" />
+        <div className="pitch-center-circle" />
+        <div className="pitch-spot pitch-spot-top" />
+        <div className="pitch-spot pitch-spot-bottom" />
+        <div className="pitch-box pitch-box-top" />
+        <div className="pitch-box pitch-box-bottom" />
+        <div className="pitch-goal pitch-goal-top" />
+        <div className="pitch-goal pitch-goal-bottom" />
+        {positions.map((item, idx) =>
+          item.athleteId ? (
+            <PlayerToken key={item.athleteId._id} item={item} index={idx + 1} onDrag={onDrag} />
+          ) : null
+        )}
+      </div>
+
+      <div className="formation-poster-footer">Countryside Football ID Verify</div>
     </div>
   );
 }
@@ -88,6 +111,7 @@ export default function FormationManager({ team, athletes }) {
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const boardRef = useRef(null);
+  const posterRef = useRef(null);
 
   const players = athletes.filter((a) => (a.role || "PLAYER") === "PLAYER");
 
@@ -198,14 +222,16 @@ export default function FormationManager({ team, athletes }) {
     }
   };
 
+  // Captures the whole poster (header + pitch + footer), not just the pitch
+  // itself, so the JPG is ready to post as-is.
   const exportJpg = async () => {
-    if (!boardRef.current) return;
+    if (!posterRef.current) return;
     setExporting(true);
     try {
-      const canvas = await html2canvas(boardRef.current, {
+      const canvas = await html2canvas(posterRef.current, {
         useCORS: true,
         scale: 2,
-        backgroundColor: "#2c7a3f",
+        backgroundColor: "#0a1830",
       });
       const link = document.createElement("a");
       link.download = `${formationName || "formation"}.jpg`;
@@ -277,7 +303,14 @@ export default function FormationManager({ team, athletes }) {
         <p className="help-text" style={{ marginBottom: 10 }}>
           Drag any player to move them on the pitch.
         </p>
-        <PitchBoard boardRef={boardRef} positions={positions} onDrag={handleDrag} />
+        <PitchBoard
+          boardRef={boardRef}
+          posterRef={posterRef}
+          team={team}
+          formationName={formationName}
+          positions={positions}
+          onDrag={handleDrag}
+        />
       </div>
     );
   }

@@ -22,6 +22,7 @@ export default function ShopPage() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     api
@@ -31,6 +32,9 @@ export default function ShopPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const q = search.trim().toLowerCase();
+  const filtered = !q ? products : products.filter((p) => p.name.toLowerCase().includes(q));
+
   return (
     <div className="container">
       <div className="shop-header">
@@ -38,12 +42,20 @@ export default function ShopPage() {
         <p>Browse our sports equipment. Tap "Order" to message us on Telegram and we'll take it from there.</p>
       </div>
 
+      <div className="field search-field">
+        <input
+          placeholder="Search products…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
       {loading && <p>Loading…</p>}
       {error && <p className="error-text">{error}</p>}
 
       {!loading && !error && (
         <div className="shop-grid">
-          {products.map((p) => {
+          {filtered.map((p) => {
             const badge = stockBadge(p.stock);
             const outOfStock = p.stock <= 0;
             return (
@@ -70,7 +82,11 @@ export default function ShopPage() {
               </div>
             );
           })}
-          {products.length === 0 && <p className="shop-empty">No products yet — check back soon.</p>}
+          {filtered.length === 0 && (
+            <p className="shop-empty">
+              {products.length === 0 ? "No products yet — check back soon." : "No products match your search."}
+            </p>
+          )}
         </div>
       )}
     </div>
