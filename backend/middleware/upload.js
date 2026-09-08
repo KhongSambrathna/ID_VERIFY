@@ -10,7 +10,15 @@ const fileFilter = (req, file, cb) => {
   const allowed = /jpeg|jpg|png|webp|pdf/;
   const ext = allowed.test(path.extname(file.originalname).toLowerCase());
   if (ext) return cb(null, true);
-  cb(new Error("Only image and PDF files are allowed"));
+  // Marked as a 400 (bad request) rather than left to default to a 500 —
+  // the server.js error handler uses this to send back a clean JSON
+  // message instead of crashing with an HTML error page. iPhone photos
+  // saved as .heic/.heif will also hit this — ask the user to pick
+  // "Most Compatible" format in their phone's camera settings, or convert
+  // to JPG before uploading.
+  const err = new Error("Only JPG, PNG, WEBP, or PDF files are allowed");
+  err.status = 400;
+  cb(err);
 };
 
 const upload = multer({

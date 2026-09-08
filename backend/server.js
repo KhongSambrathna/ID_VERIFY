@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const multer = require("multer");
 const connectDB = require("./config/db");
 
 const authRoutes = require("./routes/authRoutes");
@@ -29,6 +30,23 @@ app.use("/api/sponsors", sponsorRoutes);
 
 app.get("/", (req, res) => {
   res.send("Athlete Verification API is running");
+});
+
+// Centralized error handler — must be registered last, after every route.
+// Without this, an error thrown in a route or middleware (e.g. multer's
+// fileFilter rejecting a bad file type, or a file over the 10MB limit)
+// fell through to Express's default handler: an HTML error page the
+// frontend can't parse as JSON (so the user only ever saw a generic
+// "Failed to save athlete"), plus a scary stack trace dumped to this
+// console. Now the real reason reaches the browser as clean JSON.
+app.use((err, req, res, next) => {
+  if (!err) return next();
+  if (err instanceof multer.MulterError) {
+    // e.g. "File too large" when a photo/document is over the 10MB cap
+    return res.status(400).json({ message: err.message });
+  }
+  console.error(err.stack || err.message);
+  res.status(err.status || 500).json({ message: err.message || "Something went wrong" });
 });
 
 const PORT = process.env.PORT || 5000;
