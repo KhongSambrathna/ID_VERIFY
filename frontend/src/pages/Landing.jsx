@@ -1,3 +1,5 @@
+import TrustedBy from "../components/TrustedBy";
+
 export default function Landing() {
   return (
     <>
@@ -23,6 +25,8 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      <TrustedBy />
 
       <section className="features" id="how">
         <div className="container">

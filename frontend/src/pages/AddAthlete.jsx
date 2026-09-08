@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import TeamSelect from "../components/TeamSelect";
+import { resolveFileUrl } from "../utils/fileUrl";
 
 export default function AddAthlete() {
   const [form, setForm] = useState({
@@ -20,11 +21,51 @@ export default function AddAthlete() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Warn (don't block) when a player with the same name is already
+  // registered — the same name could still belong to two different people,
+  // so this just surfaces the possible duplicate instead of preventing it.
+  const [duplicates, setDuplicates] = useState([]);
+  const [checkingDuplicate, setCheckingDuplicate] = useState(false);
+
   const update = (key) => (e) => setForm({ ...form, [key]: e.target.value });
+
+  useEffect(() => {
+    const fullName = form.fullName.trim();
+    const khmerName = form.khmerName.trim();
+    if (!fullName && !khmerName) {
+      setDuplicates([]);
+      return;
+    }
+
+    setCheckingDuplicate(true);
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await api.get("/athletes/check-duplicate", {
+          params: { fullName, khmerName },
+        });
+        setDuplicates(data.duplicates || []);
+      } catch {
+        // best-effort — a failed check shouldn't block registration
+      } finally {
+        setCheckingDuplicate(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [form.fullName, form.khmerName]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    if (duplicates.length > 0) {
+      const names = duplicates.map((d) => `${d.fullName}${d.team ? ` (${d.team})` : ""}`).join(", ");
+      const proceed = confirm(
+        `A player with this name is already registered: ${names}.\n\nRegister this as a new, separate player anyway?`
+      );
+      if (!proceed) return;
+    }
+
     setLoading(true);
     try {
       const data = new FormData();
@@ -57,6 +98,32 @@ export default function AddAthlete() {
           <label>Khmer name</label>
           <input value={form.khmerName} onChange={update("khmerName")} />
         </div>
+
+        {checkingDuplicate && <p className="help-text">Checking for existing players with this name…</p>}
+        {!checkingDuplicate && duplicates.length > 0 && (
+          <div className="duplicate-warning">
+            <p className="duplicate-warning-title">⚠ Possible duplicate — already registered:</p>
+            {duplicates.map((d) => (
+              <div key={d._id} className="duplicate-warning-row">
+                <img
+                  src={d.photoUrl ? resolveFileUrl(d.photoUrl) : "https://placehold.co/40x40?text=?"}
+                  alt={d.fullName}
+                />
+                <div>
+                  <p className="name">
+                    {d.fullName}
+                    {d.khmerName ? ` · ${d.khmerName}` : ""}
+                  </p>
+                  <p className="meta">
+                    {d.team || "—"} {d.role ? `· ${d.role}` : ""} · ID {d.verifyId}
+                  </p>
+                </div>
+              </div>
+            ))}
+            <p className="help-text">You can still save — this is just a heads-up, not a block.</p>
+          </div>
+        )}
+
         <div className="field">
           <label>Date of birth</label>
           <input type="date" value={form.dateOfBirth} onChange={update("dateOfBirth")} />

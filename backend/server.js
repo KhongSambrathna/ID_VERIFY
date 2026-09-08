@@ -8,6 +8,7 @@ const authRoutes = require("./routes/authRoutes");
 const athleteRoutes = require("./routes/athleteRoutes");
 const coachRoutes = require("./routes/coachRoutes");
 const teamRoutes = require("./routes/teamRoutes");
+const sponsorRoutes = require("./routes/sponsorRoutes");
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/athletes", athleteRoutes);
 app.use("/api/coach", coachRoutes);
 app.use("/api/teams", teamRoutes);
+app.use("/api/sponsors", sponsorRoutes);
 
 app.get("/", (req, res) => {
   res.send("Athlete Verification API is running");

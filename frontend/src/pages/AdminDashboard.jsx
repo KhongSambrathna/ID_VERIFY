@@ -57,6 +57,9 @@ export default function AdminDashboard() {
           <Link to="/admin/users" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
             Manage users
           </Link>
+          <Link to="/admin/sponsors" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
+            Trusted by logos
+          </Link>
           <Link to="/admin/cards" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
             Export all cards
           </Link>

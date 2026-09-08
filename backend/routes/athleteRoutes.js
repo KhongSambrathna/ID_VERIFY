@@ -10,6 +10,7 @@ const {
   deleteAthlete,
   verifyAthlete,
   searchAthletes,
+  checkDuplicateName,
 } = require("../controllers/athleteController");
 
 // Public - this is what the QR code links to. No login required.
@@ -22,6 +23,8 @@ router.get("/search", searchAthletes);
 router.use(requireAuth, requireRole("ADMIN"));
 
 router.get("/", getAllAthletes);
+// must stay above /:id — otherwise "check-duplicate" gets swallowed as an :id
+router.get("/check-duplicate", checkDuplicateName);
 router.get("/:id", getAthleteById);
 router.post(
   "/",

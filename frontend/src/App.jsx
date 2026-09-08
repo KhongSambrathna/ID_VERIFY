@@ -10,8 +10,10 @@ import AthleteCardPage from "./pages/AthleteCardPage";
 import AllCardsPage from "./pages/AllCardsPage";
 import VerifyPage from "./pages/VerifyPage";
 import SearchPage from "./pages/SearchPage";
+import AboutUs from "./pages/AboutUs";
 import CoachDashboard from "./pages/CoachDashboard";
 import AdminUsers from "./pages/AdminUsers";
+import AdminSponsors from "./pages/AdminSponsors";
 
 export default function App() {
   return (
@@ -22,6 +24,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/verify/:verifyId" element={<VerifyPage />} />
         <Route path="/search" element={<SearchPage />} />
+        <Route path="/about" element={<AboutUs />} />
         <Route
           path="/admin"
           element={
@@ -67,6 +70,14 @@ export default function App() {
           element={
             <ProtectedRoute role="ADMIN">
               <AdminUsers />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/sponsors"
+          element={
+            <ProtectedRoute role="ADMIN">
+              <AdminSponsors />
             </ProtectedRoute>
           }
         />

@@ -174,6 +174,35 @@ exports.deleteAthlete = async (req, res) => {
   }
 };
 
+// GET /api/athletes/check-duplicate?fullName=...&khmerName=...  (admin) —
+// used by the Add-athlete form to warn before registering a player whose
+// name already exists, so the same person doesn't accidentally get a second
+// record. Not a hard block — two different people can share a name — so it
+// just returns whatever near-matches exist and lets the admin decide.
+exports.checkDuplicateName = async (req, res) => {
+  try {
+    const fullName = (req.query.fullName || "").trim();
+    const khmerName = (req.query.khmerName || "").trim();
+    if (!fullName && !khmerName) return res.json({ duplicates: [] });
+
+    const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const orClauses = [];
+    if (fullName) orClauses.push({ fullName: new RegExp(`^${escape(fullName)}$`, "i") });
+    if (khmerName) orClauses.push({ khmerName: new RegExp(`^${escape(khmerName)}$`, "i") });
+
+    const query = { $or: orClauses };
+    if (req.query.excludeId) query._id = { $ne: req.query.excludeId };
+
+    const duplicates = await Athlete.find(query)
+      .select("fullName khmerName team role verifyId photoUrl")
+      .limit(5);
+
+    res.json({ duplicates });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // GET /api/athletes/search?q=...  (PUBLIC) — find a player by name or ID number,
 // for anyone whose QR scanner isn't cooperating. Only non-sensitive fields are
 // returned here; the fuller record still lives behind /verify/:verifyId.
