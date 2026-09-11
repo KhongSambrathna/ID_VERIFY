@@ -3,6 +3,7 @@ import api from "../api/axios";
 import TeamSelect from "../components/TeamSelect";
 import SquadListManager from "../components/SquadListManager";
 import FormationManager from "../components/FormationManager";
+import StartingXIManager from "../components/StartingXIManager";
 
 export default function AdminMatchDay() {
   const [team, setTeam] = useState("");
@@ -31,7 +32,7 @@ export default function AdminMatchDay() {
     <div className="container dash-body">
       <div className="dash-header">
         <h2>Match day</h2>
-        <p>Build a match squad list (15–22 people, exportable as PDF/JPG) or lay out a pitch formation for any team.</p>
+        <p>Build a match squad list (15–22 people, exportable as PDF/JPG), lay out a pitch formation, or announce a Starting XI — for any team.</p>
       </div>
 
       <div style={{ maxWidth: 360, marginBottom: 20 }}>
@@ -55,6 +56,12 @@ export default function AdminMatchDay() {
             >
               Formation
             </button>
+            <button
+              className={`tab-btn ${activeTab === "startingxi" ? "active" : ""}`}
+              onClick={() => setActiveTab("startingxi")}
+            >
+              Starting XI
+            </button>
           </div>
 
           {loading && <p>Loading roster…</p>}
@@ -64,6 +71,7 @@ export default function AdminMatchDay() {
             <div className="tab-content">
               {activeTab === "lineups" && <SquadListManager team={team} athletes={athletes} />}
               {activeTab === "formations" && <FormationManager team={team} athletes={athletes} />}
+              {activeTab === "startingxi" && <StartingXIManager team={team} />}
             </div>
           )}
         </>

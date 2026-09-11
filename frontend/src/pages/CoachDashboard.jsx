@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { resolveFileUrl } from "../utils/fileUrl";
 import SquadListManager from "../components/SquadListManager";
 import FormationManager from "../components/FormationManager";
+import StartingXIManager from "../components/StartingXIManager";
 
 function formatDob(dob) {
   if (!dob) return null;
@@ -83,6 +84,12 @@ export default function CoachDashboard() {
         >
           Formation
         </button>
+        <button
+          className={`tab-btn ${activeTab === "startingxi" ? "active" : ""}`}
+          onClick={() => setActiveTab("startingxi")}
+        >
+          Starting XI
+        </button>
       </div>
 
       {/* ATHLETES TAB */}
@@ -152,6 +159,13 @@ export default function CoachDashboard() {
       {activeTab === "formations" && (
         <div className="tab-content">
           <FormationManager team={team} athletes={athletes} />
+        </div>
+      )}
+
+      {/* STARTING XI TAB */}
+      {activeTab === "startingxi" && (
+        <div className="tab-content">
+          <StartingXIManager team={team} />
         </div>
       )}
     </div>

@@ -1462,8 +1462,10 @@ table.athletes .actions-cell {
 
 /* ---------- Match day: formation poster ---------- */
 /* The whole card — crest/title header, pitch, footer — is what "Save as
-   JPG" captures, so it reads as a finished poster rather than a bare
-   green rectangle. */
+   JPG" captures, so it reads as a finished "combined XI" style graphic
+   rather than a bare green rectangle. Players are assigned to fixed
+   row slots (Forwards / Midfielders / Defenders / Goalkeeper) rather than
+   dragged freely, so the poster always reads as a clean lineup graphic. */
 .formation-poster {
   max-width: 640px;
   margin: 0 auto;
@@ -1502,11 +1504,18 @@ table.athletes .actions-cell {
   color: #fff;
   line-height: 1.2;
 }
+/* Green banner strip under the header, e.g. "vs Angkor FC — Starting XI" */
 .formation-poster-subtitle {
-  padding: 0 18px 14px;
-  margin: -2px 0 0;
-  color: #c3cbdb;
-  font-size: 13.5px;
+  margin: 0;
+  padding: 8px 18px;
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  text-align: center;
 }
 .formation-poster-footer {
   padding: 10px 18px;
@@ -1532,34 +1541,71 @@ table.athletes .actions-cell {
   );
   overflow: hidden;
   user-select: none;
-  touch-action: none;
 }
 /* Soft vignette for depth — sits above the turf, below the player tokens. */
 .pitch-board::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at 50% 42%, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.22) 100%);
+  background: radial-gradient(ellipse at 50% 42%, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.22) 100%);
   pointer-events: none;
   z-index: 1;
 }
+/* Full realistic pitch markings — outer touchlines, halfway line, center
+   circle, and a penalty box + spot at each end (forwards near the top box,
+   goalkeeper inside the bottom one). */
+.pitch-outline {
+  position: absolute;
+  inset: 3%;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  z-index: 0;
+}
 .pitch-halfway-line {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 3%;
+  right: 3%;
   top: 50%;
   height: 2px;
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.8);
+  z-index: 0;
 }
 .pitch-center-circle {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 18%;
+  width: 22%;
   aspect-ratio: 1 / 1;
-  border: 2px solid rgba(255, 255, 255, 0.85);
+  border: 2px solid rgba(255, 255, 255, 0.8);
   border-radius: 50%;
   transform: translate(-50%, -50%);
+  z-index: 0;
+}
+.pitch-center-spot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.8);
+  transform: translate(-50%, -50%);
+  z-index: 0;
+}
+.pitch-box {
+  position: absolute;
+  left: 18%;
+  width: 64%;
+  height: 13%;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  z-index: 0;
+}
+.pitch-box-top {
+  top: 3%;
+  border-top: none;
+}
+.pitch-box-bottom {
+  bottom: 3%;
+  border-bottom: none;
 }
 .pitch-spot {
   position: absolute;
@@ -1567,107 +1613,315 @@ table.athletes .actions-cell {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.8);
   transform: translateX(-50%);
+  z-index: 0;
 }
 .pitch-spot-top {
-  top: 11%;
+  top: 15%;
 }
 .pitch-spot-bottom {
-  bottom: 11%;
+  bottom: 15%;
 }
-.pitch-box {
+.pitch-row {
   position: absolute;
-  left: 20%;
-  width: 60%;
-  height: 14%;
-  border: 2px solid rgba(255, 255, 255, 0.85);
-  border-top: none;
-}
-.pitch-box-top {
-  top: 0;
-  border-top: none;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.85);
-}
-.pitch-box-bottom {
-  bottom: 0;
-  border-bottom: none;
-}
-.pitch-goal {
-  position: absolute;
-  left: 38%;
-  width: 24%;
-  height: 5%;
-  border: 2px solid rgba(255, 255, 255, 0.85);
-}
-.pitch-goal-top {
-  top: 0;
-  border-top: none;
-}
-.pitch-goal-bottom {
-  bottom: 0;
-  border-bottom: none;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 14px;
+  transform: translateY(-50%);
+  z-index: 2;
 }
 .pitch-token {
-  position: absolute;
-  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  cursor: grab;
-  width: 76px;
-  z-index: 2;
-}
-.pitch-token:active {
-  cursor: grabbing;
+  gap: 4px;
+  width: 78px;
 }
 .pitch-token-photo-wrap {
   position: relative;
   display: inline-flex;
 }
 .pitch-token img {
-  width: 46px;
-  height: 46px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid #fff;
-  outline: 2px solid var(--gold);
-  outline-offset: 1px;
+  border: 3px solid #fff;
   background: #ddd;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
-.pitch-token-num {
-  position: absolute;
-  bottom: -2px;
-  right: -4px;
-  width: 17px;
-  height: 17px;
-  border-radius: 50%;
-  background: var(--gold);
-  color: var(--navy-deep);
-  font-size: 9.5px;
-  font-weight: 800;
+.pitch-token-labelbox {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  border: 1.5px solid #fff;
+  background: rgba(10, 24, 48, 0.62);
+  padding: 3px 7px 4px;
+  border-radius: 8px;
+  max-width: 82px;
 }
 .pitch-token-name {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
   color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
   text-align: center;
-  line-height: 1.3;
+  line-height: 1.25;
   max-width: 76px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  background: rgba(10, 24, 48, 0.55);
-  padding: 1px 6px;
+}
+/* Position abbreviation (LW, ST, CDM, CB, GK, ...) shown under the name —
+   red, matching how most "starting XI" graphics label a player's role. */
+.pitch-token-position {
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #ef4444;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 1px;
+}
+.pitch-token-empty {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 255, 255, 0.4);
+}
+
+/* Substitutes list under the pitch — same poster, so it exports together. */
+.formation-subs {
+  padding: 14px 18px 4px;
+}
+.formation-subs-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #ef4444;
+  text-align: center;
+  margin: 0 0 10px;
+}
+.formation-subs-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px 18px;
+  list-style: none;
+  margin: 0;
+  padding: 0 4px 14px;
+}
+.formation-subs-list li {
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* ---------- Formation setup form (squad list + shape + slot pickers) ---------- */
+.formation-setup-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.formation-setup-row .field {
+  min-width: 220px;
+  flex: 1 1 220px;
+}
+.formation-slot-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.formation-slot-group {
+  background: #fff;
+  border: 1px solid var(--line);
   border-radius: 8px;
+  padding: 12px 14px;
+}
+.formation-slot-group-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--navy);
+  margin: 0 0 8px;
+}
+.formation-slot-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.formation-slot-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 200px;
+  min-width: 180px;
+}
+.formation-slot-field-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #ef4444;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.formation-slot-select {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 13.5px;
+  background: #fff;
+}
+
+/* ---------- Match day: Starting XI (card-grid matchday announcement) ---------- */
+/* Deliberately distinct from the Formation pitch poster above — this is a
+   simple "club vs opponent" lineup graphic: starter cards in a grid plus a
+   substitutes sidebar, no pitch diagram. */
+.startingxi-poster {
+  max-width: 680px;
+  margin: 0 auto;
+  background: linear-gradient(160deg, #0a1830 0%, #123a56 55%, #123a56 100%);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
+}
+.startingxi-header {
+  padding: 16px 18px 12px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+.startingxi-matchup {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+  color: #fff;
+  letter-spacing: 0.02em;
+}
+.startingxi-vs {
+  color: var(--gold);
+  font-weight: 600;
+  font-size: 15px;
+  margin: 0 6px;
+  text-transform: uppercase;
+}
+.startingxi-subtitle {
+  margin-top: 4px;
+  color: #c3cbdb;
+  font-size: 13px;
+}
+.startingxi-body {
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+}
+.startingxi-grid {
+  flex: 3;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  align-content: start;
+}
+.startingxi-card {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  aspect-ratio: 3 / 4;
+  background: #1b2c44;
+}
+.startingxi-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.startingxi-card-name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(10, 24, 48, 0.78);
+  color: #fff;
+  font-weight: 800;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 4px 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.startingxi-empty {
+  grid-column: 1 / -1;
+  color: #c3cbdb;
+  font-size: 13px;
+}
+.startingxi-side {
+  flex: 1;
+  min-width: 110px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+}
+/* Plain horizontal label — NOT writing-mode: vertical-rl. That rotated-text
+   approach renders correctly in a live browser but html2canvas (used for
+   "Save as JPG/PNG") doesn't support CSS vertical writing modes properly,
+   so the exported image showed scrambled/mirrored letters. A rotated
+   single-line block instead of vertical text keeps every export correct. */
+.startingxi-side-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #fff;
+  text-align: center;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 2px solid var(--gold);
+}
+.startingxi-subs-title {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin: 4px 0 4px;
+}
+.startingxi-subs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 11px;
+  color: #e4e9f2;
+  line-height: 1.7;
+}
+.startingxi-footer {
+  padding: 10px 18px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8e9bb0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+@media (max-width: 640px) {
+  .startingxi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .startingxi-side-title {
+    font-size: 12px;
+  }
 }
 
 /* ---------- Admin: Trusted-by logo manager ---------- */

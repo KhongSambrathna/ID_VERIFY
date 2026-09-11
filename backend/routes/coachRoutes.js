@@ -4,6 +4,17 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 const Athlete = require("../models/Athlete");
 const Lineup = require("../models/Lineup");
 const Formation = require("../models/Formation");
+const StartingXI = require("../models/StartingXI");
+
+// A formation's players must come from an already-created Squad List
+// (Lineup) belonging to the SAME team — this stops a Head Coach from
+// pointing sourceLineup at another team's squad list. Returns true if
+// sourceLineup is absent (optional) or valid for this team.
+async function validSourceLineup(sourceLineup, team) {
+  if (!sourceLineup) return true;
+  const lineup = await Lineup.findById(sourceLineup);
+  return !!lineup && lineup.team === team;
+}
 
 // Both Admins and Head Coaches manage match-day squad lists and formations.
 // A Head Coach is scoped to their own team (req.adminTeam); an Admin picks
@@ -129,11 +140,17 @@ router.post("/formation", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async
     const team = resolveTeam(req);
     if (!team) return res.status(400).json({ message: "Team is required" });
 
-    const { name, positions } = req.body;
+    const { name, shape, sourceLineup, positions } = req.body;
+    if (!(await validSourceLineup(sourceLineup, team))) {
+      return res.status(400).json({ message: "That squad list doesn't belong to this team" });
+    }
+
     const formation = new Formation({
       createdBy: req.adminId,
       team,
       name,
+      shape,
+      sourceLineup: sourceLineup || null,
       positions: positions || [],
     });
 
@@ -179,8 +196,14 @@ router.put("/formation/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"), as
     if (!formation) return res.status(404).json({ message: "Formation not found" });
     if (!canAccessTeam(req, formation.team)) return res.status(403).json({ message: "Access denied" });
 
-    const { name, positions } = req.body;
+    const { name, shape, sourceLineup, positions } = req.body;
+    if (sourceLineup !== undefined && !(await validSourceLineup(sourceLineup, formation.team))) {
+      return res.status(400).json({ message: "That squad list doesn't belong to this team" });
+    }
+
     if (name !== undefined) formation.name = name;
+    if (shape !== undefined) formation.shape = shape;
+    if (sourceLineup !== undefined) formation.sourceLineup = sourceLineup || null;
     if (positions !== undefined) formation.positions = positions;
 
     await formation.save();
@@ -200,6 +223,110 @@ router.delete("/formation/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"),
 
     await Formation.findByIdAndDelete(req.params.id);
     res.json({ message: "Formation deleted" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ============ STARTING XI (MATCHDAY GRAPHIC) MANAGEMENT ============
+// A simple card-grid "Starting XI" announcement — club vs opponent, starter
+// cards, substitutes list — kept separate from the tactical Formation
+// (pitch diagram) above. Same team-scoping rules apply.
+
+router.post("/startingxi", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
+  try {
+    const team = resolveTeam(req);
+    if (!team) return res.status(400).json({ message: "Team is required" });
+
+    const { name, opponent, competition, squadSize, sourceLineup, starters, substitutes } = req.body;
+    if (!(await validSourceLineup(sourceLineup, team))) {
+      return res.status(400).json({ message: "That squad list doesn't belong to this team" });
+    }
+
+    const startingXI = new StartingXI({
+      createdBy: req.adminId,
+      team,
+      name,
+      opponent,
+      competition,
+      squadSize: squadSize || 11,
+      sourceLineup: sourceLineup || null,
+      starters: starters || [],
+      substitutes: substitutes || [],
+    });
+
+    await startingXI.save();
+    await startingXI.populate("starters substitutes");
+
+    res.status(201).json(startingXI);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.get("/startingxis", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
+  try {
+    const team = resolveTeam(req);
+    if (!team) return res.status(400).json({ message: "Team is required" });
+    if (!canAccessTeam(req, team)) return res.status(403).json({ message: "Access denied" });
+
+    const list = await StartingXI.find({ team })
+      .populate("starters substitutes")
+      .sort({ createdAt: -1 });
+    res.json(list);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.get("/startingxi/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
+  try {
+    const startingXI = await StartingXI.findById(req.params.id).populate("starters substitutes");
+    if (!startingXI) return res.status(404).json({ message: "Starting XI not found" });
+    if (!canAccessTeam(req, startingXI.team)) return res.status(403).json({ message: "Access denied" });
+
+    res.json(startingXI);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.put("/startingxi/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
+  try {
+    const startingXI = await StartingXI.findById(req.params.id);
+    if (!startingXI) return res.status(404).json({ message: "Starting XI not found" });
+    if (!canAccessTeam(req, startingXI.team)) return res.status(403).json({ message: "Access denied" });
+
+    const { name, opponent, competition, squadSize, sourceLineup, starters, substitutes } = req.body;
+    if (sourceLineup !== undefined && !(await validSourceLineup(sourceLineup, startingXI.team))) {
+      return res.status(400).json({ message: "That squad list doesn't belong to this team" });
+    }
+
+    if (name !== undefined) startingXI.name = name;
+    if (opponent !== undefined) startingXI.opponent = opponent;
+    if (competition !== undefined) startingXI.competition = competition;
+    if (squadSize !== undefined) startingXI.squadSize = squadSize || 11;
+    if (sourceLineup !== undefined) startingXI.sourceLineup = sourceLineup || null;
+    if (starters !== undefined) startingXI.starters = starters;
+    if (substitutes !== undefined) startingXI.substitutes = substitutes;
+
+    await startingXI.save();
+    await startingXI.populate("starters substitutes");
+
+    res.json(startingXI);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.delete("/startingxi/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
+  try {
+    const startingXI = await StartingXI.findById(req.params.id);
+    if (!startingXI) return res.status(404).json({ message: "Starting XI not found" });
+    if (!canAccessTeam(req, startingXI.team)) return res.status(403).json({ message: "Access denied" });
+
+    await StartingXI.findByIdAndDelete(req.params.id);
+    res.json({ message: "Starting XI deleted" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
