@@ -397,6 +397,52 @@ a {
   padding: 12px 14px;
   margin-bottom: 16px;
 }
+/* "Team assignments" panel on Edit athlete — lists every team/role this
+   person currently holds, with per-row approve/reject/remove actions. */
+.assignments-card {
+  margin: 0 auto 20px;
+  padding: 24px 28px;
+}
+.assignment-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.assignment-row:last-child {
+  border-bottom: none;
+}
+.assignment-row-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.assignment-team {
+  font-weight: 600;
+  font-size: 14.5px;
+}
+.assignment-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.assignment-add-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.assignment-add-row .field {
+  margin-bottom: 0;
+}
 .duplicate-warning-title {
   margin: 0 0 8px;
   font-size: 13.5px;

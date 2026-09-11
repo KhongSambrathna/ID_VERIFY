@@ -76,7 +76,10 @@ export default function SearchPage() {
                     {a.khmerName ? ` · ${a.khmerName}` : ""}
                   </p>
                   <p className="meta">
-                    {a.team || "—"} {a.role ? `· ${a.role}` : ""} · ID {a.verifyId}
+                    {a.memberships?.length
+                      ? a.memberships.map((m) => `${m.team} · ${m.role}`).join(", ")
+                      : "—"}{" "}
+                    · ID {a.verifyId}
                   </p>
                 </div>
                 <span className={`badge ${a.isAvailable ? "verified" : "rejected"}`}>

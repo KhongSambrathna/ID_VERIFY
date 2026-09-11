@@ -16,6 +16,21 @@ function formatDob(dob) {
   return `${dd}-${mm}-${d.getFullYear()}`;
 }
 
+// `athlete` here can be either the flattened team-scoped roster shape
+// (a plain `.role` string, already just this team's) or a raw/populated
+// Athlete document (an `.assignments` array covering every team they're
+// on) — a saved Lineup's `athletes[].athleteId` is the latter. Either way,
+// this returns the role(s) that apply to THIS team, comma-joined if the
+// person holds more than one role on it.
+function rolesForTeam(athlete, team) {
+  if (!athlete) return "";
+  if (!athlete.assignments) return athlete.role || "";
+  return athlete.assignments
+    .filter((a) => a.team === team)
+    .map((a) => a.role)
+    .join(", ");
+}
+
 function SquadCountNote({ count }) {
   const inRange = count >= MIN_SQUAD && count <= MAX_SQUAD;
   return (
@@ -82,7 +97,7 @@ function SquadExportSheet({ innerRef, team, squadName, members }) {
                 <p className="squad-export-name-en">{a.fullName}</p>
                 {a.khmerName && <p className="squad-export-name-kh">{a.khmerName}</p>}
                 <p className="squad-export-meta">
-                  {a.role || "PLAYER"} · DOB {formatDob(a.dateOfBirth) || "—"}
+                  {rolesForTeam(a, team) || "PLAYER"} · DOB {formatDob(a.dateOfBirth) || "—"}
                 </p>
               </div>
             </div>
@@ -393,7 +408,7 @@ export default function SquadListManager({ team, athletes }) {
                           <div className="athlete-info">
                             <p className="name">{item.athleteId?.fullName || "Unknown"}</p>
                             <p className="role">
-                              {item.athleteId?.role || "PLAYER"} ·{" "}
+                              {rolesForTeam(item.athleteId, lineup.team) || "PLAYER"} ·{" "}
                               {formatDob(item.athleteId?.dateOfBirth) || "DOB —"} ·{" "}
                               {item.athleteId?.gender || "—"}
                             </p>

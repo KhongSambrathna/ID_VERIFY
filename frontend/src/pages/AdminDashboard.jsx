@@ -34,14 +34,25 @@ export default function AdminDashboard() {
     load();
   };
 
-  const approve = async (id) => {
-    await api.put(`/athletes/${id}/approve`);
+  // Each row is one team/role assignment (a person on 2 teams shows up as 2
+  // rows), so every action below targets `a.assignmentId`, not just `a._id`.
+  const approveAssignment = async (a) => {
+    await api.put(`/athletes/${a._id}/assignments/${a.assignmentId}/approve`);
     load();
   };
 
-  const remove = async (id) => {
-    if (!confirm("Delete this athlete record?")) return;
-    await api.delete(`/athletes/${id}`);
+  const rejectAssignment = async (a) => {
+    await api.put(`/athletes/${a._id}/assignments/${a.assignmentId}/reject`);
+    load();
+  };
+
+  const removeAssignment = async (a) => {
+    const isLast = athletes.filter((x) => x._id === a._id).length === 1;
+    const msg = isLast
+      ? "This is their only team — removing it will delete this person's whole record. Continue?"
+      : "Remove this team/role?";
+    if (!confirm(msg)) return;
+    await api.delete(`/athletes/${a._id}/assignments/${a.assignmentId}`);
     load();
   };
 
@@ -54,7 +65,7 @@ export default function AdminDashboard() {
           .some((field) => field.toLowerCase().includes(q))
       );
 
-  const pendingCount = athletes.filter((a) => a.approvalStatus === "pending").length;
+  const pendingCount = athletes.filter((a) => a.approvalStatus === "pending" || a.pendingRemoval).length;
 
   return (
     <div className="container dash-body">
@@ -117,7 +128,7 @@ export default function AdminDashboard() {
             </thead>
             <tbody>
               {filtered.map((a) => (
-                <tr key={a._id}>
+                <tr key={a.assignmentId}>
                   <td data-label="ID">{a.verifyId}</td>
                   <td data-label="Name">{a.fullName}</td>
                   <td data-label="Role">{a.role || "—"}</td>
@@ -131,23 +142,46 @@ export default function AdminDashboard() {
                     <span className={`badge ${a.status}`}>{a.status}</span>
                   </td>
                   <td data-label="Approval">
-                    {a.approvalStatus === "pending" ? (
+                    {a.pendingRemoval ? (
+                      <span className="badge rejected">Removal requested</span>
+                    ) : a.approvalStatus === "pending" ? (
                       <span className="badge rejected">Pending</span>
                     ) : (
                       <span className="badge verified">Approved</span>
                     )}
                   </td>
                   <td data-label="Actions" className="actions-cell">
-                    <Link className="link-btn" to={`/admin/athlete/${a._id}`}>
+                    <Link className="link-btn" to={`/admin/athlete/${a._id}?team=${encodeURIComponent(a.team)}`}>
                       View card
                     </Link>
                     <Link className="link-btn" to={`/admin/athlete/${a._id}/edit`}>
                       Edit
                     </Link>
-                    {a.approvalStatus === "pending" && (
-                      <button className="link-btn" onClick={() => approve(a._id)}>
-                        Approve
-                      </button>
+                    {a.pendingRemoval ? (
+                      <>
+                        <button className="link-btn" onClick={() => approveAssignment(a)}>
+                          Confirm removal
+                        </button>
+                        <button className="link-btn" onClick={() => rejectAssignment(a)}>
+                          Keep
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        {a.approvalStatus === "pending" && (
+                          <>
+                            <button className="link-btn" onClick={() => approveAssignment(a)}>
+                              Approve
+                            </button>
+                            <button className="link-btn" onClick={() => rejectAssignment(a)}>
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        <button className="link-btn" onClick={() => removeAssignment(a)}>
+                          Remove from team
+                        </button>
+                      </>
                     )}
                     {a.status !== "verified" ? (
                       <button className="link-btn" onClick={() => setStatus(a._id, "verified")}>
@@ -163,9 +197,6 @@ export default function AdminDashboard() {
                       onClick={() => setAvailable(a._id, !a.isAvailable)}
                     >
                       {a.isAvailable ? "Mark unavailable" : "Mark available"}
-                    </button>
-                    <button className="link-btn" onClick={() => remove(a._id)}>
-                      Delete
                     </button>
                   </td>
                 </tr>

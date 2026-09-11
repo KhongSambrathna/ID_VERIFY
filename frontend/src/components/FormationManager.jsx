@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import api from "../api/axios";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { exportPosterAsImage } from "../utils/exportPoster";
+import { isPlayerOnTeam } from "../utils/rolesForTeam";
 
 // Four fixed lines, top (attack) to bottom (goalkeeper) — matches how a
 // "combined XI" graphic is normally read. Only 4-line shapes are offered
@@ -212,7 +213,7 @@ export default function FormationManager({ team }) {
   // a formation can no longer be built from the full team roster directly.
   const basePool = (selectedLineup?.athletes || [])
     .map((item) => item.athleteId)
-    .filter((a) => a && (a.role || "PLAYER") === "PLAYER");
+    .filter((a) => a && isPlayerOnTeam(a, team));
   const pool = [...basePool, ...extraAthletes.filter((a) => !basePool.some((b) => b._id === a._id))];
 
   const assignedIds = new Set(Object.values(slotAssignments).filter(Boolean));

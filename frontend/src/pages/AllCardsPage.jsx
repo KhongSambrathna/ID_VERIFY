@@ -32,14 +32,30 @@ export default function AllCardsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // The API returns one row per team/role assignment (a person on 2 teams
+  // is 2 rows). For printing, a person's several roles on the SAME team
+  // belong on ONE card together ("PLAYER, ASSISTANT COACH") rather than as
+  // separate cards, so group rows by (person, team) before rendering.
+  const cards = useMemo(() => {
+    const groups = new Map();
+    athletes.forEach((a) => {
+      const key = `${a._id}:${a.team}`;
+      if (!groups.has(key)) {
+        groups.set(key, { ...a, cardKey: key, roles: [] });
+      }
+      groups.get(key).roles.push(a.role);
+    });
+    return [...groups.values()].map((c) => ({ ...c, role: c.roles.join(", ") }));
+  }, [athletes]);
+
   const teams = useMemo(
-    () => [...new Set(athletes.map((a) => a.team).filter(Boolean))].sort(),
-    [athletes]
+    () => [...new Set(cards.map((a) => a.team).filter(Boolean))].sort(),
+    [cards]
   );
 
-  const filtered = athletes.filter((a) => {
+  const filtered = cards.filter((a) => {
     if (teamFilter !== "all" && a.team !== teamFilter) return false;
-    if (roleFilter !== "all" && a.role !== roleFilter) return false;
+    if (roleFilter !== "all" && !a.roles.includes(roleFilter)) return false;
     return true;
   });
 
@@ -160,7 +176,7 @@ export default function AllCardsPage() {
 
       <div className="cards-grid" ref={gridRef}>
         {filtered.map((a) => (
-          <IDCard key={a._id} athlete={a} hideActions />
+          <IDCard key={a.cardKey} athlete={a} hideActions />
         ))}
       </div>
     </div>

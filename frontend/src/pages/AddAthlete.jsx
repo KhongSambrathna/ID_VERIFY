@@ -21,11 +21,16 @@ export default function AddAthlete() {
   const [documents, setDocuments] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [addingToId, setAddingToId] = useState(null); // which match's "add role" is in flight
   const navigate = useNavigate();
 
-  // Warn (don't block) when a player with the same name is already
-  // registered — the same name could still belong to two different people,
-  // so this just surfaces the possible duplicate instead of preventing it.
+  // Notice (don't block) when a player with the same name is already
+  // registered — the same name could belong to two different people, or it
+  // could be the SAME real person joining another team / taking on another
+  // role. Rather than creating an untracked second profile for the latter
+  // case, each match offers an "Add this team/role to them instead" button
+  // that attaches a new assignment to the existing person (same photo,
+  // same ID card, same QR).
   const [duplicates, setDuplicates] = useState([]);
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
 
@@ -56,14 +61,32 @@ export default function AddAthlete() {
     return () => clearTimeout(timer);
   }, [form.fullName, form.khmerName]);
 
+  // Attaches the team/role currently filled in on this form to an EXISTING
+  // matched person, instead of creating a whole new record for them.
+  const addToExisting = async (athleteId) => {
+    setError("");
+    setAddingToId(athleteId);
+    try {
+      await api.post(`/athletes/${athleteId}/assignments`, {
+        team: form.team,
+        role: form.role,
+      });
+      navigate(isHeadCoach ? "/coach" : `/admin/athlete/${athleteId}`);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to add team/role to that person");
+    } finally {
+      setAddingToId(null);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
     if (duplicates.length > 0) {
-      const names = duplicates.map((d) => `${d.fullName}${d.team ? ` (${d.team})` : ""}`).join(", ");
+      const names = duplicates.map((d) => `${d.fullName}`).join(", ");
       const proceed = confirm(
-        `A player with this name is already registered: ${names}.\n\nRegister this as a new, separate player anyway?`
+        `A player with this name is already registered: ${names}.\n\nRegister this as a new, separate person anyway? (If it's actually the same person, use "Add this team/role to them" above instead.)`
       );
       if (!proceed) return;
     }
@@ -110,25 +133,40 @@ export default function AddAthlete() {
         {checkingDuplicate && <p className="help-text">Checking for existing players with this name…</p>}
         {!checkingDuplicate && duplicates.length > 0 && (
           <div className="duplicate-warning">
-            <p className="duplicate-warning-title">⚠ Possible duplicate — already registered:</p>
+            <p className="duplicate-warning-title">⚠ Already registered — same person?</p>
             {duplicates.map((d) => (
               <div key={d._id} className="duplicate-warning-row">
                 <img
                   src={d.photoUrl ? resolveFileUrl(d.photoUrl) : "https://placehold.co/40x40?text=?"}
                   alt={d.fullName}
                 />
-                <div>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <p className="name">
                     {d.fullName}
                     {d.khmerName ? ` · ${d.khmerName}` : ""}
                   </p>
                   <p className="meta">
-                    {d.team || "—"} {d.role ? `· ${d.role}` : ""} · ID {d.verifyId}
+                    {(d.assignments || []).map((a) => `${a.team} · ${a.role}`).join(", ") || "No team yet"} ·
+                    ID {d.verifyId}
                   </p>
                 </div>
+                <button
+                  type="button"
+                  className="link-btn"
+                  disabled={!form.team || addingToId === d._id}
+                  onClick={() => addToExisting(d._id)}
+                  style={{ flexShrink: 0 }}
+                >
+                  {addingToId === d._id
+                    ? "Adding…"
+                    : `Add ${form.role || "role"} @ ${form.team || "team"} to them`}
+                </button>
               </div>
             ))}
-            <p className="help-text">You can still save — this is just a heads-up, not a block.</p>
+            <p className="help-text">
+              If this is the same person, use the button above instead of saving a new, separate record
+              below.
+            </p>
           </div>
         )}
 
@@ -190,7 +228,7 @@ export default function AddAthlete() {
         {error && <div className="error-text">{error}</div>}
 
         <button className="btn btn-primary" disabled={loading}>
-          {loading ? "Saving…" : "Save & generate ID"}
+          {loading ? "Saving…" : "Save & generate ID (new, separate person)"}
         </button>
       </form>
     </div>

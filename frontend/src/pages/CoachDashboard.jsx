@@ -39,20 +39,23 @@ export default function CoachDashboard() {
     }
   };
 
-  const removeAthlete = async (id) => {
-    if (!confirm("Delete this athlete record?")) return;
+  // Each row is one team/role assignment on your team (someone with 2 roles
+  // here shows up as 2 cards). Removing one isn't immediate — it's flagged
+  // for an Admin to confirm, same as adding a new one needs their approval.
+  const removeAssignment = async (athlete) => {
+    if (!confirm("Request removal of this team/role? An Admin needs to confirm it.")) return;
     try {
-      await api.delete(`/athletes/${id}`);
+      await api.delete(`/athletes/${athlete._id}/assignments/${athlete.assignmentId}`);
       loadData();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to delete athlete");
+      alert(err.response?.data?.message || "Failed to request removal");
     }
   };
 
   if (loading) return <div className="container"><p>Loading...</p></div>;
   if (error) return <div className="container"><p className="error-text">{error}</p></div>;
 
-  const pendingCount = athletes.filter((a) => a.approvalStatus === "pending").length;
+  const pendingCount = athletes.filter((a) => a.approvalStatus === "pending" || a.pendingRemoval).length;
 
   return (
     <div className="container dash-body">
@@ -108,7 +111,7 @@ export default function CoachDashboard() {
           ) : (
             <div className="athletes-grid">
               {athletes.map((athlete) => (
-                <div key={athlete._id} className="athlete-card">
+                <div key={athlete.assignmentId} className="athlete-card">
                   <img
                     src={
                       athlete.photoUrl
@@ -129,17 +132,23 @@ export default function CoachDashboard() {
                     <span className={`badge ${athlete.isAvailable ? "verified" : "rejected"}`}>
                       {athlete.isAvailable ? "Available" : "Not available"}
                     </span>
-                    {athlete.approvalStatus === "pending" && (
-                      <span className="badge rejected">Pending approval</span>
+                    {athlete.pendingRemoval ? (
+                      <span className="badge rejected">Removal requested</span>
+                    ) : (
+                      athlete.approvalStatus === "pending" && (
+                        <span className="badge rejected">Pending approval</span>
+                      )
                     )}
                   </div>
                   <div className="athlete-status" style={{ marginTop: 8 }}>
                     <Link className="link-btn" to={`/admin/athlete/${athlete._id}/edit`}>
                       Edit
                     </Link>
-                    <button className="link-btn" onClick={() => removeAthlete(athlete._id)}>
-                      Delete
-                    </button>
+                    {!athlete.pendingRemoval && (
+                      <button className="link-btn" onClick={() => removeAssignment(athlete)}>
+                        Request removal
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

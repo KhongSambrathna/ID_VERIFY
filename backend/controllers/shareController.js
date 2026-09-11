@@ -82,7 +82,7 @@ exports.shareShop = async (req, res) => {
 exports.shareVerify = async (req, res) => {
   try {
     const athlete = await Athlete.findOne({ verifyId: req.params.verifyId }).select(
-      "fullName khmerName team role photoUrl verifyId"
+      "fullName khmerName assignments photoUrl verifyId"
     );
     if (!athlete) {
       return renderSharePage(res, {
@@ -92,9 +92,11 @@ exports.shareVerify = async (req, res) => {
         redirectTo: `/verify/${req.params.verifyId}`,
       });
     }
+    const approved = (athlete.assignments || []).filter((a) => a.approvalStatus === "approved");
     renderSharePage(res, {
       title: `${athlete.fullName} — ${SITE_NAME}`,
-      description: [athlete.team, athlete.role].filter(Boolean).join(" · ") || "Athlete ID verification",
+      description:
+        approved.map((a) => `${a.team} · ${a.role}`).join(", ") || "Athlete ID verification",
       image: athlete.photoUrl || DEFAULT_IMAGE,
       redirectTo: `/verify/${athlete.verifyId}`,
     });

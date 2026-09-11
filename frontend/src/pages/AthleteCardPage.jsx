@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import html2canvas from "html2canvas";
 import api from "../api/axios";
 import IDCard from "../components/IDCard";
@@ -16,7 +16,10 @@ function formatDob(dob) {
 
 export default function AthleteCardPage() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const requestedTeam = searchParams.get("team");
   const [athlete, setAthlete] = useState(null);
+  const [selectedTeam, setSelectedTeam] = useState(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const exportWrapRef = useRef(null);
@@ -24,9 +27,28 @@ export default function AthleteCardPage() {
   useEffect(() => {
     api
       .get(`/athletes/${id}`)
-      .then(({ data }) => setAthlete(data))
+      .then(({ data }) => {
+        setAthlete(data);
+        const teams = [...new Set((data.assignments || []).map((a) => a.team))];
+        setSelectedTeam(requestedTeam && teams.includes(requestedTeam) ? requestedTeam : teams[0] || null);
+      })
       .catch((err) => setError(err.response?.data?.message || "Failed to load"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // This person's teams, one card per team — roles on that same team are
+  // joined together onto the one card ("PLAYER, ASSISTANT COACH").
+  const teams = useMemo(
+    () => [...new Set((athlete?.assignments || []).map((a) => a.team))],
+    [athlete]
+  );
+
+  const cardAthlete = useMemo(() => {
+    if (!athlete) return null;
+    if (!selectedTeam) return { ...athlete, team: "", role: "" };
+    const roles = athlete.assignments.filter((a) => a.team === selectedTeam).map((a) => a.role);
+    return { ...athlete, team: selectedTeam, role: roles.join(", ") };
+  }, [athlete, selectedTeam]);
 
   const handleSaveAsJpg = async () => {
     const cardNode = exportWrapRef.current?.querySelector(".id-card");
@@ -39,7 +61,7 @@ export default function AthleteCardPage() {
         backgroundColor: "#ffffff",
       });
       const link = document.createElement("a");
-      link.download = `${athlete.verifyId || athlete.fullName || "id-card"}.jpg`;
+      link.download = `${cardAthlete.verifyId || cardAthlete.fullName || "id-card"}.jpg`;
       link.href = canvas.toDataURL("image/jpeg", 0.95);
       link.click();
     } catch (err) {
@@ -64,7 +86,7 @@ export default function AthleteCardPage() {
 
       {error && <p className="error-text no-print">{error}</p>}
 
-      {athlete && (
+      {athlete && cardAthlete && (
         <>
           <div className="athlete-detail card no-print">
             <div className="athlete-detail-top">
@@ -90,6 +112,20 @@ export default function AthleteCardPage() {
               </div>
             </div>
 
+            {teams.length > 1 && (
+              <div className="field" style={{ maxWidth: 280, margin: "12px 0 0" }}>
+                <label>Card for team</label>
+                <select value={selectedTeam || ""} onChange={(e) => setSelectedTeam(e.target.value)}>
+                  {teams.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+                <p className="help-text">This person has {teams.length} teams — each prints its own card.</p>
+              </div>
+            )}
+
             <div className="detail-grid">
               <div className="detail-item">
                 <div className="detail-label">Date of birth</div>
@@ -101,11 +137,11 @@ export default function AthleteCardPage() {
               </div>
               <div className="detail-item">
                 <div className="detail-label">Team</div>
-                <div className="detail-value">{athlete.team || "—"}</div>
+                <div className="detail-value">{cardAthlete.team || "—"}</div>
               </div>
               <div className="detail-item">
                 <div className="detail-label">Role</div>
-                <div className="detail-value">{athlete.role || "—"}</div>
+                <div className="detail-value">{cardAthlete.role || "—"}</div>
               </div>
               <div className="detail-item detail-item-wide">
                 <div className="detail-label">Address</div>
@@ -139,7 +175,7 @@ export default function AthleteCardPage() {
               html2canvas can use it); becomes the visible content when printing. */}
           <div className="card-export-target" ref={exportWrapRef}>
             <div className="cards-grid">
-              <IDCard athlete={athlete} hideActions />
+              <IDCard athlete={cardAthlete} hideActions />
             </div>
           </div>
         </>

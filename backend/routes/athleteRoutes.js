@@ -7,7 +7,11 @@ const {
   getAllAthletes,
   getAthleteById,
   updateAthlete,
-  approveAthlete,
+  addAssignment,
+  updateAssignment,
+  removeAssignment,
+  approveAssignment,
+  rejectAssignment,
   deleteAthlete,
   verifyAthlete,
   searchAthletes,
@@ -22,8 +26,8 @@ router.get("/search", searchAthletes);
 // Admin and Head Coach below this line. A Head Coach is scoped to just
 // their own team by the controller (see athleteController.js) — every
 // route here is shared rather than duplicated under /api/coach/*, since
-// the access rules differ only in *which* records each role can touch,
-// not in the actions themselves.
+// the access rules differ only in *which* records/assignments each role
+// can touch, not in the actions themselves.
 router.use(requireAuth, requireRole("ADMIN", "HEAD_COACH"));
 
 router.get("/", getAllAthletes);
@@ -43,9 +47,19 @@ router.put(
   upload.fields([{ name: "photo", maxCount: 1 }]),
   updateAthlete
 );
-// Admin-only, even though everything above this line is shared — approving
-// is deliberately not something a Head Coach can do to their own submission.
-router.put("/:id/approve", requireRole("ADMIN"), approveAthlete);
-router.delete("/:id", deleteAthlete);
+
+// Team/role assignments — a person can have several, one per team (or even
+// several on the same team, e.g. Player + Assistant Coach). Add/edit/remove
+// act on ONE assignment at a time; approve/reject (admin-only) are how an
+// Admin signs off on a Head Coach's pending add or pending removal request.
+router.post("/:id/assignments", addAssignment);
+router.put("/:id/assignments/:assignmentId", updateAssignment);
+router.delete("/:id/assignments/:assignmentId", removeAssignment);
+router.put("/:id/assignments/:assignmentId/approve", requireRole("ADMIN"), approveAssignment);
+router.put("/:id/assignments/:assignmentId/reject", requireRole("ADMIN"), rejectAssignment);
+
+// Admin-only — a Head Coach removes someone through the assignment routes
+// above instead (which always requires Admin confirmation, per team).
+router.delete("/:id", requireRole("ADMIN"), deleteAthlete);
 
 module.exports = router;

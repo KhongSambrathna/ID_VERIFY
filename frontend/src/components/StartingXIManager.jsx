@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import api from "../api/axios";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { exportPosterAsImage } from "../utils/exportPoster";
+import { isPlayerOnTeam } from "../utils/rolesForTeam";
 
 // This club mostly plays 8, 9, 10, or 11-a-side — this only changes the
 // "usually N players" hint below, it never caps how many starters can be
@@ -105,7 +106,7 @@ export default function StartingXIManager({ team }) {
   // or unrelated athlete.
   const basePool = (selectedLineup?.athletes || [])
     .map((item) => item.athleteId)
-    .filter((a) => a && (a.role || "PLAYER") === "PLAYER");
+    .filter((a) => a && isPlayerOnTeam(a, team));
   const pool = [...basePool, ...extraAthletes.filter((a) => !basePool.some((b) => b._id === a._id))];
 
   const starterAthletes = starterIds.map((id) => pool.find((a) => a._id === id)).filter(Boolean);

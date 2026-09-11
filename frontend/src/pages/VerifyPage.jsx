@@ -76,14 +76,19 @@ export default function VerifyPage() {
                 <div className="detail-label">Gender</div>
                 <div className="detail-value">{athlete.gender || "—"}</div>
               </div>
-              <div className="detail-item">
-                <div className="detail-label">Team</div>
-                <div className="detail-value">{athlete.team || "—"}</div>
-              </div>
-              <div className="detail-item">
-                <div className="detail-label">Role</div>
-                <div className="detail-value">{athlete.role || "—"}</div>
-              </div>
+              {(athlete.memberships?.length
+                ? athlete.memberships
+                : [{ team: athlete.team, role: athlete.role }]
+              ).flatMap((m, i) => [
+                <div className="detail-item" key={`team-${i}`}>
+                  <div className="detail-label">Team</div>
+                  <div className="detail-value">{m.team || "—"}</div>
+                </div>,
+                <div className="detail-item" key={`role-${i}`}>
+                  <div className="detail-label">Role</div>
+                  <div className="detail-value">{m.role || "—"}</div>
+                </div>,
+              ])}
               <div className="detail-item detail-item-wide">
                 <div className="detail-label">Address</div>
                 <div className="detail-value">{athlete.address || "—"}</div>

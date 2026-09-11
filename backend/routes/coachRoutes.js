@@ -5,6 +5,7 @@ const Athlete = require("../models/Athlete");
 const Lineup = require("../models/Lineup");
 const Formation = require("../models/Formation");
 const StartingXI = require("../models/StartingXI");
+const flattenAssignments = require("../utils/flattenAssignments");
 
 // A formation's players must come from an already-created Squad List
 // (Lineup) belonging to the SAME team — this stops a Head Coach from
@@ -35,12 +36,13 @@ function canAccessTeam(req, team) {
 
 // GET /api/coach/my-team
 // Head Coach gets athletes in their team. (Admins use GET /api/athletes?team=X instead.)
+// Same one-row-per-assignment shape as GET /api/athletes — a person who is
+// e.g. both a Player and an Assistant Coach on this team shows up as 2 rows.
 router.get("/my-team", requireAuth, requireRole("HEAD_COACH"), async (req, res) => {
   try {
-    const athletes = await Athlete.find({ team: req.adminTeam }).select(
-      "fullName khmerName dateOfBirth gender photoUrl team role verifyId _id isAvailable approvalStatus"
-    );
-    res.json(athletes);
+    const athletes = await Athlete.find({ "assignments.team": req.adminTeam });
+    const rows = athletes.flatMap((a) => flattenAssignments(a, req.adminTeam));
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
