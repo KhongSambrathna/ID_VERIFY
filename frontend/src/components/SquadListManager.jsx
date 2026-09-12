@@ -31,6 +31,29 @@ function rolesForTeam(athlete, team) {
     .join(", ");
 }
 
+// Same dual-shape handling as rolesForTeam above, but for the total fee
+// owed on this team's assignment (the flattened shape already carries the
+// summed `.feeOwed`; a raw/populated doc only has the itemized `.fees`
+// rows, so sum those instead). Admin/Head Coach only — never used by
+// SquadExportSheet (the printable/exportable sheet), so it never reaches a
+// downloaded roster or a printed card.
+function feeOwedForTeam(athlete, team) {
+  if (!athlete) return 0;
+  if (!athlete.assignments) return athlete.feeOwed || 0;
+  const match = athlete.assignments.find((a) => a.team === team);
+  return (match?.fees || []).reduce((sum, f) => sum + (f.amount || 0), 0);
+}
+
+// A joined "$10 — Uniform fee, $15 — Registration" string for a tooltip —
+// same dual-shape handling as above.
+function feeSummaryForTeam(athlete, team) {
+  if (!athlete) return "";
+  const fees = !athlete.assignments
+    ? athlete.fees || []
+    : athlete.assignments.find((a) => a.team === team)?.fees || [];
+  return fees.map((f) => `$${f.amount}${f.note ? ` — ${f.note}` : ""}`).join(", ");
+}
+
 function SquadCountNote({ count }) {
   const inRange = count >= MIN_SQUAD && count <= MAX_SQUAD;
   return (
@@ -63,6 +86,14 @@ function AthletePicker({ athletes, selected, onToggle }) {
             />
             <span>
               {athlete.fullName} <span className="picker-meta">({athlete.role || "PLAYER"} · {formatDob(athlete.dateOfBirth) || "DOB —"})</span>
+              {athlete.feeOwed > 0 && (
+                <span
+                  className="badge rejected picker-debt-badge"
+                  title={(athlete.fees || []).map((f) => `$${f.amount}${f.note ? ` — ${f.note}` : ""}`).join(", ")}
+                >
+                  Owes ${athlete.feeOwed}
+                </span>
+              )}
             </span>
           </span>
         </label>
@@ -406,7 +437,17 @@ export default function SquadListManager({ team, athletes }) {
                             className="tiny-photo"
                           />
                           <div className="athlete-info">
-                            <p className="name">{item.athleteId?.fullName || "Unknown"}</p>
+                            <p className="name">
+                              {item.athleteId?.fullName || "Unknown"}
+                              {feeOwedForTeam(item.athleteId, lineup.team) > 0 && (
+                                <span
+                                  className="badge rejected picker-debt-badge"
+                                  title={feeSummaryForTeam(item.athleteId, lineup.team)}
+                                >
+                                  Owes ${feeOwedForTeam(item.athleteId, lineup.team)}
+                                </span>
+                              )}
+                            </p>
                             <p className="role">
                               {rolesForTeam(item.athleteId, lineup.team) || "PLAYER"} ·{" "}
                               {formatDob(item.athleteId?.dateOfBirth) || "DOB —"} ·{" "}

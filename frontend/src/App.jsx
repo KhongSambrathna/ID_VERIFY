@@ -17,6 +17,8 @@ import AdminSponsors from "./pages/AdminSponsors";
 import AdminMatchDay from "./pages/AdminMatchDay";
 import AdminShop from "./pages/AdminShop";
 import ShopPage from "./pages/ShopPage";
+import DebtReportPage from "./pages/DebtReportPage";
+import PlayerDashboard from "./pages/PlayerDashboard";
 
 export default function App() {
   return (
@@ -48,7 +50,7 @@ export default function App() {
         <Route
           path="/admin/athlete/:id"
           element={
-            <ProtectedRoute role="ADMIN">
+            <ProtectedRoute role={["ADMIN", "PLAYER"]}>
               <AthleteCardPage />
             </ProtectedRoute>
           }
@@ -106,6 +108,22 @@ export default function App() {
           element={
             <ProtectedRoute role="HEAD_COACH">
               <CoachDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/debt-report"
+          element={
+            <ProtectedRoute role={["ADMIN", "HEAD_COACH"]}>
+              <DebtReportPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/player"
+          element={
+            <ProtectedRoute role="PLAYER">
+              <PlayerDashboard />
             </ProtectedRoute>
           }
         />

@@ -32,6 +32,29 @@ const assignmentSchema = new mongoose.Schema(
     // clears the flag and keeps it). An Admin's own delete is immediate and
     // never touches this flag.
     pendingRemoval: { type: Boolean, default: false },
+    // Every separate fee/debt this person owes ON THIS TEAM — e.g. one row
+    // for "Uniform fee: $10", another for "2026 registration: $15" — rather
+    // than one combined number, so a new fee can be recorded without
+    // erasing what was already there. The total owed is the sum of every
+    // row's amount (0 rows, or all paid off/removed, means fully paid up).
+    // Tracked per-assignment, not per-person, since someone on two teams can
+    // be paid up on one and behind on the other. Only Admin/Head Coach/
+    // Player ever see this (roster tables, squad-list picker, the Edit
+    // page, the debt report, the player view) — it is never included in a
+    // public API response (search/verify/share) or on any printed/exported
+    // card.
+    fees: {
+      type: [
+        new mongoose.Schema(
+          {
+            amount: { type: Number, required: true, min: 0 },
+            note: { type: String, default: "" }, // e.g. "Uniform fee"
+          },
+          { timestamps: true }
+        ),
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );

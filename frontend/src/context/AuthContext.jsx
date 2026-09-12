@@ -43,6 +43,7 @@ export function AuthProvider({ children }) {
         isAuthed: !!token,
         isAdmin: role === "ADMIN",
         isHeadCoach: role === "HEAD_COACH",
+        isPlayer: role === "PLAYER",
         login,
         logout,
       }}

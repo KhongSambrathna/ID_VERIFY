@@ -12,6 +12,9 @@ const {
   removeAssignment,
   approveAssignment,
   rejectAssignment,
+  addFee,
+  updateFee,
+  removeFee,
   deleteAthlete,
   verifyAthlete,
   searchAthletes,
@@ -23,19 +26,25 @@ router.get("/verify/:verifyId", verifyAthlete);
 // Public - lets anyone find a player by name or ID number without scanning anything.
 router.get("/search", searchAthletes);
 
-// Admin and Head Coach below this line. A Head Coach is scoped to just
-// their own team by the controller (see athleteController.js) — every
-// route here is shared rather than duplicated under /api/coach/*, since
-// the access rules differ only in *which* records/assignments each role
-// can touch, not in the actions themselves.
-router.use(requireAuth, requireRole("ADMIN", "HEAD_COACH"));
+// Signed-in below this line. A Head Coach/Player is scoped to just their
+// own team by the controller (see athleteController.js) — every route here
+// is shared rather than duplicated under /api/coach/*, since the access
+// rules differ only in *which* records/assignments each role can touch,
+// not in the actions themselves.
+router.use(requireAuth);
 
-router.get("/", getAllAthletes);
+// Read-only — Admin (every team), Head Coach and Player (both forced to
+// their own team by the controller) can all view. A Player account is NEVER
+// allowed past this point — every route below is Admin/Head Coach only, so
+// a shared player login can look but never touch anything.
+router.get("/", requireRole("ADMIN", "HEAD_COACH", "PLAYER"), getAllAthletes);
 // must stay above /:id — otherwise "check-duplicate" gets swallowed as an :id
-router.get("/check-duplicate", checkDuplicateName);
-router.get("/:id", getAthleteById);
+router.get("/check-duplicate", requireRole("ADMIN", "HEAD_COACH"), checkDuplicateName);
+router.get("/:id", requireRole("ADMIN", "HEAD_COACH", "PLAYER"), getAthleteById);
+
 router.post(
   "/",
+  requireRole("ADMIN", "HEAD_COACH"),
   upload.fields([
     { name: "photo", maxCount: 1 },
     { name: "documents", maxCount: 10 },
@@ -44,6 +53,7 @@ router.post(
 );
 router.put(
   "/:id",
+  requireRole("ADMIN", "HEAD_COACH"),
   upload.fields([{ name: "photo", maxCount: 1 }]),
   updateAthlete
 );
@@ -52,11 +62,20 @@ router.put(
 // several on the same team, e.g. Player + Assistant Coach). Add/edit/remove
 // act on ONE assignment at a time; approve/reject (admin-only) are how an
 // Admin signs off on a Head Coach's pending add or pending removal request.
-router.post("/:id/assignments", addAssignment);
-router.put("/:id/assignments/:assignmentId", updateAssignment);
-router.delete("/:id/assignments/:assignmentId", removeAssignment);
+router.post("/:id/assignments", requireRole("ADMIN", "HEAD_COACH"), addAssignment);
+router.put("/:id/assignments/:assignmentId", requireRole("ADMIN", "HEAD_COACH"), updateAssignment);
+router.delete("/:id/assignments/:assignmentId", requireRole("ADMIN", "HEAD_COACH"), removeAssignment);
 router.put("/:id/assignments/:assignmentId/approve", requireRole("ADMIN"), approveAssignment);
 router.put("/:id/assignments/:assignmentId/reject", requireRole("ADMIN"), rejectAssignment);
+
+// Fee/debt rows on one assignment — several can exist at once (e.g.
+// "Uniform fee: $10" and "2026 registration: $15"), each added/edited/
+// removed independently. Same Admin/Head Coach (own team) access as the
+// assignment routes above; a Player account only ever GETs this data via
+// the flattened total + breakdown, never through these.
+router.post("/:id/assignments/:assignmentId/fees", requireRole("ADMIN", "HEAD_COACH"), addFee);
+router.put("/:id/assignments/:assignmentId/fees/:feeId", requireRole("ADMIN", "HEAD_COACH"), updateFee);
+router.delete("/:id/assignments/:assignmentId/fees/:feeId", requireRole("ADMIN", "HEAD_COACH"), removeFee);
 
 // Admin-only — a Head Coach removes someone through the assignment routes
 // above instead (which always requires Admin confirmation, per team).

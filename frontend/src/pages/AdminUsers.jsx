@@ -6,7 +6,10 @@ import TeamSelect from "../components/TeamSelect";
 const ROLE_OPTIONS = [
   { value: "ADMIN", label: "Admin" },
   { value: "HEAD_COACH", label: "Head Coach" },
+  { value: "PLAYER", label: "Player (read-only, shared)" },
 ];
+
+const ROLE_LABELS = { HEAD_COACH: "Head Coach", PLAYER: "Player", ADMIN: "Admin" };
 
 export default function AdminUsers() {
   const { user: currentUser } = useAuth();
@@ -50,7 +53,7 @@ export default function AdminUsers() {
         username: form.username,
         password: form.password,
         role: form.role,
-        team: form.role === "HEAD_COACH" ? form.team : undefined,
+        team: form.role === "HEAD_COACH" || form.role === "PLAYER" ? form.team : undefined,
       });
       setForm({ username: "", password: "", role: "HEAD_COACH", team: "" });
       load();
@@ -75,7 +78,12 @@ export default function AdminUsers() {
     <div className="container dash-body">
       <div className="dash-header">
         <h2>Users &amp; roles</h2>
-        <p>Create Head Coach logins so coaches can build their own team's lineups — they can only pull athletes already registered in their team, never add new ones.</p>
+        <p>
+          Create Head Coach logins so coaches can build their own team's lineups — they can only pull
+          athletes already registered in their team, never add new ones. Create a Player login (one shared
+          account per team) so players can view their team's roster and fee/debt status — read-only, no
+          editing.
+        </p>
       </div>
 
       <form className="card" style={{ maxWidth: 480, marginBottom: 24 }} onSubmit={handleCreate}>
@@ -98,8 +106,14 @@ export default function AdminUsers() {
             ))}
           </select>
         </div>
-        {form.role === "HEAD_COACH" && (
+        {(form.role === "HEAD_COACH" || form.role === "PLAYER") && (
           <TeamSelect value={form.team} onChange={(team) => setForm({ ...form, team })} required />
+        )}
+        {form.role === "PLAYER" && (
+          <p className="help-text" style={{ marginTop: -8 }}>
+            One shared login for every player on this team — they can see the whole team's roster and
+            fee/debt status, but can never add, edit, or remove anything.
+          </p>
         )}
         {formError && <div className="error-text">{formError}</div>}
         <button className="btn btn-primary" disabled={saving}>
@@ -125,7 +139,7 @@ export default function AdminUsers() {
               {users.map((u) => (
                 <tr key={u._id}>
                   <td data-label="Username">{u.username}</td>
-                  <td data-label="Role">{u.role === "HEAD_COACH" ? "Head Coach" : "Admin"}</td>
+                  <td data-label="Role">{ROLE_LABELS[u.role] || "Admin"}</td>
                   <td data-label="Team">{u.team || "—"}</td>
                   <td data-label="Actions" className="actions-cell">
                     {u._id !== currentUser?.id && (

@@ -139,6 +139,16 @@ export default function CoachDashboard() {
                         <span className="badge rejected">Pending approval</span>
                       )
                     )}
+                    {athlete.feeOwed > 0 && (
+                      <span
+                        className="badge rejected"
+                        title={(athlete.fees || [])
+                          .map((f) => `$${f.amount}${f.note ? ` — ${f.note}` : ""}`)
+                          .join(", ")}
+                      >
+                        Owes ${athlete.feeOwed}
+                      </span>
+                    )}
                   </div>
                   <div className="athlete-status" style={{ marginTop: 8 }}>
                     <Link className="link-btn" to={`/admin/athlete/${athlete._id}/edit`}>

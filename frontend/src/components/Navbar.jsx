@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function Navbar() {
-  const { isAuthed, isAdmin, logout } = useAuth();
+  const { isAuthed, isAdmin, isHeadCoach, isPlayer, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
@@ -56,7 +56,12 @@ export default function Navbar() {
           <Link to="/shop" onClick={closeMenu}>Shop</Link>
           {isAuthed ? (
             <>
-              <Link to={isAdmin ? "/admin" : "/coach"} onClick={closeMenu}>Dashboard</Link>
+              <Link to={isAdmin ? "/admin" : isHeadCoach ? "/coach" : "/player"} onClick={closeMenu}>
+                Dashboard
+              </Link>
+              {!isPlayer && (
+                <Link to="/debt-report" onClick={closeMenu}>Debt report</Link>
+              )}
               {isAdmin && <Link to="/admin/users" onClick={closeMenu}>Users</Link>}
               <a
                 href="#"

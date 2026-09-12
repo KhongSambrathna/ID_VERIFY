@@ -9,13 +9,17 @@ const adminSchema = new mongoose.Schema(
       // ADMIN can manage every athlete record and create/manage user logins.
       // HEAD_COACH can only pull athletes already in their own `team` into
       // lineups — they cannot add/edit/delete athlete records.
+      // PLAYER is a single shared, read-only login for everyone on one team
+      // — they can see (never edit) every athlete on their own team,
+      // including fee/debt info, same as a Head Coach sees, just with no
+      // write access at all.
       type: String,
-      enum: ["ADMIN", "HEAD_COACH"],
+      enum: ["ADMIN", "HEAD_COACH", "PLAYER"],
       default: "ADMIN",
     },
     team: {
-      // required for HEAD_COACH accounts — which team's roster they can see.
-      // Should match the `team` value used on Athlete records.
+      // required for HEAD_COACH and PLAYER accounts — which team's roster
+      // they can see. Should match the `team` value used on Athlete records.
       type: String,
     },
   },

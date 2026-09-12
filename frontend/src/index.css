@@ -431,6 +431,45 @@ a {
   gap: 8px;
   flex-wrap: wrap;
 }
+.assignment-row-fee {
+  margin-top: 6px;
+}
+.assignment-row-fee label {
+  font-size: 12.5px;
+  color: #666;
+}
+.assignment-row-fee input {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 13.5px;
+}
+.fee-items {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+.fee-items li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: #444;
+  padding: 3px 0;
+}
+.fee-add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.fee-add-row input[type="number"] {
+  width: 90px;
+}
+.fee-add-row input[type="text"] {
+  width: 180px;
+}
 .assignment-add-row {
   display: flex;
   align-items: flex-end;
@@ -661,6 +700,21 @@ table.athletes .actions-cell {
 .badge.pending { background: #f6e6c4; color: var(--pending); }
 .badge.verified { background: #d9ecdf; color: var(--ok); }
 .badge.rejected { background: #f3d9d4; color: var(--bad); }
+/* A <button> wearing the .badge look, for a fee total that expands an
+   itemized breakdown on click — resets the browser's default button chrome
+   so it reads identically to the plain-span badges everywhere else. */
+.fee-toggle {
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+.picker-debt-badge {
+  margin-left: 8px;
+  font-size: 11px;
+  padding: 2px 8px;
+  vertical-align: middle;
+}
 
 .link-btn {
   background: none;

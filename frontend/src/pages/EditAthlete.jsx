@@ -26,10 +26,14 @@ export default function EditAthlete() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [infoMessage, setInfoMessage] = useState("");
 
-  // Per-assignment UI state: a draft role while editing, and a per-row
-  // "this one's request is in flight" flag so only that row shows "Saving…".
+  // Per-assignment UI state: a draft role while editing, a draft new
+  // fee/debt row per assignment (amount + note, before it's added), and a
+  // per-row "this one's request is in flight" flag so only that row shows
+  // "Saving…".
   const [roleDrafts, setRoleDrafts] = useState({});
+  const [newFeeDrafts, setNewFeeDrafts] = useState({});
   const [busyAssignmentId, setBusyAssignmentId] = useState(null);
   const [newTeam, setNewTeam] = useState(isHeadCoach ? coachTeam || "" : "");
   const [newRole, setNewRole] = useState("PLAYER");
@@ -51,6 +55,7 @@ export default function EditAthlete() {
         });
         setCurrentPhotoUrl(data.photoUrl || null);
         setRoleDrafts({});
+        setNewFeeDrafts({});
       })
       .catch((err) => setError(err.response?.data?.message || "Failed to load athlete"));
   };
@@ -59,20 +64,30 @@ export default function EditAthlete() {
     loadAthlete().finally(() => setLoading(false));
   }, [id]);
 
-  const update = (key) => (e) => setForm({ ...form, [key]: e.target.value });
+  const update = (key) => (e) => {
+    setInfoMessage("");
+    setForm({ ...form, [key]: e.target.value });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setInfoMessage("");
     setSaving(true);
     try {
       const data = new FormData();
       Object.entries(form).forEach(([k, v]) => data.append(k, v));
       if (photo) data.append("photo", photo);
 
-      await api.put(`/athletes/${id}`, data, {
+      const { data: result } = await api.put(`/athletes/${id}`, data, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+      if (result?.noChanges) {
+        // Nothing was actually different from what's already saved (e.g. just
+        // opened the page and hit Save) — stay put, don't trigger a re-approval.
+        setInfoMessage("No changes to save.");
+        return;
+      }
       navigate(isHeadCoach ? "/coach" : `/admin/athlete/${id}`);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to save changes");
@@ -103,6 +118,48 @@ export default function EditAthlete() {
       afterAssignmentChange(data);
     } catch (err) {
       setAssignmentError(err.response?.data?.message || "Failed to update role");
+    } finally {
+      setBusyAssignmentId(null);
+    }
+  };
+
+  // Fee/debt rows are internal bookkeeping only — adding or removing one
+  // never flips the assignment back to "pending" the way a role change
+  // does. Each row is its own {amount, note} — adding a newly-owed fee
+  // never overwrites what was already recorded, so a second debt just
+  // becomes a second row.
+  const addFeeAction = async (assignmentId) => {
+    const draft = newFeeDrafts[assignmentId] || {};
+    const amount = Number(draft.amount);
+    if (!draft.amount || !Number.isFinite(amount) || amount <= 0) {
+      setAssignmentError("Enter a valid, positive fee amount");
+      return;
+    }
+    setAssignmentError("");
+    setBusyAssignmentId(assignmentId);
+    try {
+      const { data } = await api.post(`/athletes/${id}/assignments/${assignmentId}/fees`, {
+        amount,
+        note: draft.note || "",
+      });
+      afterAssignmentChange(data);
+      setNewFeeDrafts({ ...newFeeDrafts, [assignmentId]: { amount: "", note: "" } });
+    } catch (err) {
+      setAssignmentError(err.response?.data?.message || "Failed to add fee");
+    } finally {
+      setBusyAssignmentId(null);
+    }
+  };
+
+  const removeFeeAction = async (assignmentId, feeId) => {
+    if (!confirm("Remove this fee row?")) return;
+    setAssignmentError("");
+    setBusyAssignmentId(assignmentId);
+    try {
+      const { data } = await api.delete(`/athletes/${id}/assignments/${assignmentId}/fees/${feeId}`);
+      afterAssignmentChange(data);
+    } catch (err) {
+      setAssignmentError(err.response?.data?.message || "Failed to remove fee");
     } finally {
       setBusyAssignmentId(null);
     }
@@ -246,6 +303,77 @@ export default function EditAthlete() {
                     <span className="badge rejected">Pending</span>
                   )}
                   {a.pendingRemoval && <span className="badge rejected">Removal requested</span>}
+                  {!(a.fees || []).length ? (
+                    <span className="badge verified">Fee paid</span>
+                  ) : (
+                    <span className="badge rejected">
+                      Owes ${a.fees.reduce((sum, f) => sum + (f.amount || 0), 0)}
+                    </span>
+                  )}
+                </div>
+
+                <div className="assignment-row-fee">
+                  {(a.fees || []).length > 0 && (
+                    <ul className="fee-items">
+                      {a.fees.map((f) => (
+                        <li key={f._id}>
+                          <span>
+                            ${f.amount}
+                            {f.note ? ` — ${f.note}` : ""}
+                          </span>
+                          {canManage && (
+                            <button
+                              type="button"
+                              className="link-btn"
+                              disabled={isBusy}
+                              onClick={() => removeFeeAction(a._id, f._id)}
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {canManage && (
+                    <div className="fee-add-row">
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        placeholder="Amount"
+                        value={newFeeDrafts[a._id]?.amount ?? ""}
+                        onChange={(e) =>
+                          setNewFeeDrafts({
+                            ...newFeeDrafts,
+                            [a._id]: { ...newFeeDrafts[a._id], amount: e.target.value },
+                          })
+                        }
+                        disabled={isBusy}
+                      />
+                      <input
+                        type="text"
+                        placeholder="For (e.g. Uniform fee)"
+                        maxLength={200}
+                        value={newFeeDrafts[a._id]?.note ?? ""}
+                        onChange={(e) =>
+                          setNewFeeDrafts({
+                            ...newFeeDrafts,
+                            [a._id]: { ...newFeeDrafts[a._id], note: e.target.value },
+                          })
+                        }
+                        disabled={isBusy}
+                      />
+                      <button
+                        type="button"
+                        className="link-btn"
+                        disabled={isBusy || !newFeeDrafts[a._id]?.amount}
+                        onClick={() => addFeeAction(a._id)}
+                      >
+                        + Add fee
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="assignment-row-actions">
@@ -376,6 +504,7 @@ export default function EditAthlete() {
         </div>
 
         {error && <div className="error-text">{error}</div>}
+        {infoMessage && <p className="help-text">{infoMessage}</p>}
 
         <button className="btn btn-primary" disabled={saving}>
           {saving ? "Saving…" : "Save changes"}

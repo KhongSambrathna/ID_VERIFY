@@ -24,14 +24,23 @@ function flattenAssignments(athlete, teamFilter) {
   };
   return (athlete.assignments || [])
     .filter((a) => !teamFilter || a.team === teamFilter)
-    .map((a) => ({
-      ...base,
-      assignmentId: a._id,
-      team: a.team,
-      role: a.role,
-      approvalStatus: a.approvalStatus,
-      pendingRemoval: a.pendingRemoval,
-    }));
+    .map((a) => {
+      const fees = (a.fees || []).map((f) => ({ _id: f._id, amount: f.amount || 0, note: f.note || "" }));
+      return {
+        ...base,
+        assignmentId: a._id,
+        team: a.team,
+        role: a.role,
+        approvalStatus: a.approvalStatus,
+        pendingRemoval: a.pendingRemoval,
+        // `feeOwed` stays as the TOTAL across every fee row — every existing
+        // consumer that just checks "> 0" or prints the number keeps working
+        // unchanged; `fees` is the itemized breakdown for anything that
+        // wants to show what's actually owed for.
+        feeOwed: fees.reduce((sum, f) => sum + f.amount, 0),
+        fees,
+      };
+    });
 }
 
 module.exports = flattenAssignments;

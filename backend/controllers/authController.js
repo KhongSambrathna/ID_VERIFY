@@ -81,11 +81,11 @@ exports.createUser = async (req, res) => {
     if (!username || !password) {
       return res.status(400).json({ message: "Username and password required" });
     }
-    if (role && !["ADMIN", "HEAD_COACH"].includes(role)) {
-      return res.status(400).json({ message: "Role must be ADMIN or HEAD_COACH" });
+    if (role && !["ADMIN", "HEAD_COACH", "PLAYER"].includes(role)) {
+      return res.status(400).json({ message: "Role must be ADMIN, HEAD_COACH, or PLAYER" });
     }
-    if (role === "HEAD_COACH" && !team) {
-      return res.status(400).json({ message: "Team is required for a Head Coach account" });
+    if ((role === "HEAD_COACH" || role === "PLAYER") && !team) {
+      return res.status(400).json({ message: "Team is required for a Head Coach or Player account" });
     }
 
     const exists = await Admin.findOne({ username });
@@ -95,7 +95,7 @@ exports.createUser = async (req, res) => {
       username,
       password,
       role: role || "ADMIN",
-      team: role === "HEAD_COACH" ? team : undefined,
+      team: role === "HEAD_COACH" || role === "PLAYER" ? team : undefined,
     });
 
     res.status(201).json(publicAdmin(user));

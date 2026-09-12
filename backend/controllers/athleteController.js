@@ -60,7 +60,13 @@ exports.createAthlete = async (req, res) => {
       gender,
       address,
       assignments: team
-        ? [{ team, role: role || "PLAYER", approvalStatus: isHeadCoach ? "pending" : "approved" }]
+        ? [
+            {
+              team,
+              role: role || "PLAYER",
+              approvalStatus: isHeadCoach ? "pending" : "approved",
+            },
+          ]
         : [],
       isAvailable: isAvailable === "false" ? false : true,
       createdBy: req.adminId,
@@ -99,16 +105,16 @@ exports.createAthlete = async (req, res) => {
   }
 };
 
-// GET /api/athletes  (admin - every team unless ?team= is given; head coach -
-// always forced to their own team, regardless of any ?team= they pass, so
-// they can't browse other teams' rosters through this endpoint)
-// Returns one row PER team/role assignment (see flattenAssignments) — a
-// person on 2 teams appears as 2 rows, each carrying that team's own role
-// and approval state.
+// GET /api/athletes  (admin - every team unless ?team= is given; head coach
+// and player - always forced to their own team, regardless of any ?team=
+// they pass, so neither can browse other teams' rosters through this
+// endpoint) Returns one row PER team/role assignment (see flattenAssignments)
+// — a person on 2 teams appears as 2 rows, each carrying that team's own
+// role and approval state.
 exports.getAllAthletes = async (req, res) => {
   try {
-    const isHeadCoach = req.adminRole === "HEAD_COACH";
-    const team = isHeadCoach ? req.adminTeam : req.query.team || null;
+    const isTeamScoped = req.adminRole === "HEAD_COACH" || req.adminRole === "PLAYER";
+    const team = isTeamScoped ? req.adminTeam : req.query.team || null;
     const filter = team ? { "assignments.team": team } : {};
     const athletes = await Athlete.find(filter).sort({ createdAt: -1 });
     const rows = athletes.flatMap((a) => flattenAssignments(a, team));
@@ -118,18 +124,18 @@ exports.getAllAthletes = async (req, res) => {
   }
 };
 
-// GET /api/athletes/:id  (admin - any record; head coach - only a person who
-// has at least one assignment on their own team) — returns the RAW person
-// document (full `assignments` array included), for the Edit page and the
-// ID-card page, both of which need to see every team/role this person has.
+// GET /api/athletes/:id  (admin - any record; head coach and player - only a
+// person who has at least one assignment on their own team) — returns the
+// RAW person document (full `assignments` array included), for the Edit
+// page and the ID-card page, both of which need to see every team/role
+// this person has. A Player account only ever reads this (the route never
+// allows it to hit any write endpoint), but stays team-scoped just the same.
 exports.getAthleteById = async (req, res) => {
   try {
     const athlete = await Athlete.findById(req.params.id);
     if (!athlete) return res.status(404).json({ message: "Athlete not found" });
-    if (
-      req.adminRole === "HEAD_COACH" &&
-      !athlete.assignments.some((a) => a.team === req.adminTeam)
-    ) {
+    const isTeamScoped = req.adminRole === "HEAD_COACH" || req.adminRole === "PLAYER";
+    if (isTeamScoped && !athlete.assignments.some((a) => a.team === req.adminTeam)) {
       return res.status(403).json({ message: "Access denied" });
     }
     res.json(athlete);
@@ -145,6 +151,21 @@ exports.getAthleteById = async (req, res) => {
 const ADMIN_EDITABLE_FIELDS = ["fullName", "khmerName", "dateOfBirth", "gender", "address", "status"];
 const HEAD_COACH_EDITABLE_FIELDS = ["fullName", "khmerName", "dateOfBirth", "gender", "address"];
 
+// Date-of-birth needs its own comparison — the form sends "YYYY-MM-DD" but
+// the stored value is a Date — so a plain string compare would treat every
+// submit as "changed" even when the date is identical.
+function valuesDiffer(field, current, incoming) {
+  if (field === "dateOfBirth") {
+    const toDay = (v) => {
+      if (!v) return "";
+      const d = new Date(v);
+      return isNaN(d) ? "" : d.toISOString().slice(0, 10);
+    };
+    return toDay(current) !== toDay(incoming);
+  }
+  return String(current ?? "") !== String(incoming ?? "");
+}
+
 exports.updateAthlete = async (req, res) => {
   try {
     const athlete = await Athlete.findById(req.params.id);
@@ -155,12 +176,25 @@ exports.updateAthlete = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
+    // Only apply/save a field, and only count it toward `changed`, if it's
+    // actually different from what's already stored — submitting the form
+    // unmodified (e.g. just opening Edit and clicking Save) must be a no-op,
+    // not a re-approval trigger.
+    let changed = false;
     const editableFields = isHeadCoach ? HEAD_COACH_EDITABLE_FIELDS : ADMIN_EDITABLE_FIELDS;
     editableFields.forEach((field) => {
-      if (req.body[field] !== undefined) athlete[field] = req.body[field];
+      if (req.body[field] === undefined) return;
+      if (valuesDiffer(field, athlete[field], req.body[field])) {
+        athlete[field] = req.body[field];
+        changed = true;
+      }
     });
     if (req.body.isAvailable !== undefined) {
-      athlete.isAvailable = toBool(req.body.isAvailable);
+      const incoming = toBool(req.body.isAvailable);
+      if (athlete.isAvailable !== incoming) {
+        athlete.isAvailable = incoming;
+        changed = true;
+      }
     }
 
     // Optional new photo (multipart edit form) — replaces the old one.
@@ -172,6 +206,7 @@ exports.updateAthlete = async (req, res) => {
       });
       athlete.photoUrl = url;
       athlete.photoPublicId = publicId;
+      changed = true;
       if (oldPhotoPublicId) {
         cloudinary.uploader.destroy(oldPhotoPublicId).catch((err) =>
           console.warn("Old photo cleanup failed:", err.message)
@@ -179,10 +214,18 @@ exports.updateAthlete = async (req, res) => {
       }
     }
 
+    // Nothing actually changed (viewed the record, maybe only touched a fee
+    // amount elsewhere, then hit Save) — don't write anything and don't
+    // touch approval status; just tell the caller there was nothing to do.
+    if (!changed) {
+      return res.json({ ...athlete.toObject(), noChanges: true });
+    }
+
     // A Head Coach editing this shared profile sends their OWN team's
     // assignment(s) back to "pending" for re-review — this never touches
     // the person's OTHER teams' assignments, which stay exactly as they
-    // were (still approved/public if they already were).
+    // were (still approved/public if they already were). This only fires
+    // when a real change was made above.
     if (isHeadCoach) {
       athlete.assignments.forEach((a) => {
         if (a.team === req.adminTeam) a.approvalStatus = "pending";
@@ -216,7 +259,11 @@ exports.addAssignment = async (req, res) => {
       return res.status(400).json({ message: "This person already has that exact team and role" });
     }
 
-    athlete.assignments.push({ team, role, approvalStatus: isHeadCoach ? "pending" : "approved" });
+    athlete.assignments.push({
+      team,
+      role,
+      approvalStatus: isHeadCoach ? "pending" : "approved",
+    });
     await athlete.save();
     res.status(201).json(athlete);
   } catch (err) {
@@ -226,9 +273,10 @@ exports.addAssignment = async (req, res) => {
 
 // PUT /api/athletes/:id/assignments/:assignmentId  — change the ROLE on one
 // existing team assignment (the team itself is fixed — to move someone to a
-// different team, remove this assignment and add a new one). A Head Coach
-// can only touch an assignment on their own team, and doing so sends that
-// one assignment back to "pending" for re-review.
+// different team, remove this assignment and add a new one; fee/debt rows
+// are managed separately below via addFee/updateFee/removeFee). A Head
+// Coach can only touch an assignment on their own team, and doing so sends
+// that one assignment back to "pending" for re-review.
 exports.updateAssignment = async (req, res) => {
   try {
     const athlete = await Athlete.findById(req.params.id);
@@ -241,9 +289,90 @@ exports.updateAssignment = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    if (req.body.role) assignment.role = req.body.role;
-    if (isHeadCoach) assignment.approvalStatus = "pending";
+    if (req.body.role && req.body.role !== assignment.role) {
+      assignment.role = req.body.role;
+      if (isHeadCoach) assignment.approvalStatus = "pending";
+    }
 
+    await athlete.save();
+    res.json(athlete);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Fee/debt line items on one assignment — e.g. "Uniform fee: $10" and
+// "2026 registration: $15" as two separate rows, so adding a newly-owed fee
+// never overwrites what was already recorded. None of these ever flips the
+// assignment's approvalStatus — recording money owed is internal
+// bookkeeping, never shown on a card or in public search/verify.
+function findAssignmentForFee(req) {
+  return Athlete.findById(req.params.id).then((athlete) => {
+    if (!athlete) return { error: [404, "Athlete not found"] };
+    const assignment = athlete.assignments.id(req.params.assignmentId);
+    if (!assignment) return { error: [404, "Assignment not found"] };
+    const isHeadCoach = req.adminRole === "HEAD_COACH";
+    if (isHeadCoach && assignment.team !== req.adminTeam) {
+      return { error: [403, "Access denied"] };
+    }
+    return { athlete, assignment };
+  });
+}
+
+// POST /api/athletes/:id/assignments/:assignmentId/fees — add one fee/debt row.
+exports.addFee = async (req, res) => {
+  try {
+    const { athlete, assignment, error } = await findAssignmentForFee(req);
+    if (error) return res.status(error[0]).json({ message: error[1] });
+
+    const amount = Number(req.body.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ message: "Amount must be a positive number" });
+    }
+
+    assignment.fees.push({ amount, note: String(req.body.note || "").slice(0, 200) });
+    await athlete.save();
+    res.status(201).json(athlete);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PUT /api/athletes/:id/assignments/:assignmentId/fees/:feeId — edit one row's amount/note.
+exports.updateFee = async (req, res) => {
+  try {
+    const { athlete, assignment, error } = await findAssignmentForFee(req);
+    if (error) return res.status(error[0]).json({ message: error[1] });
+
+    const fee = assignment.fees.id(req.params.feeId);
+    if (!fee) return res.status(404).json({ message: "Fee row not found" });
+
+    if (req.body.amount !== undefined) {
+      const amount = Number(req.body.amount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return res.status(400).json({ message: "Amount must be a positive number" });
+      }
+      fee.amount = amount;
+    }
+    if (req.body.note !== undefined) {
+      fee.note = String(req.body.note).slice(0, 200);
+    }
+
+    await athlete.save();
+    res.json(athlete);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// DELETE /api/athletes/:id/assignments/:assignmentId/fees/:feeId — remove one row
+// (e.g. it was paid off, or entered by mistake).
+exports.removeFee = async (req, res) => {
+  try {
+    const { athlete, assignment, error } = await findAssignmentForFee(req);
+    if (error) return res.status(error[0]).json({ message: error[1] });
+
+    assignment.fees = assignment.fees.filter((f) => String(f._id) !== String(req.params.feeId));
     await athlete.save();
     res.json(athlete);
   } catch (err) {

@@ -123,6 +123,7 @@ export default function AdminDashboard() {
                 <th>Available</th>
                 <th>Status</th>
                 <th>Approval</th>
+                <th>Fee</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -148,6 +149,18 @@ export default function AdminDashboard() {
                       <span className="badge rejected">Pending</span>
                     ) : (
                       <span className="badge verified">Approved</span>
+                    )}
+                  </td>
+                  <td data-label="Fee">
+                    {a.feeOwed > 0 ? (
+                      <span
+                        className="badge rejected"
+                        title={(a.fees || []).map((f) => `$${f.amount}${f.note ? ` — ${f.note}` : ""}`).join(", ")}
+                      >
+                        Owes ${a.feeOwed}
+                      </span>
+                    ) : (
+                      <span className="badge verified">Paid</span>
                     )}
                   </td>
                   <td data-label="Actions" className="actions-cell">
@@ -203,7 +216,7 @@ export default function AdminDashboard() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: "center", color: "#777" }}>
+                  <td colSpan={9} style={{ textAlign: "center", color: "#777" }}>
                     {athletes.length === 0
                       ? "No athletes yet — add your first one."
                       : "No matches for your search."}

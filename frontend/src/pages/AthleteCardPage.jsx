@@ -4,6 +4,7 @@ import html2canvas from "html2canvas";
 import api from "../api/axios";
 import IDCard from "../components/IDCard";
 import { resolveFileUrl } from "../utils/fileUrl";
+import { useAuth } from "../context/AuthContext";
 
 function formatDob(dob) {
   if (!dob) return null;
@@ -16,12 +17,14 @@ function formatDob(dob) {
 
 export default function AthleteCardPage() {
   const { id } = useParams();
+  const { isPlayer } = useAuth();
   const [searchParams] = useSearchParams();
   const requestedTeam = searchParams.get("team");
   const [athlete, setAthlete] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [feeExpanded, setFeeExpanded] = useState(false);
   const exportWrapRef = useRef(null);
 
   useEffect(() => {
@@ -49,6 +52,25 @@ export default function AthleteCardPage() {
     const roles = athlete.assignments.filter((a) => a.team === selectedTeam).map((a) => a.role);
     return { ...athlete, team: selectedTeam, role: roles.join(", ") };
   }, [athlete, selectedTeam]);
+
+  // Fee/debt info for the currently selected team only — Admin/Head
+  // Coach/Player viewers only (this whole page is), and never part of the
+  // printed/exported card below. Only the TOTAL shows by default; the
+  // itemized breakdown only appears once the viewer clicks it.
+  const teamFee = useMemo(() => {
+    if (!athlete || !selectedTeam) return { owed: 0, items: [] };
+    const onTeam = athlete.assignments.filter((a) => a.team === selectedTeam);
+    const items = onTeam.flatMap((a) => a.fees || []);
+    return {
+      owed: items.reduce((sum, f) => sum + (f.amount || 0), 0),
+      items,
+    };
+  }, [athlete, selectedTeam]);
+
+  // Collapse the breakdown again whenever a different team's card is shown.
+  useEffect(() => {
+    setFeeExpanded(false);
+  }, [selectedTeam]);
 
   const handleSaveAsJpg = async () => {
     const cardNode = exportWrapRef.current?.querySelector(".id-card");
@@ -79,7 +101,7 @@ export default function AthleteCardPage() {
           via the hidden card below. */}
       <div className="dash-header no-print">
         <h2>Athlete record</h2>
-        <Link to="/admin" className="link-btn">
+        <Link to={isPlayer ? "/player" : "/admin"} className="link-btn">
           ← Back to dashboard
         </Link>
       </div>
@@ -147,16 +169,48 @@ export default function AthleteCardPage() {
                 <div className="detail-label">Address</div>
                 <div className="detail-value">{athlete.address || "—"}</div>
               </div>
+              <div className="detail-item detail-item-wide">
+                <div className="detail-label">Fee / debt (this team)</div>
+                <div className="detail-value">
+                  {teamFee.owed > 0 ? (
+                    <>
+                      <button
+                        type="button"
+                        className="badge rejected fee-toggle"
+                        onClick={() => setFeeExpanded((v) => !v)}
+                      >
+                        Owes ${teamFee.owed} {feeExpanded ? "▲" : "▼"}
+                      </button>
+                      {feeExpanded && (
+                        <ul className="fee-items" style={{ marginTop: 6 }}>
+                          {teamFee.items.map((f) => (
+                            <li key={f._id}>
+                              <span>
+                                ${f.amount}
+                                {f.note ? ` — ${f.note}` : ""}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
+                  ) : (
+                    <span className="badge verified">Fee paid</span>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="dash-actions" style={{ marginTop: 20 }}>
-              <Link
-                to={`/admin/athlete/${athlete._id}/edit`}
-                className="btn btn-outline"
-                style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
-              >
-                Edit
-              </Link>
+              {!isPlayer && (
+                <Link
+                  to={`/admin/athlete/${athlete._id}/edit`}
+                  className="btn btn-outline"
+                  style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
+                >
+                  Edit
+                </Link>
+              )}
               <button className="btn btn-primary" onClick={() => window.print()}>
                 Export / Print card
               </button>
