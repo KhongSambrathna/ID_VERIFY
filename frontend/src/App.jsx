@@ -18,6 +18,8 @@ import AdminMatchDay from "./pages/AdminMatchDay";
 import AdminShop from "./pages/AdminShop";
 import ShopPage from "./pages/ShopPage";
 import DebtReportPage from "./pages/DebtReportPage";
+import StatsPage from "./pages/StatsPage";
+import RenewPage from "./pages/RenewPage";
 import PlayerDashboard from "./pages/PlayerDashboard";
 
 export default function App() {
@@ -116,6 +118,22 @@ export default function App() {
           element={
             <ProtectedRoute role={["ADMIN", "HEAD_COACH"]}>
               <DebtReportPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/stats"
+          element={
+            <ProtectedRoute role={["ADMIN", "HEAD_COACH"]}>
+              <StatsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/renew"
+          element={
+            <ProtectedRoute role={["ADMIN", "HEAD_COACH"]}>
+              <RenewPage />
             </ProtectedRoute>
           }
         />

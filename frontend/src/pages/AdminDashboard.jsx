@@ -7,7 +7,6 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [stats, setStats] = useState(null);
   const [selectedPending, setSelectedPending] = useState([]);
   const [bulkApproving, setBulkApproving] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
@@ -24,18 +23,8 @@ export default function AdminDashboard() {
     }
   };
 
-  const loadStats = async () => {
-    try {
-      const { data } = await api.get("/athletes/stats");
-      setStats(data);
-    } catch {
-      // non-critical — the dashboard still works without the summary widget
-    }
-  };
-
   useEffect(() => {
     load();
-    loadStats();
   }, []);
 
   const exportCsv = async () => {
@@ -70,7 +59,6 @@ export default function AdminDashboard() {
       await api.put("/athletes/bulk-approve", { items: selectedPending });
       setSelectedPending([]);
       load();
-      loadStats();
     } catch (err) {
       alert(err.response?.data?.message || "Failed to bulk-approve");
     } finally {
@@ -93,13 +81,11 @@ export default function AdminDashboard() {
   const approveAssignment = async (a) => {
     await api.put(`/athletes/${a._id}/assignments/${a.assignmentId}/approve`);
     load();
-    loadStats();
   };
 
   const rejectAssignment = async (a) => {
     await api.put(`/athletes/${a._id}/assignments/${a.assignmentId}/reject`);
     load();
-    loadStats();
   };
 
   const removeAssignment = async (a) => {
@@ -143,6 +129,12 @@ export default function AdminDashboard() {
           <Link to="/admin/cards" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
             Export all cards
           </Link>
+          <Link to="/admin/stats" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
+            Pending &amp; debt report
+          </Link>
+          <Link to="/admin/renew" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
+            ID renewal
+          </Link>
           <button
             type="button"
             className="btn btn-outline"
@@ -157,55 +149,6 @@ export default function AdminDashboard() {
           </Link>
         </div>
       </div>
-
-      {stats && (
-        <div className="card" style={{ marginBottom: 16, padding: 16 }}>
-          <div className="dash-actions" style={{ gap: 24, flexWrap: "wrap" }}>
-            <div>
-              <div className="detail-label">Total athletes</div>
-              <div className="detail-value" style={{ fontSize: 20, fontWeight: 700 }}>
-                {stats.totalAthletes}
-              </div>
-            </div>
-            <div>
-              <div className="detail-label">Pending approvals</div>
-              <div className="detail-value" style={{ fontSize: 20, fontWeight: 700 }}>
-                {stats.totalPendingApprovals}
-              </div>
-            </div>
-            <div>
-              <div className="detail-label">Total debt (club-wide)</div>
-              <div className="detail-value" style={{ fontSize: 20, fontWeight: 700 }}>
-                ${stats.totalDebt}
-              </div>
-            </div>
-          </div>
-          {stats.teams?.length > 0 && (
-            <div className="table-scroll" style={{ marginTop: 12 }}>
-              <table className="athletes">
-                <thead>
-                  <tr>
-                    <th>Team</th>
-                    <th>Athletes</th>
-                    <th>Pending</th>
-                    <th>Debt</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.teams.map((t) => (
-                    <tr key={t.team}>
-                      <td data-label="Team">{t.team}</td>
-                      <td data-label="Athletes">{t.athleteCount}</td>
-                      <td data-label="Pending">{t.pendingCount}</td>
-                      <td data-label="Debt">${t.totalDebt}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
 
       {pendingCount > 0 && (
         <p className="help-text" style={{ color: "var(--navy)", fontWeight: 600 }}>

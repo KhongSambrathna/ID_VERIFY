@@ -940,3 +940,41 @@ exports.bulkApproveAssignments = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+// PUT /api/athletes/bulk-renew  (admin any; head coach only athletes on
+// their own team) — body: { athleteIds: [...] }. Stamps lastVerifiedAt to
+// today for each one, for clearing a backlog of "needs renewal" people from
+// the dedicated Renewal page instead of one at a time. lastVerifiedAt is a
+// whole-person field (not per-assignment), so this takes athlete ids
+// directly rather than {athleteId, assignmentId} pairs. Each item is
+// handled independently, same as bulk-approve above.
+exports.bulkRenewVerification = async (req, res) => {
+  try {
+    const athleteIds = Array.isArray(req.body.athleteIds) ? req.body.athleteIds : [];
+    if (!athleteIds.length) return res.status(400).json({ message: "No athletes given" });
+
+    const isHeadCoach = req.adminRole === "HEAD_COACH";
+    const results = [];
+    for (const athleteId of athleteIds) {
+      try {
+        const athlete = await Athlete.findById(athleteId);
+        if (!athlete) {
+          results.push({ athleteId, ok: false, message: "Athlete not found" });
+          continue;
+        }
+        if (isHeadCoach && !athlete.assignments.some((a) => a.team === req.adminTeam)) {
+          results.push({ athleteId, ok: false, message: "Access denied" });
+          continue;
+        }
+        athlete.lastVerifiedAt = new Date();
+        await athlete.save();
+        results.push({ athleteId, ok: true });
+      } catch (err) {
+        results.push({ athleteId, ok: false, message: err.message });
+      }
+    }
+    res.json({ results });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

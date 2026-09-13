@@ -20,6 +20,7 @@ const {
   getStats,
   exportRosterCsv,
   bulkApproveAssignments,
+  bulkRenewVerification,
   deleteAthlete,
   verifyAthlete,
   searchAthletes,
@@ -49,6 +50,7 @@ router.get("/check-duplicate", requireRole("ADMIN", "HEAD_COACH"), checkDuplicat
 router.get("/stats", requireRole("ADMIN", "HEAD_COACH"), getStats);
 router.get("/export.csv", requireRole("ADMIN", "HEAD_COACH"), exportRosterCsv);
 router.put("/bulk-approve", requireRole("ADMIN"), bulkApproveAssignments);
+router.put("/bulk-renew", requireRole("ADMIN", "HEAD_COACH"), bulkRenewVerification);
 router.get("/:id", requireRole("ADMIN", "HEAD_COACH", "PLAYER"), getAthleteById);
 router.get("/:id/scan-logs", requireRole("ADMIN", "HEAD_COACH"), getScanLogs);
 

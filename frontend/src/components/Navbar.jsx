@@ -62,6 +62,12 @@ export default function Navbar() {
               {!isPlayer && (
                 <Link to="/debt-report" onClick={closeMenu}>Debt report</Link>
               )}
+              {!isPlayer && (
+                <Link to="/admin/stats" onClick={closeMenu}>Stats</Link>
+              )}
+              {!isPlayer && (
+                <Link to="/admin/renew" onClick={closeMenu}>ID renewal</Link>
+              )}
               {isAdmin && <Link to="/admin/users" onClick={closeMenu}>Users</Link>}
               <a
                 href="#"
