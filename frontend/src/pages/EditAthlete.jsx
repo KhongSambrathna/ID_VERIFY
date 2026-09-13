@@ -23,6 +23,15 @@ export default function EditAthlete() {
   const [athlete, setAthlete] = useState(null); // raw record — source of `assignments`
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState(null);
   const [photo, setPhoto] = useState(null);
+  // Reference/ID documents (national ID copy, birth certificate, etc.) —
+  // Admin/Head Coach only, shown when an opposing team asks to verify
+  // identity in person. `existingDocs` is what's already saved;
+  // `removeDocIds` marks some of those for removal; `newDocs` are new files
+  // picked but not yet uploaded. All three only take effect when the main
+  // "Save changes" button below is pressed, same as a photo replacement.
+  const [existingDocs, setExistingDocs] = useState([]);
+  const [removeDocIds, setRemoveDocIds] = useState(new Set());
+  const [newDocs, setNewDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -33,8 +42,10 @@ export default function EditAthlete() {
   // per-row "this one's request is in flight" flag so only that row shows
   // "Saving…".
   const [roleDrafts, setRoleDrafts] = useState({});
+  const [jerseyDrafts, setJerseyDrafts] = useState({});
   const [newFeeDrafts, setNewFeeDrafts] = useState({});
   const [busyAssignmentId, setBusyAssignmentId] = useState(null);
+  const [renewing, setRenewing] = useState(false);
   const [newTeam, setNewTeam] = useState(isHeadCoach ? coachTeam || "" : "");
   const [newRole, setNewRole] = useState("PLAYER");
   const [addingAssignment, setAddingAssignment] = useState(false);
@@ -54,7 +65,11 @@ export default function EditAthlete() {
           isAvailable: data.isAvailable ? "true" : "false",
         });
         setCurrentPhotoUrl(data.photoUrl || null);
+        setExistingDocs(data.supportingDocuments || []);
+        setRemoveDocIds(new Set());
+        setNewDocs([]);
         setRoleDrafts({});
+        setJerseyDrafts({});
         setNewFeeDrafts({});
       })
       .catch((err) => setError(err.response?.data?.message || "Failed to load athlete"));
@@ -69,6 +84,16 @@ export default function EditAthlete() {
     setForm({ ...form, [key]: e.target.value });
   };
 
+  const toggleRemoveDoc = (docId) => {
+    setInfoMessage("");
+    setRemoveDocIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(docId)) next.delete(docId);
+      else next.add(docId);
+      return next;
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -78,6 +103,8 @@ export default function EditAthlete() {
       const data = new FormData();
       Object.entries(form).forEach(([k, v]) => data.append(k, v));
       if (photo) data.append("photo", photo);
+      newDocs.forEach((f) => data.append("documents", f));
+      if (removeDocIds.size) data.append("removeDocumentIds", JSON.stringify([...removeDocIds]));
 
       const { data: result } = await api.put(`/athletes/${id}`, data, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -108,18 +135,49 @@ export default function EditAthlete() {
     setRoleDrafts({});
   };
 
-  const saveRole = async (assignmentId) => {
+  // Saves whichever of role / jersey number was actually touched for this
+  // assignment. Jersey number never triggers re-approval (it's a squad-list
+  // convenience, not something that affects identity/eligibility) — only a
+  // real role change does, same as before.
+  const saveAssignmentMeta = async (a) => {
     setAssignmentError("");
-    setBusyAssignmentId(assignmentId);
+    setBusyAssignmentId(a._id);
     try {
-      const { data } = await api.put(`/athletes/${id}/assignments/${assignmentId}`, {
-        role: roleDrafts[assignmentId],
-      });
+      const payload = { role: roleDrafts[a._id] ?? a.role };
+      if (jerseyDrafts[a._id] !== undefined) payload.jerseyNumber = jerseyDrafts[a._id];
+      const { data } = await api.put(`/athletes/${id}/assignments/${a._id}`, payload);
       afterAssignmentChange(data);
+      setJerseyDrafts((prev) => {
+        const next = { ...prev };
+        delete next[a._id];
+        return next;
+      });
     } catch (err) {
-      setAssignmentError(err.response?.data?.message || "Failed to update role");
+      setAssignmentError(err.response?.data?.message || "Failed to save");
     } finally {
       setBusyAssignmentId(null);
+    }
+  };
+
+  const jerseyIsDirty = (a) => {
+    if (jerseyDrafts[a._id] === undefined) return false;
+    const draft = jerseyDrafts[a._id];
+    const draftNum = draft === "" ? null : Number(draft);
+    return draftNum !== (a.jerseyNumber ?? null);
+  };
+
+  // Admin any record, Head Coach their own team — just stamps
+  // lastVerifiedAt to today. Never blocks anything; it only clears the
+  // "needs renewal" badge once it's over a year old.
+  const renewVerification = async () => {
+    setRenewing(true);
+    try {
+      const { data } = await api.put(`/athletes/${id}/renew`);
+      setAthlete(data);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to renew");
+    } finally {
+      setRenewing(false);
     }
   };
 
@@ -247,11 +305,25 @@ export default function EditAthlete() {
     <div className="container" style={{ paddingBottom: 60 }}>
       <div className="dash-header">
         <h2>Edit athlete</h2>
-        {!isHeadCoach && (
-          <Link to={`/admin/athlete/${id}`} className="link-btn">
-            ← Back to record
-          </Link>
-        )}
+        <div className="dash-actions">
+          <span className="help-text" style={{ margin: 0 }}>
+            {athlete?.lastVerifiedAt
+              ? `Last verified ${new Date(athlete.lastVerifiedAt).toLocaleDateString()}`
+              : "Never verified in person"}
+          </span>
+          {(!athlete?.lastVerifiedAt ||
+            Date.now() - new Date(athlete.lastVerifiedAt).getTime() > 365 * 24 * 60 * 60 * 1000) && (
+            <span className="badge rejected">Needs renewal</span>
+          )}
+          <button type="button" className="link-btn" onClick={renewVerification} disabled={renewing}>
+            {renewing ? "Renewing…" : "Renew (verified today)"}
+          </button>
+          {!isHeadCoach && (
+            <Link to={`/admin/athlete/${id}`} className="link-btn">
+              ← Back to record
+            </Link>
+          )}
+        </div>
       </div>
       {isHeadCoach && (
         <p className="help-text" style={{ maxWidth: 640 }}>
@@ -289,16 +361,28 @@ export default function EditAthlete() {
                       </option>
                     ))}
                   </select>
-                  {canManage && roleDrafts[a._id] !== undefined && roleDrafts[a._id] !== a.role && (
-                    <button
-                      type="button"
-                      className="link-btn"
-                      disabled={isBusy}
-                      onClick={() => saveRole(a._id)}
-                    >
-                      Save role
-                    </button>
-                  )}
+                  <input
+                    type="number"
+                    min="0"
+                    max="99"
+                    placeholder="#"
+                    className="jersey-input"
+                    value={jerseyDrafts[a._id] ?? (a.jerseyNumber ?? "")}
+                    onChange={(e) => setJerseyDrafts({ ...jerseyDrafts, [a._id]: e.target.value })}
+                    disabled={!canManage || isBusy}
+                    title="Jersey number for this team"
+                  />
+                  {canManage &&
+                    ((roleDrafts[a._id] !== undefined && roleDrafts[a._id] !== a.role) || jerseyIsDirty(a)) && (
+                      <button
+                        type="button"
+                        className="link-btn"
+                        disabled={isBusy}
+                        onClick={() => saveAssignmentMeta(a)}
+                      >
+                        Save
+                      </button>
+                    )}
                   {a.approvalStatus === "pending" && !a.pendingRemoval && (
                     <span className="badge rejected">Pending</span>
                   )}
@@ -501,6 +585,43 @@ export default function EditAthlete() {
           )}
           <input type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files[0])} />
           <p className="help-text">Leave empty to keep the current photo.</p>
+        </div>
+
+        <div className="field">
+          <label>Reference documents</label>
+          <p className="help-text" style={{ marginTop: -4 }}>
+            National ID copy, birth certificate, family book, etc. — for Admin and Head Coach only, to
+            prove identity in person if another team asks to check. Never shown on the printed card,
+            export, or public page.
+          </p>
+          {existingDocs.length > 0 && (
+            <ul className="fee-items">
+              {existingDocs.map((doc) => (
+                <li key={doc._id}>
+                  <a href={resolveFileUrl(doc.fileUrl)} target="_blank" rel="noreferrer">
+                    {doc.label || "Document"}
+                  </a>
+                  <label style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 400 }}>
+                    <input
+                      type="checkbox"
+                      checked={removeDocIds.has(String(doc._id))}
+                      onChange={() => toggleRemoveDoc(String(doc._id))}
+                    />
+                    Remove
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
+          <input
+            type="file"
+            multiple
+            accept="image/*,application/pdf"
+            onChange={(e) => setNewDocs(Array.from(e.target.files))}
+          />
+          <p className="help-text">
+            Adding or removing a document only takes effect when you press "Save changes" below.
+          </p>
         </div>
 
         {error && <div className="error-text">{error}</div>}

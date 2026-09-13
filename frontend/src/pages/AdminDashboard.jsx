@@ -7,6 +7,10 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [stats, setStats] = useState(null);
+  const [selectedPending, setSelectedPending] = useState([]);
+  const [bulkApproving, setBulkApproving] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -20,9 +24,59 @@ export default function AdminDashboard() {
     }
   };
 
+  const loadStats = async () => {
+    try {
+      const { data } = await api.get("/athletes/stats");
+      setStats(data);
+    } catch {
+      // non-critical — the dashboard still works without the summary widget
+    }
+  };
+
   useEffect(() => {
     load();
+    loadStats();
   }, []);
+
+  const exportCsv = async () => {
+    setExportingCsv(true);
+    try {
+      const { data } = await api.get("/athletes/export.csv", { responseType: "blob" });
+      const url = window.URL.createObjectURL(data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "roster.csv";
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to export roster");
+    } finally {
+      setExportingCsv(false);
+    }
+  };
+
+  const togglePendingSelected = (a) => {
+    setSelectedPending((prev) =>
+      prev.some((x) => x.assignmentId === a.assignmentId)
+        ? prev.filter((x) => x.assignmentId !== a.assignmentId)
+        : [...prev, { athleteId: a._id, assignmentId: a.assignmentId }]
+    );
+  };
+
+  const bulkApproveSelected = async () => {
+    if (selectedPending.length === 0) return;
+    setBulkApproving(true);
+    try {
+      await api.put("/athletes/bulk-approve", { items: selectedPending });
+      setSelectedPending([]);
+      load();
+      loadStats();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to bulk-approve");
+    } finally {
+      setBulkApproving(false);
+    }
+  };
 
   const setStatus = async (id, status) => {
     await api.put(`/athletes/${id}`, { status });
@@ -39,11 +93,13 @@ export default function AdminDashboard() {
   const approveAssignment = async (a) => {
     await api.put(`/athletes/${a._id}/assignments/${a.assignmentId}/approve`);
     load();
+    loadStats();
   };
 
   const rejectAssignment = async (a) => {
     await api.put(`/athletes/${a._id}/assignments/${a.assignmentId}/reject`);
     load();
+    loadStats();
   };
 
   const removeAssignment = async (a) => {
@@ -87,17 +143,86 @@ export default function AdminDashboard() {
           <Link to="/admin/cards" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
             Export all cards
           </Link>
+          <button
+            type="button"
+            className="btn btn-outline"
+            style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
+            onClick={exportCsv}
+            disabled={exportingCsv}
+          >
+            {exportingCsv ? "Exporting…" : "Export roster (CSV)"}
+          </button>
           <Link to="/admin/new" className="btn btn-primary">
             + Add athlete
           </Link>
         </div>
       </div>
 
+      {stats && (
+        <div className="card" style={{ marginBottom: 16, padding: 16 }}>
+          <div className="dash-actions" style={{ gap: 24, flexWrap: "wrap" }}>
+            <div>
+              <div className="detail-label">Total athletes</div>
+              <div className="detail-value" style={{ fontSize: 20, fontWeight: 700 }}>
+                {stats.totalAthletes}
+              </div>
+            </div>
+            <div>
+              <div className="detail-label">Pending approvals</div>
+              <div className="detail-value" style={{ fontSize: 20, fontWeight: 700 }}>
+                {stats.totalPendingApprovals}
+              </div>
+            </div>
+            <div>
+              <div className="detail-label">Total debt (club-wide)</div>
+              <div className="detail-value" style={{ fontSize: 20, fontWeight: 700 }}>
+                ${stats.totalDebt}
+              </div>
+            </div>
+          </div>
+          {stats.teams?.length > 0 && (
+            <div className="table-scroll" style={{ marginTop: 12 }}>
+              <table className="athletes">
+                <thead>
+                  <tr>
+                    <th>Team</th>
+                    <th>Athletes</th>
+                    <th>Pending</th>
+                    <th>Debt</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.teams.map((t) => (
+                    <tr key={t.team}>
+                      <td data-label="Team">{t.team}</td>
+                      <td data-label="Athletes">{t.athleteCount}</td>
+                      <td data-label="Pending">{t.pendingCount}</td>
+                      <td data-label="Debt">${t.totalDebt}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {pendingCount > 0 && (
         <p className="help-text" style={{ color: "var(--navy)", fontWeight: 600 }}>
           {pendingCount} record{pendingCount > 1 ? "s" : ""} pending approval — hidden from public search and QR
           verify until approved.
         </p>
+      )}
+
+      {selectedPending.length > 0 && (
+        <div className="dash-actions" style={{ marginBottom: 12 }}>
+          <button className="btn btn-primary" onClick={bulkApproveSelected} disabled={bulkApproving}>
+            {bulkApproving ? "Approving…" : `Approve selected (${selectedPending.length})`}
+          </button>
+          <button className="btn btn-outline" onClick={() => setSelectedPending([])} disabled={bulkApproving}>
+            Clear selection
+          </button>
+        </div>
       )}
 
       <div className="field search-field">
@@ -116,10 +241,12 @@ export default function AdminDashboard() {
           <table className="athletes">
             <thead>
               <tr>
+                <th></th>
                 <th>ID</th>
                 <th>Name</th>
                 <th>Role</th>
                 <th>Team</th>
+                <th>Jersey #</th>
                 <th>Available</th>
                 <th>Status</th>
                 <th>Approval</th>
@@ -130,10 +257,20 @@ export default function AdminDashboard() {
             <tbody>
               {filtered.map((a) => (
                 <tr key={a.assignmentId}>
+                  <td data-label="">
+                    {a.approvalStatus === "pending" && !a.pendingRemoval && (
+                      <input
+                        type="checkbox"
+                        checked={selectedPending.some((x) => x.assignmentId === a.assignmentId)}
+                        onChange={() => togglePendingSelected(a)}
+                      />
+                    )}
+                  </td>
                   <td data-label="ID">{a.verifyId}</td>
                   <td data-label="Name">{a.fullName}</td>
                   <td data-label="Role">{a.role || "—"}</td>
                   <td data-label="Team">{a.team || "—"}</td>
+                  <td data-label="Jersey #">{a.jerseyNumber ?? "—"}</td>
                   <td data-label="Available">
                     <span className={`badge ${a.isAvailable ? "verified" : "rejected"}`}>
                       {a.isAvailable ? "Available" : "Not available"}
@@ -216,7 +353,7 @@ export default function AdminDashboard() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: "center", color: "#777" }}>
+                  <td colSpan={11} style={{ textAlign: "center", color: "#777" }}>
                     {athletes.length === 0
                       ? "No athletes yet — add your first one."
                       : "No matches for your search."}

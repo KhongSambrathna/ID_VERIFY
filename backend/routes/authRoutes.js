@@ -6,6 +6,7 @@ const {
   login,
   listUsers,
   createUser,
+  updateUser,
   deleteUser,
 } = require("../controllers/authController");
 
@@ -16,6 +17,7 @@ router.post("/login", login);
 // Admin only — managing other login accounts (Head Coach, additional Admins)
 router.get("/users", requireAuth, requireRole("ADMIN"), listUsers);
 router.post("/users", requireAuth, requireRole("ADMIN"), createUser);
+router.put("/users/:id", requireAuth, requireRole("ADMIN"), updateUser);
 router.delete("/users/:id", requireAuth, requireRole("ADMIN"), deleteUser);
 
 module.exports = router;

@@ -3,6 +3,7 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import api from "../api/axios";
 import { resolveFileUrl } from "../utils/fileUrl";
+import { jerseyNumberForTeam } from "../utils/rolesForTeam";
 
 const MIN_SQUAD = 15;
 const MAX_SQUAD = 22;
@@ -85,6 +86,9 @@ function AthletePicker({ athletes, selected, onToggle }) {
               className="small-photo"
             />
             <span>
+              {athlete.jerseyNumber !== null && athlete.jerseyNumber !== undefined && (
+                <span className="picker-meta">#{athlete.jerseyNumber} </span>
+              )}
               {athlete.fullName} <span className="picker-meta">({athlete.role || "PLAYER"} · {formatDob(athlete.dateOfBirth) || "DOB —"})</span>
               {athlete.feeOwed > 0 && (
                 <span
@@ -116,9 +120,10 @@ function SquadExportSheet({ innerRef, team, squadName, members }) {
         {members.map((item, idx) => {
           const a = item.athleteId;
           if (!a) return null;
+          const jersey = jerseyNumberForTeam(a, team);
           return (
             <div key={item.athleteId?._id || idx} className="squad-export-row">
-              <span className="squad-export-num">{idx + 1}</span>
+              <span className="squad-export-num">{jersey ?? idx + 1}</span>
               <img
                 src={a.photoUrl ? resolveFileUrl(a.photoUrl) : "https://placehold.co/60x60?text=Photo"}
                 alt={a.fullName}
@@ -426,7 +431,9 @@ export default function SquadListManager({ team, athletes }) {
                     <div className="lineup-athletes">
                       {lineup.athletes.map((item, idx) => (
                         <div key={idx} className="lineup-athlete">
-                          <span className="number">{idx + 1}</span>
+                          <span className="number">
+                            {jerseyNumberForTeam(item.athleteId, lineup.team) ?? idx + 1}
+                          </span>
                           <img
                             src={
                               item.athleteId?.photoUrl

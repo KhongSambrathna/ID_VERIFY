@@ -22,9 +22,11 @@ export default function CoachDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("athletes");
+  const [stats, setStats] = useState(null);
 
   useEffect(() => {
     loadData();
+    loadStats();
   }, []);
 
   const loadData = async () => {
@@ -36,6 +38,17 @@ export default function CoachDashboard() {
       setError(err.response?.data?.message || "Failed to load data");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Backend forces a Head Coach's own team, so this always comes back
+  // scoped to their team only — no query param needed here.
+  const loadStats = async () => {
+    try {
+      const { data } = await api.get("/athletes/stats");
+      setStats(data);
+    } catch {
+      // non-critical — the dashboard still works without the summary widget
     }
   };
 
@@ -98,6 +111,30 @@ export default function CoachDashboard() {
       {/* ATHLETES TAB */}
       {activeTab === "athletes" && (
         <div className="tab-content">
+          {stats?.teams?.[0] && (
+            <div className="card" style={{ marginBottom: 16, padding: 16 }}>
+              <div className="dash-actions" style={{ gap: 24, flexWrap: "wrap" }}>
+                <div>
+                  <div className="detail-label">Athletes</div>
+                  <div className="detail-value" style={{ fontSize: 20, fontWeight: 700 }}>
+                    {stats.teams[0].athleteCount}
+                  </div>
+                </div>
+                <div>
+                  <div className="detail-label">Pending approvals</div>
+                  <div className="detail-value" style={{ fontSize: 20, fontWeight: 700 }}>
+                    {stats.teams[0].pendingCount}
+                  </div>
+                </div>
+                <div>
+                  <div className="detail-label">Total debt</div>
+                  <div className="detail-value" style={{ fontSize: 20, fontWeight: 700 }}>
+                    ${stats.teams[0].totalDebt}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="dash-header" style={{ marginBottom: 12 }}>
             <h3 style={{ margin: 0 }}>
               My Team Athletes {pendingCount > 0 && `(${pendingCount} pending approval)`}
@@ -123,7 +160,10 @@ export default function CoachDashboard() {
                   />
                   <h4>{athlete.fullName}</h4>
                   {athlete.khmerName && <p className="khmer-name">{athlete.khmerName}</p>}
-                  <p className="role">{athlete.role || "PLAYER"}</p>
+                  <p className="role">
+                    {athlete.role || "PLAYER"}
+                    {athlete.jerseyNumber != null && ` · #${athlete.jerseyNumber}`}
+                  </p>
                   <p className="verify-id">ID: {athlete.verifyId}</p>
                   <p className="athlete-meta">
                     {formatDob(athlete.dateOfBirth) || "DOB —"} · {athlete.gender || "—"}
@@ -149,8 +189,18 @@ export default function CoachDashboard() {
                         Owes ${athlete.feeOwed}
                       </span>
                     )}
+                    {(!athlete.lastVerifiedAt ||
+                      Date.now() - new Date(athlete.lastVerifiedAt).getTime() > 365 * 24 * 60 * 60 * 1000) && (
+                      <span className="badge rejected">Needs renewal</span>
+                    )}
                   </div>
                   <div className="athlete-status" style={{ marginTop: 8 }}>
+                    <Link
+                      className="link-btn"
+                      to={`/admin/athlete/${athlete._id}?team=${encodeURIComponent(athlete.team)}`}
+                    >
+                      View card
+                    </Link>
                     <Link className="link-btn" to={`/admin/athlete/${athlete._id}/edit`}>
                       Edit
                     </Link>

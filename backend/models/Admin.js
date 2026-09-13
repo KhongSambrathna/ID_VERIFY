@@ -22,6 +22,11 @@ const adminSchema = new mongoose.Schema(
       // they can see. Should match the `team` value used on Athlete records.
       type: String,
     },
+    // Optional Telegram notifications (pending approvals, approve/reject,
+    // new fees). Empty/unset = notifications are just skipped for this
+    // account — nothing breaks. Get this by messaging the club's bot once,
+    // then looking the numeric chat id up (e.g. via @userinfobot).
+    telegramChatId: { type: String, default: "" },
   },
   { timestamps: true }
 );

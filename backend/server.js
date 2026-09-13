@@ -15,6 +15,11 @@ const shareRoutes = require("./routes/shareRoutes");
 
 const app = express();
 
+// Render (and most hosts) put the app behind a proxy — without this,
+// req.ip is always the proxy's own address, not the real visitor's, which
+// would make the QR-verify scan log useless.
+app.set("trust proxy", true);
+
 connectDB();
 
 app.use(cors());

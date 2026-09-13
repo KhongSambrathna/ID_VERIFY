@@ -15,6 +15,7 @@ function publicAdmin(admin) {
     username: admin.username,
     role: admin.role,
     team: admin.team || null,
+    telegramChatId: admin.telegramChatId || "",
   };
 }
 
@@ -67,7 +68,9 @@ exports.login = async (req, res) => {
 // GET /api/auth/users  (admin only) — list every login account
 exports.listUsers = async (req, res) => {
   try {
-    const users = await Admin.find().select("username role team createdAt").sort({ createdAt: -1 });
+    const users = await Admin.find()
+      .select("username role team telegramChatId createdAt")
+      .sort({ createdAt: -1 });
     res.json(users);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -99,6 +102,23 @@ exports.createUser = async (req, res) => {
     });
 
     res.status(201).json(publicAdmin(user));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PUT /api/auth/users/:id  (admin only) — currently just the optional
+// Telegram chat id used for notifications; username/role/team are fixed at
+// creation (delete and recreate the account to change those).
+exports.updateUser = async (req, res) => {
+  try {
+    const user = await Admin.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    if (req.body.telegramChatId !== undefined) {
+      user.telegramChatId = String(req.body.telegramChatId || "").trim();
+    }
+    await user.save();
+    res.json(publicAdmin(user));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

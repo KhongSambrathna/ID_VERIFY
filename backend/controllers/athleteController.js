@@ -1,9 +1,11 @@
 const Athlete = require("../models/Athlete");
+const ScanLog = require("../models/ScanLog");
 const generateAthleteQR = require("../utils/generateQR");
 const generateShortId = require("../utils/generateShortId");
 const uploadBufferToCloudinary = require("../utils/uploadToCloudinary");
 const cloudinary = require("../config/cloudinary");
 const flattenAssignments = require("../utils/flattenAssignments");
+const { notifyAdmins, notifyTeamCoaches } = require("../utils/notify");
 
 function toBool(value) {
   if (typeof value === "boolean") return value;
@@ -99,6 +101,11 @@ exports.createAthlete = async (req, res) => {
     athlete.qrCodePublicId = qr.publicId;
 
     await athlete.save();
+
+    if (isHeadCoach && team) {
+      notifyAdmins(`🆕 ${athlete.fullName} was added to ${team} by a Head Coach — needs approval.`);
+    }
+
     res.status(201).json(athlete);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -138,6 +145,17 @@ exports.getAthleteById = async (req, res) => {
     if (isTeamScoped && !athlete.assignments.some((a) => a.team === req.adminTeam)) {
       return res.status(403).json({ message: "Access denied" });
     }
+
+    // Reference/ID documents (national ID copy, birth certificate, etc.) are
+    // for Admin and Head Coach only — used to prove identity in person when
+    // an opposing team asks to check. A shared Player login can see
+    // everything else on this record (fees included) but never these.
+    if (req.adminRole === "PLAYER") {
+      const obj = athlete.toObject();
+      delete obj.supportingDocuments;
+      return res.json(obj);
+    }
+
     res.json(athlete);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -214,6 +232,53 @@ exports.updateAthlete = async (req, res) => {
       }
     }
 
+    // Reference/ID documents (national ID copy, birth certificate, family
+    // book, etc.) — kept for Admin/Head Coach to prove identity in person
+    // when an opposing team asks to check. Unlike fee/debt rows, adding or
+    // removing one of these IS treated like any other shared-profile edit:
+    // it counts toward `changed` below, so a Head Coach doing this sends
+    // their own-team assignment(s) back to "pending" the same as editing
+    // the name/DOB/etc. would.
+    if (req.body.removeDocumentIds) {
+      let removeIds = [];
+      try {
+        removeIds = JSON.parse(req.body.removeDocumentIds);
+      } catch {
+        removeIds = String(req.body.removeDocumentIds).split(",");
+      }
+      removeIds = removeIds.map(String).filter(Boolean);
+      if (removeIds.length) {
+        const toRemove = athlete.supportingDocuments.filter((d) => removeIds.includes(String(d._id)));
+        if (toRemove.length) {
+          athlete.supportingDocuments = athlete.supportingDocuments.filter(
+            (d) => !removeIds.includes(String(d._id))
+          );
+          changed = true;
+          toRemove.forEach((doc) => {
+            if (doc.publicId) {
+              cloudinary.uploader
+                .destroy(doc.publicId, { resource_type: doc.resourceType || "image" })
+                .catch((err) => console.warn("Old document cleanup failed:", err.message));
+            }
+          });
+        }
+      }
+    }
+
+    if (req.files?.documents?.length) {
+      const newDocs = await Promise.all(
+        req.files.documents.map(async (f) => {
+          const { url, publicId, resourceType } = await uploadBufferToCloudinary(f.buffer, {
+            folder: "athlete-verify/documents",
+            resourceType: "auto",
+          });
+          return { label: f.originalname, fileUrl: url, publicId, resourceType };
+        })
+      );
+      athlete.supportingDocuments = [...(athlete.supportingDocuments || []), ...newDocs];
+      changed = true;
+    }
+
     // Nothing actually changed (viewed the record, maybe only touched a fee
     // amount elsewhere, then hit Save) — don't write anything and don't
     // touch approval status; just tell the caller there was nothing to do.
@@ -233,6 +298,11 @@ exports.updateAthlete = async (req, res) => {
     }
 
     await athlete.save();
+
+    if (isHeadCoach) {
+      notifyAdmins(`✏️ ${athlete.fullName}'s record on ${req.adminTeam} was edited — needs re-approval.`);
+    }
+
     res.json(athlete);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -265,6 +335,11 @@ exports.addAssignment = async (req, res) => {
       approvalStatus: isHeadCoach ? "pending" : "approved",
     });
     await athlete.save();
+
+    if (isHeadCoach) {
+      notifyAdmins(`🆕 ${athlete.fullName} was added to ${team} (${role}) by a Head Coach — needs approval.`);
+    }
+
     res.status(201).json(athlete);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -294,6 +369,42 @@ exports.updateAssignment = async (req, res) => {
       if (isHeadCoach) assignment.approvalStatus = "pending";
     }
 
+    // Shirt/kit number for this team — a squad-list convenience, not
+    // something that affects identity/eligibility, so (like fees) it never
+    // flips approvalStatus even for a Head Coach.
+    if (req.body.jerseyNumber !== undefined) {
+      const raw = req.body.jerseyNumber;
+      if (raw === "" || raw === null) {
+        assignment.jerseyNumber = null;
+      } else {
+        const num = Number(raw);
+        if (!Number.isFinite(num) || num < 0 || num > 99) {
+          return res.status(400).json({ message: "Jersey number must be between 0 and 99" });
+        }
+        assignment.jerseyNumber = num;
+      }
+    }
+
+    await athlete.save();
+    res.json(athlete);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PUT /api/athletes/:id/renew — marks this person's identity as freshly
+// re-checked today (Admin any record; Head Coach only their own team).
+// Just stamps `lastVerifiedAt` — never blocks or gates anything else, it
+// only clears the "needs renewal" badge once it's over a year old.
+exports.renewVerification = async (req, res) => {
+  try {
+    const athlete = await Athlete.findById(req.params.id);
+    if (!athlete) return res.status(404).json({ message: "Athlete not found" });
+    const isHeadCoach = req.adminRole === "HEAD_COACH";
+    if (isHeadCoach && !athlete.assignments.some((a) => a.team === req.adminTeam)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    athlete.lastVerifiedAt = new Date();
     await athlete.save();
     res.json(athlete);
   } catch (err) {
@@ -330,8 +441,14 @@ exports.addFee = async (req, res) => {
       return res.status(400).json({ message: "Amount must be a positive number" });
     }
 
-    assignment.fees.push({ amount, note: String(req.body.note || "").slice(0, 200) });
+    const note = String(req.body.note || "").slice(0, 200);
+    assignment.fees.push({ amount, note });
     await athlete.save();
+
+    const text = `💵 New fee for ${athlete.fullName} (${assignment.team}): $${amount}${note ? ` — ${note}` : ""}`;
+    notifyAdmins(text);
+    notifyTeamCoaches(assignment.team, text);
+
     res.status(201).json(athlete);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -433,23 +550,29 @@ exports.approveAssignment = async (req, res) => {
     const assignment = athlete.assignments.id(req.params.assignmentId);
     if (!assignment) return res.status(404).json({ message: "Assignment not found" });
 
+    const team = assignment.team;
+    const fullName = athlete.fullName;
+
     if (assignment.pendingRemoval) {
       const wasLast = athlete.assignments.length === 1;
       athlete.assignments = athlete.assignments.filter((a) => String(a._id) !== String(assignment._id));
       if (wasLast) {
         cleanupAthleteAssets(athlete);
         await Athlete.findByIdAndDelete(athlete._id);
+        notifyTeamCoaches(team, `✅ ${fullName}'s removal from ${team} was confirmed by Admin.`);
         return res.json({
           message: "Removal confirmed — it was their only team, so the whole record was deleted",
           deletedAthlete: true,
         });
       }
       await athlete.save();
+      notifyTeamCoaches(team, `✅ ${fullName}'s removal from ${team} was confirmed by Admin.`);
       return res.json(athlete);
     }
 
     assignment.approvalStatus = "approved";
     await athlete.save();
+    notifyTeamCoaches(team, `✅ ${fullName}'s ${team} assignment was approved by Admin.`);
     res.json(athlete);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -468,9 +591,13 @@ exports.rejectAssignment = async (req, res) => {
     const assignment = athlete.assignments.id(req.params.assignmentId);
     if (!assignment) return res.status(404).json({ message: "Assignment not found" });
 
+    const team = assignment.team;
+    const fullName = athlete.fullName;
+
     if (assignment.pendingRemoval) {
       assignment.pendingRemoval = false;
       await athlete.save();
+      notifyTeamCoaches(team, `↩️ Admin declined the removal request for ${fullName} on ${team} — they stay on the team.`);
       return res.json(athlete);
     }
 
@@ -479,12 +606,14 @@ exports.rejectAssignment = async (req, res) => {
     if (wasLast) {
       cleanupAthleteAssets(athlete);
       await Athlete.findByIdAndDelete(athlete._id);
+      notifyTeamCoaches(team, `❌ ${fullName}'s ${team} assignment was rejected by Admin.`);
       return res.json({
         message: "Rejected — it was their only team, so the whole record was deleted",
         deletedAthlete: true,
       });
     }
     await athlete.save();
+    notifyTeamCoaches(team, `❌ ${fullName}'s ${team} assignment was rejected by Admin.`);
     res.json(athlete);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -605,6 +734,16 @@ exports.verifyAthlete = async (req, res) => {
       return res.status(404).json({ message: "This record is pending admin approval and isn't public yet" });
     }
 
+    // Best-effort scan log — timestamp + IP/device only, never a "who"
+    // (this page has no login). Fire-and-forget: a logging hiccup must
+    // never break the actual verify response.
+    ScanLog.create({
+      athlete: athlete._id,
+      verifyId: athlete.verifyId,
+      ip: (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.ip || "",
+      userAgent: req.headers["user-agent"] || "",
+    }).catch((err) => console.warn("Scan log write failed:", err.message));
+
     res.json({
       _id: athlete._id,
       fullName: athlete.fullName,
@@ -621,6 +760,182 @@ exports.verifyAthlete = async (req, res) => {
       team: approved.map((a) => a.team).join(", "),
       role: approved.map((a) => a.role).join(", "),
     });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// GET /api/athletes/:id/scan-logs  (admin - any record; head coach - own
+// team only) — the most recent public verify hits for one person, newest
+// first. IP/device only, since the verify page has no login and there is
+// no real "who" to show.
+exports.getScanLogs = async (req, res) => {
+  try {
+    const athlete = await Athlete.findById(req.params.id);
+    if (!athlete) return res.status(404).json({ message: "Athlete not found" });
+    const isHeadCoach = req.adminRole === "HEAD_COACH";
+    if (isHeadCoach && !athlete.assignments.some((a) => a.team === req.adminTeam)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const logs = await ScanLog.find({ athlete: athlete._id }).sort({ scannedAt: -1 }).limit(50);
+    res.json(logs);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// GET /api/athletes/stats  (admin - club-wide, or one team via ?team=;
+// head coach - always forced to their own team) — quick counts for a
+// dashboard: how many people per team, how many still waiting on approval,
+// how much is owed in total. Never a public route.
+exports.getStats = async (req, res) => {
+  try {
+    const isHeadCoach = req.adminRole === "HEAD_COACH";
+    const teamFilter = isHeadCoach ? req.adminTeam : req.query.team || null;
+    const filter = teamFilter ? { "assignments.team": teamFilter } : {};
+    const athletes = await Athlete.find(filter);
+
+    const perTeam = {};
+    const seenPerTeam = {};
+    let totalPending = 0;
+    let totalDebt = 0;
+
+    athletes.forEach((athlete) => {
+      athlete.assignments.forEach((a) => {
+        if (teamFilter && a.team !== teamFilter) return;
+        if (!perTeam[a.team]) {
+          perTeam[a.team] = { team: a.team, athleteCount: 0, pendingCount: 0, totalDebt: 0 };
+          seenPerTeam[a.team] = new Set();
+        }
+        if (!seenPerTeam[a.team].has(String(athlete._id))) {
+          seenPerTeam[a.team].add(String(athlete._id));
+          perTeam[a.team].athleteCount += 1;
+        }
+        if (a.approvalStatus === "pending" || a.pendingRemoval) {
+          perTeam[a.team].pendingCount += 1;
+          totalPending += 1;
+        }
+        const owed = (a.fees || []).reduce((sum, f) => sum + (f.amount || 0), 0);
+        perTeam[a.team].totalDebt += owed;
+        totalDebt += owed;
+      });
+    });
+
+    res.json({
+      teams: Object.values(perTeam).sort((x, y) => x.team.localeCompare(y.team)),
+      totalAthletes: athletes.length,
+      totalPendingApprovals: totalPending,
+      totalDebt,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// GET /api/athletes/export.csv  (admin - all teams or one via ?team=;
+// head coach - own team forced) — a flat CSV of the visible roster, for
+// handing to a federation or keeping an offline backup. Authenticated
+// same as every other admin/coach route — never reachable publicly.
+exports.exportRosterCsv = async (req, res) => {
+  try {
+    const isHeadCoach = req.adminRole === "HEAD_COACH";
+    const team = isHeadCoach ? req.adminTeam : req.query.team || null;
+    const filter = team ? { "assignments.team": team } : {};
+    const athletes = await Athlete.find(filter).sort({ fullName: 1 });
+    const rows = athletes.flatMap((a) => flattenAssignments(a, team));
+
+    const escapeCsv = (v) => {
+      const s = v === null || v === undefined ? "" : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const header = [
+      "Team",
+      "Full name",
+      "Khmer name",
+      "Jersey #",
+      "Role",
+      "Date of birth",
+      "Gender",
+      "Verify ID",
+      "Status",
+      "Available",
+      "Approval",
+      "Debt owed",
+    ];
+    const lines = [header.map(escapeCsv).join(",")];
+    rows.forEach((r) => {
+      lines.push(
+        [
+          r.team,
+          r.fullName,
+          r.khmerName || "",
+          r.jerseyNumber ?? "",
+          r.role,
+          r.dateOfBirth ? new Date(r.dateOfBirth).toISOString().slice(0, 10) : "",
+          r.gender || "",
+          r.verifyId,
+          r.status,
+          r.isAvailable ? "Available" : "Not available",
+          r.pendingRemoval ? "Removal requested" : r.approvalStatus,
+          r.feeOwed || 0,
+        ]
+          .map(escapeCsv)
+          .join(",")
+      );
+    });
+    const csv = lines.join("\r\n");
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="roster${team ? "-" + team : ""}.csv"`);
+    // Leading BOM so Excel opens the Khmer-name column as UTF-8 correctly.
+    res.send("﻿" + csv);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PUT /api/athletes/bulk-approve  (admin only) — body: { items:
+// [{athleteId, assignmentId}, ...] }. Approves many pending assignments (or
+// confirms many pending removals) in one request, for clearing a backlog.
+// Each item is handled independently — one bad id doesn't stop the rest —
+// and the response reports per-item success/failure.
+exports.bulkApproveAssignments = async (req, res) => {
+  try {
+    const items = Array.isArray(req.body.items) ? req.body.items : [];
+    if (!items.length) return res.status(400).json({ message: "No items given" });
+
+    const results = [];
+    for (const item of items) {
+      try {
+        const athlete = await Athlete.findById(item.athleteId);
+        if (!athlete) {
+          results.push({ ...item, ok: false, message: "Athlete not found" });
+          continue;
+        }
+        const assignment = athlete.assignments.id(item.assignmentId);
+        if (!assignment) {
+          results.push({ ...item, ok: false, message: "Assignment not found" });
+          continue;
+        }
+        if (assignment.pendingRemoval) {
+          const wasLast = athlete.assignments.length === 1;
+          athlete.assignments = athlete.assignments.filter((a) => String(a._id) !== String(assignment._id));
+          if (wasLast) {
+            cleanupAthleteAssets(athlete);
+            await Athlete.findByIdAndDelete(athlete._id);
+          } else {
+            await athlete.save();
+          }
+        } else {
+          assignment.approvalStatus = "approved";
+          await athlete.save();
+        }
+        results.push({ ...item, ok: true });
+      } catch (err) {
+        results.push({ ...item, ok: false, message: err.message });
+      }
+    }
+    res.json({ results });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import api from "../api/axios";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { exportPosterAsImage } from "../utils/exportPoster";
-import { isPlayerOnTeam } from "../utils/rolesForTeam";
+import { isPlayerOnTeam, jerseyNumberForTeam } from "../utils/rolesForTeam";
 
 // This club mostly plays 8, 9, 10, or 11-a-side — this only changes the
 // "usually N players" hint below, it never caps how many starters can be
@@ -31,7 +31,10 @@ function StartingXIPoster({ posterRef, team, name, opponent, competition, starte
                 src={a.photoUrl ? resolveFileUrl(a.photoUrl) : "https://placehold.co/200x260?text=Photo"}
                 alt={a.fullName}
               />
-              <span className="startingxi-card-name">{a.fullName}</span>
+              <span className="startingxi-card-name">
+                {jerseyNumberForTeam(a, team) !== null && `#${jerseyNumberForTeam(a, team)} `}
+                {a.fullName}
+              </span>
             </div>
           ))}
           {starterAthletes.length === 0 && <p className="startingxi-empty">No starters selected yet.</p>}
@@ -44,7 +47,10 @@ function StartingXIPoster({ posterRef, team, name, opponent, competition, starte
               <p className="startingxi-subs-title">Substitutes</p>
               <ul className="startingxi-subs-list">
                 {subAthletes.map((a) => (
-                  <li key={a._id}>{a.fullName}</li>
+                  <li key={a._id}>
+                    {jerseyNumberForTeam(a, team) !== null && `#${jerseyNumberForTeam(a, team)} `}
+                    {a.fullName}
+                  </li>
                 ))}
               </ul>
             </>
@@ -341,6 +347,7 @@ export default function StartingXIManager({ team }) {
                   alt={a.fullName}
                   className="small-photo"
                 />
+                {jerseyNumberForTeam(a, team) !== null && `#${jerseyNumberForTeam(a, team)} `}
                 {a.fullName}
               </span>
             </label>

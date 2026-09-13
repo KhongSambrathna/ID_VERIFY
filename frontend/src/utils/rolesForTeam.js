@@ -22,3 +22,14 @@ export function isPlayerOnTeam(athlete, team) {
   if (!athlete.assignments) return (athlete.role || "PLAYER") === "PLAYER";
   return athlete.assignments.some((a) => a.team === team && a.role === "PLAYER");
 }
+
+// Shirt/kit number ON THIS TEAM — same dual-shape handling as rolesForTeam
+// (a flattened roster row already carries `.jerseyNumber` directly; a
+// raw/populated Athlete doc needs the matching team's assignment picked
+// out of `.assignments`). Returns null when none is set.
+export function jerseyNumberForTeam(athlete, team) {
+  if (!athlete) return null;
+  if (!athlete.assignments) return athlete.jerseyNumber ?? null;
+  const match = athlete.assignments.find((a) => a.team === team);
+  return match?.jerseyNumber ?? null;
+}

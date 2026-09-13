@@ -20,6 +20,7 @@ function flattenAssignments(athlete, teamFilter) {
     status: athlete.status,
     verifyId: athlete.verifyId,
     qrCodeUrl: athlete.qrCodeUrl,
+    lastVerifiedAt: athlete.lastVerifiedAt,
     createdAt: athlete.createdAt,
   };
   return (athlete.assignments || [])
@@ -33,6 +34,7 @@ function flattenAssignments(athlete, teamFilter) {
         role: a.role,
         approvalStatus: a.approvalStatus,
         pendingRemoval: a.pendingRemoval,
+        jerseyNumber: a.jerseyNumber ?? null,
         // `feeOwed` stays as the TOTAL across every fee row — every existing
         // consumer that just checks "> 0" or prints the number keeps working
         // unchanged; `fees` is the itemized breakdown for anything that

@@ -50,7 +50,7 @@ export default function App() {
         <Route
           path="/admin/athlete/:id"
           element={
-            <ProtectedRoute role={["ADMIN", "PLAYER"]}>
+            <ProtectedRoute role={["ADMIN", "HEAD_COACH", "PLAYER"]}>
               <AthleteCardPage />
             </ProtectedRoute>
           }

@@ -2093,3 +2093,16 @@ table.athletes .actions-cell {
     width: 100%;
   }
 }
+
+/* Jersey number field next to a role select in EditAthlete's assignment
+   rows — deliberately narrow (0-99 only) so it doesn't compete with the
+   role dropdown for space. */
+.jersey-input {
+  width: 56px;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  text-align: center;
+}
+

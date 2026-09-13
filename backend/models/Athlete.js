@@ -55,6 +55,12 @@ const assignmentSchema = new mongoose.Schema(
       ],
       default: [],
     },
+    // Shirt/kit number ON THIS TEAM — a person on two teams can wear a
+    // different number on each, so this lives on the assignment, not the
+    // shared profile. Purely a squad-list/lineup convenience: it never
+    // gates approval (a Head Coach setting it doesn't send anything back to
+    // "pending"), same reasoning as fees being pure bookkeeping.
+    jerseyNumber: { type: Number, min: 0, max: 99, default: null },
   },
   { timestamps: true }
 );
@@ -97,6 +103,13 @@ const athleteSchema = new mongoose.Schema(
     },
     qrCodeUrl: { type: String }, // Cloudinary secure_url of the generated QR code
     qrCodePublicId: { type: String }, // Cloudinary public_id of the QR code
+    // When this person's identity was last confirmed in person (checked
+    // against their reference documents) and the "Renew" button pressed.
+    // Purely advisory — there's no fixed expiry and it never blocks the
+    // public verify page; it only drives a "needs renewal" badge once it's
+    // more than a year old, so Admin/Head Coach know to re-check someone
+    // (e.g. after they move up an age group).
+    lastVerifiedAt: { type: Date, default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
   },
   { timestamps: true }

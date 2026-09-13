@@ -15,6 +15,11 @@ const {
   addFee,
   updateFee,
   removeFee,
+  renewVerification,
+  getScanLogs,
+  getStats,
+  exportRosterCsv,
+  bulkApproveAssignments,
   deleteAthlete,
   verifyAthlete,
   searchAthletes,
@@ -38,9 +43,14 @@ router.use(requireAuth);
 // allowed past this point — every route below is Admin/Head Coach only, so
 // a shared player login can look but never touch anything.
 router.get("/", requireRole("ADMIN", "HEAD_COACH", "PLAYER"), getAllAthletes);
-// must stay above /:id — otherwise "check-duplicate" gets swallowed as an :id
+// These bare paths must stay above /:id and /bulk-approve above /:id for
+// PUT — otherwise Express swallows them as an :id param instead.
 router.get("/check-duplicate", requireRole("ADMIN", "HEAD_COACH"), checkDuplicateName);
+router.get("/stats", requireRole("ADMIN", "HEAD_COACH"), getStats);
+router.get("/export.csv", requireRole("ADMIN", "HEAD_COACH"), exportRosterCsv);
+router.put("/bulk-approve", requireRole("ADMIN"), bulkApproveAssignments);
 router.get("/:id", requireRole("ADMIN", "HEAD_COACH", "PLAYER"), getAthleteById);
+router.get("/:id/scan-logs", requireRole("ADMIN", "HEAD_COACH"), getScanLogs);
 
 router.post(
   "/",
@@ -54,9 +64,13 @@ router.post(
 router.put(
   "/:id",
   requireRole("ADMIN", "HEAD_COACH"),
-  upload.fields([{ name: "photo", maxCount: 1 }]),
+  upload.fields([
+    { name: "photo", maxCount: 1 },
+    { name: "documents", maxCount: 10 },
+  ]),
   updateAthlete
 );
+router.put("/:id/renew", requireRole("ADMIN", "HEAD_COACH"), renewVerification);
 
 // Team/role assignments — a person can have several, one per team (or even
 // several on the same team, e.g. Player + Assistant Coach). Add/edit/remove

@@ -17,7 +17,7 @@ function formatDob(dob) {
 
 export default function AthleteCardPage() {
   const { id } = useParams();
-  const { isPlayer } = useAuth();
+  const { isPlayer, isHeadCoach } = useAuth();
   const [searchParams] = useSearchParams();
   const requestedTeam = searchParams.get("team");
   const [athlete, setAthlete] = useState(null);
@@ -25,6 +25,9 @@ export default function AthleteCardPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [feeExpanded, setFeeExpanded] = useState(false);
+  const [renewing, setRenewing] = useState(false);
+  const [scanLogs, setScanLogs] = useState(null);
+  const [scanLogsOpen, setScanLogsOpen] = useState(false);
   const exportWrapRef = useRef(null);
 
   useEffect(() => {
@@ -38,6 +41,38 @@ export default function AthleteCardPage() {
       .catch((err) => setError(err.response?.data?.message || "Failed to load"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Admin any record; Head Coach their own team — just stamps
+  // lastVerifiedAt to today, clearing the "needs renewal" badge.
+  const renewVerification = async () => {
+    setRenewing(true);
+    try {
+      const { data } = await api.put(`/athletes/${id}/renew`);
+      setAthlete(data);
+    } catch {
+      // non-critical — silently ignore, the badge just stays as-is
+    } finally {
+      setRenewing(false);
+    }
+  };
+
+  // QR-verify scan history — timestamp + IP/device only (that page has no
+  // login, so there's no "who" to show). Admin/Head Coach only, loaded on
+  // demand since most viewers of this page will never need it.
+  const loadScanLogs = async () => {
+    if (scanLogsOpen) {
+      setScanLogsOpen(false);
+      return;
+    }
+    setScanLogsOpen(true);
+    if (scanLogs) return;
+    try {
+      const { data } = await api.get(`/athletes/${id}/scan-logs`);
+      setScanLogs(data);
+    } catch {
+      setScanLogs([]);
+    }
+  };
 
   // This person's teams, one card per team — roles on that same team are
   // joined together onto the one card ("PLAYER, ASSISTANT COACH").
@@ -101,7 +136,7 @@ export default function AthleteCardPage() {
           via the hidden card below. */}
       <div className="dash-header no-print">
         <h2>Athlete record</h2>
-        <Link to={isPlayer ? "/player" : "/admin"} className="link-btn">
+        <Link to={isPlayer ? "/player" : isHeadCoach ? "/coach" : "/admin"} className="link-btn">
           ← Back to dashboard
         </Link>
       </div>
@@ -165,10 +200,84 @@ export default function AthleteCardPage() {
                 <div className="detail-label">Role</div>
                 <div className="detail-value">{cardAthlete.role || "—"}</div>
               </div>
+              {!isPlayer && (
+                <div className="detail-item">
+                  <div className="detail-label">Jersey #</div>
+                  <div className="detail-value">
+                    {athlete.assignments
+                      ?.filter((a) => a.team === selectedTeam)
+                      .map((a) => a.jerseyNumber)
+                      .find((n) => n !== null && n !== undefined) ?? "—"}
+                  </div>
+                </div>
+              )}
               <div className="detail-item detail-item-wide">
                 <div className="detail-label">Address</div>
                 <div className="detail-value">{athlete.address || "—"}</div>
               </div>
+              {!isPlayer && (
+                <div className="detail-item detail-item-wide">
+                  <div className="detail-label">Verification</div>
+                  <div className="detail-value">
+                    {athlete.lastVerifiedAt
+                      ? `Last verified ${new Date(athlete.lastVerifiedAt).toLocaleDateString()}`
+                      : "Never verified in person"}
+                    {(!athlete.lastVerifiedAt ||
+                      Date.now() - new Date(athlete.lastVerifiedAt).getTime() > 365 * 24 * 60 * 60 * 1000) && (
+                      <span className="badge rejected" style={{ marginLeft: 8 }}>
+                        Needs renewal
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      className="link-btn"
+                      style={{ marginLeft: 8 }}
+                      onClick={renewVerification}
+                      disabled={renewing}
+                    >
+                      {renewing ? "Renewing…" : "Renew (verified today)"}
+                    </button>
+                    <div style={{ marginTop: 4 }}>
+                      <button type="button" className="link-btn" onClick={loadScanLogs}>
+                        {scanLogsOpen ? "Hide QR-verify scan history ▲" : "Show QR-verify scan history ▼"}
+                      </button>
+                      {scanLogsOpen && (
+                        <ul className="fee-items" style={{ marginTop: 4 }}>
+                          {scanLogs === null && <li>Loading…</li>}
+                          {scanLogs?.length === 0 && <li>No scans recorded yet.</li>}
+                          {scanLogs?.map((log) => (
+                            <li key={log._id}>
+                              <span>
+                                {new Date(log.scannedAt).toLocaleString()} — {log.ip || "unknown IP"}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {!isPlayer && (
+                <div className="detail-item detail-item-wide">
+                  <div className="detail-label">Reference documents</div>
+                  <div className="detail-value">
+                    {athlete.supportingDocuments?.length ? (
+                      <ul className="fee-items">
+                        {athlete.supportingDocuments.map((doc) => (
+                          <li key={doc._id}>
+                            <a href={resolveFileUrl(doc.fileUrl)} target="_blank" rel="noreferrer">
+                              {doc.label || "Document"}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="help-text">None on file</span>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="detail-item detail-item-wide">
                 <div className="detail-label">Fee / debt (this team)</div>
                 <div className="detail-value">
