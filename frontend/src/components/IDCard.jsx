@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import html2canvas from "html2canvas";
 import { resolveFileUrl } from "../utils/fileUrl";
+import { saveCanvasAsImage } from "../utils/saveCanvasAsImage";
 
 function formatDob(dob) {
   if (!dob) return null;
@@ -28,10 +29,7 @@ export default function IDCard({ athlete, hideActions }) {
         scale: 3, // higher resolution than the on-screen card
         backgroundColor: "#ffffff",
       });
-      const link = document.createElement("a");
-      link.download = `${athlete.verifyId || athlete.fullName || "id-card"}.jpg`;
-      link.href = canvas.toDataURL("image/jpeg", 0.95);
-      link.click();
+      await saveCanvasAsImage(canvas, `${athlete.verifyId || athlete.fullName || "id-card"}.jpg`);
     } catch (err) {
       console.error("Failed to save card as JPG:", err);
       alert("Couldn't save the card as an image. Please try again.");

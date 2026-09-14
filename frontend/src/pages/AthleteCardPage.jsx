@@ -4,6 +4,7 @@ import html2canvas from "html2canvas";
 import api from "../api/axios";
 import IDCard from "../components/IDCard";
 import { resolveFileUrl } from "../utils/fileUrl";
+import { saveCanvasAsImage } from "../utils/saveCanvasAsImage";
 import { useAuth } from "../context/AuthContext";
 
 function formatDob(dob) {
@@ -117,10 +118,7 @@ export default function AthleteCardPage() {
         scale: 3,
         backgroundColor: "#ffffff",
       });
-      const link = document.createElement("a");
-      link.download = `${cardAthlete.verifyId || cardAthlete.fullName || "id-card"}.jpg`;
-      link.href = canvas.toDataURL("image/jpeg", 0.95);
-      link.click();
+      await saveCanvasAsImage(canvas, `${cardAthlete.verifyId || cardAthlete.fullName || "id-card"}.jpg`);
     } catch (err) {
       console.error("Failed to save card as JPG:", err);
       alert("Couldn't save the card as an image. Please try again.");
