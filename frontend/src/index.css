@@ -727,6 +727,49 @@ table.athletes .actions-cell {
   margin-right: 10px;
 }
 
+/* Small pill-style buttons for a table's Actions column — used instead of
+   .link-btn there so a row of several actions reads as buttons rather than
+   a run of underlined text. .positive/.danger color-code what the action
+   does (approves/keeps vs. rejects/removes); plain .action-btn (View card,
+   Edit) stays neutral. */
+.action-btn {
+  display: inline-block;
+  background: white;
+  border: 1px solid var(--line);
+  color: var(--navy);
+  border-radius: 6px;
+  padding: 5px 11px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
+  text-decoration: none;
+  margin: 2px 4px 2px 0;
+  font-family: inherit;
+}
+.action-btn:hover:not(:disabled) {
+  background: var(--cream);
+  border-color: var(--navy);
+}
+.action-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.action-btn.positive {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+.action-btn.positive:hover:not(:disabled) {
+  background: #eaf4ee;
+}
+.action-btn.danger {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+.action-btn.danger:hover:not(:disabled) {
+  background: #f8eae7;
+}
+
 /* ---------- ID Card (5.4cm x 8.5cm printable card) ---------- */
 .id-card-actions {
   display: flex;
@@ -1235,6 +1278,9 @@ table.athletes .actions-cell {
   table.athletes td.actions-cell .link-btn {
     margin-right: 0;
   }
+  table.athletes td.actions-cell .action-btn {
+    margin-right: 0;
+  }
 
   .athletes-grid {
     grid-template-columns: 1fr 1fr;
@@ -1266,6 +1312,50 @@ table.athletes .actions-cell {
 .tab-btn.active {
   color: var(--navy);
   border-bottom-color: var(--gold);
+}
+
+/* Admin dashboard's "Tools" dropdown — secondary links/actions tucked away
+   so the header doesn't grow a new button per feature. */
+.tools-dropdown {
+  position: relative;
+  display: inline-block;
+}
+.tools-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  min-width: 210px;
+  z-index: 30;
+}
+.tools-dropdown-menu a,
+.tools-dropdown-menu button {
+  display: block;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 6px;
+  text-align: left;
+  color: var(--navy);
+  text-decoration: none;
+  font-size: 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.tools-dropdown-menu a:hover,
+.tools-dropdown-menu button:hover:not(:disabled) {
+  background: #f2f2f2;
+}
+.tools-dropdown-menu button:disabled {
+  color: #999;
+  cursor: default;
 }
 
 .athletes-grid {

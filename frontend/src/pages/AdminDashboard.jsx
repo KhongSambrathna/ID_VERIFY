@@ -1,15 +1,32 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/axios";
+
+// Secondary tools tucked into one dropdown instead of a row of buttons —
+// this page was accumulating one new button per feature and getting
+// cluttered. "+ Add athlete" stays a primary button since it's the most
+// common action; everything else lives here.
+const TOOL_LINKS = [
+  { to: "/admin/users", label: "Manage users" },
+  { to: "/admin/sponsors", label: "Trusted by logos" },
+  { to: "/admin/matchday", label: "Match day" },
+  { to: "/admin/shop", label: "Shop" },
+  { to: "/admin/cards", label: "Export all cards" },
+  { to: "/admin/stats", label: "Pending & debt report" },
+  { to: "/admin/renew", label: "ID renewal" },
+];
 
 export default function AdminDashboard() {
   const [athletes, setAthletes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState("all"); // "all" | "pending"
   const [selectedPending, setSelectedPending] = useState([]);
   const [bulkApproving, setBulkApproving] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const toolsRef = useRef(null);
 
   const load = async () => {
     setLoading(true);
@@ -27,7 +44,18 @@ export default function AdminDashboard() {
     load();
   }, []);
 
+  // Close the Tools dropdown on an outside click, same pattern as the navbar.
+  useEffect(() => {
+    if (!toolsOpen) return;
+    const onClickOutside = (e) => {
+      if (toolsRef.current && !toolsRef.current.contains(e.target)) setToolsOpen(false);
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [toolsOpen]);
+
   const exportCsv = async () => {
+    setToolsOpen(false);
     setExportingCsv(true);
     try {
       const { data } = await api.get("/athletes/export.csv", { responseType: "blob" });
@@ -66,16 +94,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const setStatus = async (id, status) => {
-    await api.put(`/athletes/${id}`, { status });
-    load();
-  };
-
-  const setAvailable = async (id, isAvailable) => {
-    await api.put(`/athletes/${id}`, { isAvailable });
-    load();
-  };
-
   // Each row is one team/role assignment (a person on 2 teams shows up as 2
   // rows), so every action below targets `a.assignmentId`, not just `a._id`.
   const approveAssignment = async (a) => {
@@ -99,74 +117,65 @@ export default function AdminDashboard() {
   };
 
   const q = search.trim().toLowerCase();
-  const filtered = !q
-    ? athletes
-    : athletes.filter((a) =>
-        [a.fullName, a.khmerName, a.team, a.role, a.verifyId]
-          .filter(Boolean)
-          .some((field) => field.toLowerCase().includes(q))
-      );
+  const matchesSearch = (a) =>
+    !q ||
+    [a.fullName, a.khmerName, a.team, a.role, a.verifyId]
+      .filter(Boolean)
+      .some((field) => field.toLowerCase().includes(q));
 
+  const all = athletes.filter(matchesSearch);
+  const pending = athletes.filter((a) => (a.approvalStatus === "pending" || a.pendingRemoval) && matchesSearch(a));
   const pendingCount = athletes.filter((a) => a.approvalStatus === "pending" || a.pendingRemoval).length;
+
+  const allPendingSelected =
+    pending.length > 0 && pending.every((a) => selectedPending.some((x) => x.assignmentId === a.assignmentId));
+
+  const toggleAllPending = () => {
+    if (allPendingSelected) {
+      setSelectedPending((prev) => prev.filter((x) => !pending.some((p) => p.assignmentId === x.assignmentId)));
+    } else {
+      setSelectedPending((prev) => {
+        const have = new Set(prev.map((x) => x.assignmentId));
+        const additions = pending
+          .filter((p) => !have.has(p.assignmentId))
+          .map((p) => ({ athleteId: p._id, assignmentId: p.assignmentId }));
+        return [...prev, ...additions];
+      });
+    }
+  };
 
   return (
     <div className="container dash-body">
       <div className="dash-header">
         <h2>Athlete records</h2>
         <div className="dash-actions">
-          <Link to="/admin/users" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
-            Manage users
-          </Link>
-          <Link to="/admin/sponsors" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
-            Trusted by logos
-          </Link>
-          <Link to="/admin/matchday" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
-            Match day
-          </Link>
-          <Link to="/admin/shop" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
-            Shop
-          </Link>
-          <Link to="/admin/cards" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
-            Export all cards
-          </Link>
-          <Link to="/admin/stats" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
-            Pending &amp; debt report
-          </Link>
-          <Link to="/admin/renew" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
-            ID renewal
-          </Link>
-          <button
-            type="button"
-            className="btn btn-outline"
-            style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
-            onClick={exportCsv}
-            disabled={exportingCsv}
-          >
-            {exportingCsv ? "Exporting…" : "Export roster (CSV)"}
-          </button>
           <Link to="/admin/new" className="btn btn-primary">
             + Add athlete
           </Link>
+          <div className="tools-dropdown" ref={toolsRef}>
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
+              onClick={() => setToolsOpen((v) => !v)}
+            >
+              Tools ▾
+            </button>
+            {toolsOpen && (
+              <div className="tools-dropdown-menu">
+                {TOOL_LINKS.map((l) => (
+                  <Link key={l.to} to={l.to} onClick={() => setToolsOpen(false)}>
+                    {l.label}
+                  </Link>
+                ))}
+                <button type="button" onClick={exportCsv} disabled={exportingCsv}>
+                  {exportingCsv ? "Exporting…" : "Export roster (CSV)"}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-
-      {pendingCount > 0 && (
-        <p className="help-text" style={{ color: "var(--navy)", fontWeight: 600 }}>
-          {pendingCount} record{pendingCount > 1 ? "s" : ""} pending approval — hidden from public search and QR
-          verify until approved.
-        </p>
-      )}
-
-      {selectedPending.length > 0 && (
-        <div className="dash-actions" style={{ marginBottom: 12 }}>
-          <button className="btn btn-primary" onClick={bulkApproveSelected} disabled={bulkApproving}>
-            {bulkApproving ? "Approving…" : `Approve selected (${selectedPending.length})`}
-          </button>
-          <button className="btn btn-outline" onClick={() => setSelectedPending([])} disabled={bulkApproving}>
-            Clear selection
-          </button>
-        </div>
-      )}
 
       <div className="field search-field">
         <input
@@ -176,15 +185,28 @@ export default function AdminDashboard() {
         />
       </div>
 
+      <div className="tabs">
+        <button className={`tab-btn ${activeTab === "all" ? "active" : ""}`} onClick={() => setActiveTab("all")}>
+          All athletes ({all.length})
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "pending" ? "active" : ""}`}
+          onClick={() => setActiveTab("pending")}
+        >
+          Pending approval ({pendingCount})
+        </button>
+      </div>
+
       {loading && <p>Loading…</p>}
       {error && <p className="error-text">{error}</p>}
 
-      {!loading && !error && (
+      {/* ALL ATHLETES TAB — browse/manage everything; approve/reject moved to
+          the Pending tab to keep this table's Actions column short. */}
+      {!loading && !error && activeTab === "all" && (
         <div className="table-scroll">
           <table className="athletes">
             <thead>
               <tr>
-                <th></th>
                 <th>ID</th>
                 <th>Name</th>
                 <th>Role</th>
@@ -198,17 +220,8 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((a) => (
+              {all.map((a) => (
                 <tr key={a.assignmentId}>
-                  <td data-label="">
-                    {a.approvalStatus === "pending" && !a.pendingRemoval && (
-                      <input
-                        type="checkbox"
-                        checked={selectedPending.some((x) => x.assignmentId === a.assignmentId)}
-                        onChange={() => togglePendingSelected(a)}
-                      />
-                    )}
-                  </td>
                   <td data-label="ID">{a.verifyId}</td>
                   <td data-label="Name">{a.fullName}</td>
                   <td data-label="Role">{a.role || "—"}</td>
@@ -244,59 +257,21 @@ export default function AdminDashboard() {
                     )}
                   </td>
                   <td data-label="Actions" className="actions-cell">
-                    <Link className="link-btn" to={`/admin/athlete/${a._id}?team=${encodeURIComponent(a.team)}`}>
+                    <Link className="action-btn" to={`/admin/athlete/${a._id}?team=${encodeURIComponent(a.team)}`}>
                       View card
                     </Link>
-                    <Link className="link-btn" to={`/admin/athlete/${a._id}/edit`}>
+                    <Link className="action-btn" to={`/admin/athlete/${a._id}/edit`}>
                       Edit
                     </Link>
-                    {a.pendingRemoval ? (
-                      <>
-                        <button className="link-btn" onClick={() => approveAssignment(a)}>
-                          Confirm removal
-                        </button>
-                        <button className="link-btn" onClick={() => rejectAssignment(a)}>
-                          Keep
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        {a.approvalStatus === "pending" && (
-                          <>
-                            <button className="link-btn" onClick={() => approveAssignment(a)}>
-                              Approve
-                            </button>
-                            <button className="link-btn" onClick={() => rejectAssignment(a)}>
-                              Reject
-                            </button>
-                          </>
-                        )}
-                        <button className="link-btn" onClick={() => removeAssignment(a)}>
-                          Remove from team
-                        </button>
-                      </>
-                    )}
-                    {a.status !== "verified" ? (
-                      <button className="link-btn" onClick={() => setStatus(a._id, "verified")}>
-                        Verify
-                      </button>
-                    ) : (
-                      <button className="link-btn" onClick={() => setStatus(a._id, "unverified")}>
-                        Unverify
-                      </button>
-                    )}
-                    <button
-                      className="link-btn"
-                      onClick={() => setAvailable(a._id, !a.isAvailable)}
-                    >
-                      {a.isAvailable ? "Mark unavailable" : "Mark available"}
+                    <button className="action-btn danger" onClick={() => removeAssignment(a)}>
+                      Remove from team
                     </button>
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
+              {all.length === 0 && (
                 <tr>
-                  <td colSpan={11} style={{ textAlign: "center", color: "#777" }}>
+                  <td colSpan={10} style={{ textAlign: "center", color: "#777" }}>
                     {athletes.length === 0
                       ? "No athletes yet — add your first one."
                       : "No matches for your search."}
@@ -306,6 +281,100 @@ export default function AdminDashboard() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* PENDING APPROVAL TAB — the actionable queue: approve/reject,
+          confirm/decline removals, one at a time or in bulk. */}
+      {!loading && !error && activeTab === "pending" && (
+        <>
+          <p className="help-text" style={{ marginTop: 0 }}>
+            Hidden from public search and QR verify until approved.
+          </p>
+          {selectedPending.length > 0 && (
+            <div className="dash-actions" style={{ marginBottom: 12 }}>
+              <button className="btn btn-primary" onClick={bulkApproveSelected} disabled={bulkApproving}>
+                {bulkApproving ? "Approving…" : `Approve selected (${selectedPending.length})`}
+              </button>
+              <button className="btn btn-outline" onClick={() => setSelectedPending([])} disabled={bulkApproving}>
+                Clear selection
+              </button>
+            </div>
+          )}
+          <div className="table-scroll">
+            <table className="athletes">
+              <thead>
+                <tr>
+                  <th>
+                    <input type="checkbox" checked={allPendingSelected} onChange={toggleAllPending} />
+                  </th>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>Role</th>
+                  <th>Team</th>
+                  <th>Approval</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pending.map((a) => (
+                  <tr key={a.assignmentId}>
+                    <td data-label="">
+                      {!a.pendingRemoval && (
+                        <input
+                          type="checkbox"
+                          checked={selectedPending.some((x) => x.assignmentId === a.assignmentId)}
+                          onChange={() => togglePendingSelected(a)}
+                        />
+                      )}
+                    </td>
+                    <td data-label="ID">{a.verifyId}</td>
+                    <td data-label="Name">{a.fullName}</td>
+                    <td data-label="Role">{a.role || "—"}</td>
+                    <td data-label="Team">{a.team || "—"}</td>
+                    <td data-label="Approval">
+                      {a.pendingRemoval ? (
+                        <span className="badge rejected">Removal requested</span>
+                      ) : (
+                        <span className="badge rejected">Pending</span>
+                      )}
+                    </td>
+                    <td data-label="Actions" className="actions-cell">
+                      <Link className="action-btn" to={`/admin/athlete/${a._id}?team=${encodeURIComponent(a.team)}`}>
+                        View card
+                      </Link>
+                      {a.pendingRemoval ? (
+                        <>
+                          <button className="action-btn danger" onClick={() => approveAssignment(a)}>
+                            Confirm removal
+                          </button>
+                          <button className="action-btn positive" onClick={() => rejectAssignment(a)}>
+                            Keep
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button className="action-btn positive" onClick={() => approveAssignment(a)}>
+                            Approve
+                          </button>
+                          <button className="action-btn danger" onClick={() => rejectAssignment(a)}>
+                            Reject
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {pending.length === 0 && (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: "center", color: "#777" }}>
+                      Nothing pending.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );

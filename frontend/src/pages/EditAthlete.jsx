@@ -63,6 +63,7 @@ export default function EditAthlete() {
           gender: data.gender || "male",
           address: data.address || "",
           isAvailable: data.isAvailable ? "true" : "false",
+          status: data.status || "unverified",
         });
         setCurrentPhotoUrl(data.photoUrl || null);
         setExistingDocs(data.supportingDocuments || []);
@@ -578,6 +579,15 @@ export default function EditAthlete() {
             <option value="false">Not available</option>
           </select>
         </div>
+        {isAdmin && (
+          <div className="field">
+            <label>Card status</label>
+            <select value={form.status} onChange={update("status")}>
+              <option value="verified">Verified</option>
+              <option value="unverified">Unverified</option>
+            </select>
+          </div>
+        )}
         <div className="field">
           <label>Photo</label>
           {currentPhotoUrl && !photo && (
