@@ -25,6 +25,8 @@ import ChangePasswordPage from "./pages/ChangePasswordPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import AdminTournaments from "./pages/AdminTournaments";
 import TournamentsPage from "./pages/TournamentsPage";
+import TournamentSquadPage from "./pages/TournamentSquadPage";
+import PlayerSquadListPage from "./pages/PlayerSquadListPage";
 
 export default function App() {
   return (
@@ -171,6 +173,22 @@ export default function App() {
           element={
             <ProtectedRoute role="PLAYER">
               <TournamentsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tournaments/:id/squad"
+          element={
+            <ProtectedRoute role={["ADMIN", "HEAD_COACH", "PLAYER"]}>
+              <TournamentSquadPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/squad-list"
+          element={
+            <ProtectedRoute role="PLAYER">
+              <PlayerSquadListPage />
             </ProtectedRoute>
           }
         />

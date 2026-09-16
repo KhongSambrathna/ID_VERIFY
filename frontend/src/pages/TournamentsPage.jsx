@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 
@@ -23,6 +24,7 @@ function ageRuleSummary(t) {
 // self-service "forgot password" flow on the sign-in page.
 export default function TournamentsPage() {
   const { user, team, athleteId, login } = useAuth();
+  const navigate = useNavigate();
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -52,7 +54,7 @@ export default function TournamentsPage() {
     setRegisteringId(t._id);
     try {
       await api.post(`/tournaments/${t._id}/register`, { team });
-      load();
+      navigate(`/tournaments/${t._id}/squad`);
     } catch (err) {
       alert(err.response?.data?.message || "Failed to register");
     } finally {
@@ -157,6 +159,9 @@ export default function TournamentsPage() {
                         <span className="badge verified" style={{ marginRight: 6 }}>
                           Registered
                         </span>
+                        <button className="link-btn" onClick={() => navigate(`/tournaments/${t._id}/squad`)}>
+                          View squad
+                        </button>
                         <button className="action-btn danger" disabled={registeringId === t._id} onClick={() => unregister(t)}>
                           Cancel
                         </button>

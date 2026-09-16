@@ -74,6 +74,9 @@ export default function Navbar() {
               {isPlayer && athleteId && (
                 <Link to="/tournaments" onClick={closeMenu}>Tournaments</Link>
               )}
+              {isPlayer && (
+                <Link to="/squad-list" onClick={closeMenu}>Squad list</Link>
+              )}
               {isAdmin && <Link to="/admin/users" onClick={closeMenu}>Users</Link>}
               <a
                 href="#"

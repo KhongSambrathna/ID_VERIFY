@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { resolveFileUrl } from "../utils/fileUrl";
@@ -21,7 +21,12 @@ export default function CoachDashboard() {
   const [athletes, setAthletes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState("athletes");
+  const [searchParams] = useSearchParams();
+  // Lets a link from elsewhere (e.g. a tournament's squad page) land
+  // directly on a specific tab, e.g. /coach?tab=lineups.
+  const validTabs = ["athletes", "lineups", "formations", "startingxi"];
+  const tabFromUrl = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(validTabs.includes(tabFromUrl) ? tabFromUrl : "athletes");
 
   useEffect(() => {
     loadData();

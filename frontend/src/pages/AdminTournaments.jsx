@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import TeamSelect from "../components/TeamSelect";
@@ -39,6 +40,7 @@ const emptyForm = {
 // Admin can leave a tournament open to every team.
 export default function AdminTournaments() {
   const { isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -87,7 +89,7 @@ export default function AdminTournaments() {
     setFormError("");
     setSaving(true);
     try {
-      await api.post("/tournaments", {
+      const { data } = await api.post("/tournaments", {
         name: form.name,
         description: form.description,
         entryFee: form.entryFee,
@@ -100,7 +102,10 @@ export default function AdminTournaments() {
       });
       setForm(emptyForm);
       setShowCreate(false);
-      load();
+      // Jump straight to this tournament's squad-list page — empty at
+      // first, but it's the same place players/registrations show up as
+      // they sign up, and where the register-on-behalf search lives too.
+      navigate(`/tournaments/${data._id}/squad`);
     } catch (err) {
       setFormError(err.response?.data?.message || "Failed to create tournament");
     } finally {
@@ -337,6 +342,9 @@ export default function AdminTournaments() {
                       <button className="action-btn" onClick={() => toggleExpand(t)}>
                         {expandedId === t._id ? "Hide" : "View / register"}
                       </button>
+                      <button className="action-btn" onClick={() => navigate(`/tournaments/${t._id}/squad`)}>
+                        View squad
+                      </button>
                       <button className="action-btn" onClick={() => exportCsv(t)}>
                         Export
                       </button>
@@ -353,6 +361,22 @@ export default function AdminTournaments() {
                           <div style={{ padding: "8px 4px" }}>
                             {detail.description && <p className="help-text">{detail.description}</p>}
                             <h4 style={{ marginBottom: 6 }}>Registered players ({detail.registrations.length})</h4>
+                            {detail.teamLineups?.length > 0 && (
+                              <p className="help-text" style={{ marginTop: -4 }}>
+                                Kept in sync with each team's Squad list, ready for Formation/Starting XI —{" "}
+                                {detail.teamLineups.map((tl, i) => (
+                                  <span key={tl.team}>
+                                    {i > 0 && " · "}
+                                    <Link
+                                      className="link-btn"
+                                      to={isAdmin ? `/admin/matchday?team=${encodeURIComponent(tl.team)}&tab=lineups` : `/coach?tab=lineups`}
+                                    >
+                                      Open {tl.team}'s Squad list
+                                    </Link>
+                                  </span>
+                                ))}
+                              </p>
+                            )}
                             {detail.registrations.length === 0 ? (
                               <p className="help-text">Nobody registered yet.</p>
                             ) : (

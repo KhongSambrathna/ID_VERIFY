@@ -13,6 +13,8 @@ const registrationSchema = new mongoose.Schema(
     fullName: { type: String, required: true }, // snapshot, so CSV export still works if the athlete record later changes
     khmerName: { type: String },
     verifyId: { type: String },
+    photoUrl: { type: String, default: null }, // snapshot, same reason as fullName/khmerName/verifyId
+    dateOfBirth: { type: Date, default: null }, // snapshot, same reason as fullName/khmerName/verifyId
     jerseyNumber: { type: Number, default: null },
     // null = the player registered themselves; set = which Admin/Head
     // Coach account registered them instead (no phone / couldn't self-serve).
@@ -49,6 +51,20 @@ const tournamentSchema = new mongoose.Schema(
     maxParticipants: { type: Number, default: null },
     registrations: { type: [registrationSchema], default: [] },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
+    // One auto-managed Lineup ("Squad list", the same thing the My Team >
+    // Squad list tab manages) per team registering in this tournament — kept
+    // in sync as people register/unregister, so a coach can go straight from
+    // tournament sign-ups into Formation/Starting XI without re-picking the
+    // squad by hand. Keyed by team since an open tournament can span several.
+    teamLineups: {
+      type: [
+        {
+          team: { type: String, required: true },
+          lineup: { type: mongoose.Schema.Types.ObjectId, ref: "Lineup", required: true },
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );

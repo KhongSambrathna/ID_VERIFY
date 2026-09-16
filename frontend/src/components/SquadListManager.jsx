@@ -144,7 +144,11 @@ function SquadExportSheet({ innerRef, team, squadName, members }) {
   );
 }
 
-export default function SquadListManager({ team, athletes }) {
+// `readOnly` — a Player account viewing their own team's squad lists: they
+// can see who's in each list and export it, but never create/edit/delete
+// one. `athletes` can be passed as [] in that case since the create/edit
+// picker is never rendered.
+export default function SquadListManager({ team, athletes, readOnly = false }) {
   const [lineups, setLineups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -320,14 +324,14 @@ export default function SquadListManager({ team, athletes }) {
     <div>
       <div className="lineup-header">
         <h3>Squad lists — {team}</h3>
-        {!showNewLineupForm && (
+        {!readOnly && !showNewLineupForm && (
           <button className="btn btn-primary" onClick={() => setShowNewLineupForm(true)}>
             + Create squad list
           </button>
         )}
       </div>
 
-      {showNewLineupForm && (
+      {!readOnly && showNewLineupForm && (
         <div className="lineup-form card">
           <h4>Create squad list</h4>
           <div className="field">
@@ -367,7 +371,7 @@ export default function SquadListManager({ team, athletes }) {
       ) : (
         <div className="lineups-list">
           {lineups.map((lineup) => {
-            const isEditing = editingLineupId === lineup._id;
+            const isEditing = !readOnly && editingLineupId === lineup._id;
             return (
               <div key={lineup._id} className="lineup-card card">
                 {isEditing ? (
@@ -403,9 +407,11 @@ export default function SquadListManager({ team, athletes }) {
                     <div className="lineup-header-card">
                       <h4>{lineup.name}</h4>
                       <div className="dash-actions">
-                        <button className="link-btn" onClick={() => startEditLineup(lineup)}>
-                          Edit
-                        </button>
+                        {!readOnly && (
+                          <button className="link-btn" onClick={() => startEditLineup(lineup)}>
+                            Edit
+                          </button>
+                        )}
                         <button
                           className="link-btn"
                           onClick={() => exportJpg(lineup)}
@@ -420,9 +426,11 @@ export default function SquadListManager({ team, athletes }) {
                         >
                           {exportingId === `${lineup._id}-pdf` ? "Exporting…" : "Export PDF"}
                         </button>
-                        <button className="btn btn-danger" onClick={() => deleteLineup(lineup._id)}>
-                          Delete
-                        </button>
+                        {!readOnly && (
+                          <button className="btn btn-danger" onClick={() => deleteLineup(lineup._id)}>
+                            Delete
+                          </button>
+                        )}
                       </div>
                     </div>
 

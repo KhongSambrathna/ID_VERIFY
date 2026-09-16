@@ -1,7 +1,52 @@
 const Tournament = require("../models/Tournament");
 const Athlete = require("../models/Athlete");
 const Admin = require("../models/Admin");
+const Lineup = require("../models/Lineup");
 const { notifyAdmins, notifyTeamCoaches } = require("../utils/notify");
+
+// Finds (or creates) the auto-managed Lineup — the same "Squad list" the My
+// Team > Squad list tab manages — for one team's registrations in this
+// tournament. Mutates tournament.teamLineups in memory when a new one is
+// created; the caller is responsible for tournament.save() afterwards (it's
+// saved together with whatever else that call is already saving).
+async function ensureTournamentLineup(tournament, team) {
+  const entry = tournament.teamLineups.find((e) => e.team === team);
+  if (entry) {
+    const existing = await Lineup.findById(entry.lineup);
+    if (existing) return existing;
+    // Lineup was deleted separately (from the Squad list tab) — fall
+    // through and recreate one, then repoint this entry at it.
+  }
+
+  const lineup = await Lineup.create({
+    coachId: tournament.createdBy,
+    team,
+    name: `${tournament.name} — Tournament squad`,
+    athletes: [],
+    notes: `Auto-managed — kept in sync with registrations for the "${tournament.name}" tournament.`,
+  });
+
+  if (entry) {
+    entry.lineup = lineup._id;
+  } else {
+    tournament.teamLineups.push({ team, lineup: lineup._id });
+  }
+  return lineup;
+}
+
+async function addAthleteToLineup(lineup, athleteId) {
+  const already = lineup.athletes.some((a) => String(a.athleteId) === String(athleteId));
+  if (!already) {
+    lineup.athletes.push({ athleteId });
+    await lineup.save();
+  }
+}
+
+async function removeAthleteFromLineup(lineup, athleteId) {
+  const before = lineup.athletes.length;
+  lineup.athletes = lineup.athletes.filter((a) => String(a.athleteId) !== String(athleteId));
+  if (lineup.athletes.length !== before) await lineup.save();
+}
 
 // A Head Coach may only ever touch a tournament scoped to their own team —
 // never an open-to-everyone one (those are Admin-only), never another
@@ -118,6 +163,33 @@ exports.getTournament = async (req, res) => {
 
     if (req.adminRole !== "ADMIN" && tournament.team && tournament.team !== req.adminTeam) {
       return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Self-healing backfill: dateOfBirth/photoUrl were added to the
+    // registration snapshot after some registrations already existed, so
+    // those older rows are missing them even though the athlete record
+    // itself has the data. Pull it in from the athlete once and persist it,
+    // so this only ever runs a single time per old registration.
+    const missing = tournament.registrations.filter((r) => r.dateOfBirth == null || r.photoUrl == null);
+    if (missing.length > 0) {
+      const athletes = await Athlete.find({ _id: { $in: missing.map((r) => r.athlete) } }).select(
+        "dateOfBirth photoUrl"
+      );
+      const byId = new Map(athletes.map((a) => [String(a._id), a]));
+      let changed = false;
+      missing.forEach((r) => {
+        const a = byId.get(String(r.athlete));
+        if (!a) return;
+        if (r.dateOfBirth == null && a.dateOfBirth) {
+          r.dateOfBirth = a.dateOfBirth;
+          changed = true;
+        }
+        if (r.photoUrl == null && a.photoUrl) {
+          r.photoUrl = a.photoUrl;
+          changed = true;
+        }
+      });
+      if (changed) await tournament.save();
     }
 
     // Tell the caller whether THEY (when they're an individual Player
@@ -239,6 +311,8 @@ async function buildRegistration(tournament, athleteId, requestedTeam) {
     fullName: athlete.fullName,
     khmerName: athlete.khmerName,
     verifyId: athlete.verifyId,
+    photoUrl: athlete.photoUrl || null,
+    dateOfBirth: athlete.dateOfBirth || null,
     jerseyNumber: assignment.jerseyNumber ?? null,
     isOverage,
   };
@@ -306,7 +380,9 @@ exports.registerSelf = async (req, res) => {
 
     const row = await buildRegistration(tournament, req.athleteId, req.body.team);
     tournament.registrations.push(row);
+    const lineup = await ensureTournamentLineup(tournament, row.team);
     await tournament.save();
+    await addAthleteToLineup(lineup, row.athlete);
 
     notifyTeamCoaches(row.team, `📝 ${row.fullName} registered for "${tournament.name}" (${row.team}).`);
 
@@ -346,7 +422,9 @@ exports.registerOnBehalf = async (req, res) => {
     const row = await buildRegistration(tournament, athleteId, team);
     row.registeredBy = req.adminId;
     tournament.registrations.push(row);
+    const lineup = await ensureTournamentLineup(tournament, row.team);
     await tournament.save();
+    await addAthleteToLineup(lineup, row.athlete);
 
     res.status(201).json(tournament);
   } catch (err) {
@@ -375,8 +453,19 @@ exports.unregister = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
+    const removedAthleteId = row.athlete;
+    const removedTeam = row.team;
     row.deleteOne();
     await tournament.save();
+
+    // Keep the auto-managed Squad list in sync — drop them from it too, so
+    // they don't linger in the Formation/Starting XI player pool.
+    const entry = tournament.teamLineups.find((e) => e.team === removedTeam);
+    if (entry) {
+      const lineup = await Lineup.findById(entry.lineup);
+      if (lineup) await removeAthleteFromLineup(lineup, removedAthleteId);
+    }
+
     res.json({ message: "Removed from tournament" });
   } catch (err) {
     res.status(500).json({ message: err.message });

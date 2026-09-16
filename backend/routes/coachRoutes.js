@@ -76,7 +76,9 @@ router.post("/lineup", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (r
   }
 });
 
-router.get("/lineups", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
+// PLAYER (shared or individual login) can view their own team's squad
+// lists read-only — create/update/delete stay Admin/Head Coach only below.
+router.get("/lineups", requireAuth, requireRole("HEAD_COACH", "ADMIN", "PLAYER"), async (req, res) => {
   try {
     const team = resolveTeam(req);
     if (!team) return res.status(400).json({ message: "Team is required" });
@@ -89,7 +91,7 @@ router.get("/lineups", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (r
   }
 });
 
-router.get("/lineup/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
+router.get("/lineup/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN", "PLAYER"), async (req, res) => {
   try {
     const lineup = await Lineup.findById(req.params.id).populate("athletes.athleteId");
     if (!lineup) return res.status(404).json({ message: "Lineup not found" });
