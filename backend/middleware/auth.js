@@ -11,6 +11,10 @@ function requireAuth(req, res, next) {
     req.adminId = decoded.id;
     req.adminRole = decoded.role || "ADMIN";
     req.adminTeam = decoded.team || null;
+    // Only set on an individual Player login (one account per athlete, used
+    // for tournament self-registration) — a legacy shared team-wide Player
+    // login has no single athlete to point at, so this stays null.
+    req.athleteId = decoded.athleteId || null;
     next();
   } catch (err) {
     return res.status(401).json({ message: "Invalid or expired token" });

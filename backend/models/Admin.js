@@ -20,12 +20,28 @@ const adminSchema = new mongoose.Schema(
     team: {
       // required for HEAD_COACH and PLAYER accounts — which team's roster
       // they can see. Should match the `team` value used on Athlete records.
+      // For an individual player account (athleteId set below) this is just
+      // that athlete's FIRST team assignment — only used for the shared
+      // team-roster view; tournament registration looks at the athlete's
+      // full assignments list instead, not this single field.
       type: String,
     },
-    // Optional Telegram notifications (pending approvals, approve/reject,
-    // new fees). Empty/unset = notifications are just skipped for this
-    // account — nothing breaks. Get this by messaging the club's bot once,
-    // then looking the numeric chat id up (e.g. via @userinfobot).
+    // Set only on an individual PLAYER account (one login per athlete, used
+    // for tournament self-registration) — links this login back to the one
+    // Athlete document it belongs to. A shared/legacy PLAYER login (one
+    // password for a whole team, created the old way) leaves this unset.
+    athleteId: { type: mongoose.Schema.Types.ObjectId, ref: "Athlete", default: null },
+    // True right after an account is created with the default password (or
+    // after an Admin/Head Coach/Telegram self-service reset) — the frontend
+    // forces a password-change screen before anything else is usable until
+    // this flips back to false.
+    mustChangePassword: { type: Boolean, default: false },
+    // Optional Telegram notifications. For ADMIN/HEAD_COACH: pending
+    // approvals, approve/reject, new fees. For an individual PLAYER
+    // account: only used for the self-service "forgot password" flow (a
+    // temporary password is sent here). Empty/unset = skipped, nothing
+    // breaks. Get this by messaging the club's bot once, then looking the
+    // numeric chat id up (e.g. via @userinfobot).
     telegramChatId: { type: String, default: "" },
   },
   { timestamps: true }

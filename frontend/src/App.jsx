@@ -21,6 +21,10 @@ import DebtReportPage from "./pages/DebtReportPage";
 import StatsPage from "./pages/StatsPage";
 import RenewPage from "./pages/RenewPage";
 import PlayerDashboard from "./pages/PlayerDashboard";
+import ChangePasswordPage from "./pages/ChangePasswordPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import AdminTournaments from "./pages/AdminTournaments";
+import TournamentsPage from "./pages/TournamentsPage";
 
 export default function App() {
   return (
@@ -29,6 +33,15 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route
+          path="/change-password"
+          element={
+            <ProtectedRoute>
+              <ChangePasswordPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/verify/:verifyId" element={<VerifyPage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/shop" element={<ShopPage />} />
@@ -142,6 +155,22 @@ export default function App() {
           element={
             <ProtectedRoute role="PLAYER">
               <PlayerDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/tournaments"
+          element={
+            <ProtectedRoute role={["ADMIN", "HEAD_COACH"]}>
+              <AdminTournaments />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tournaments"
+          element={
+            <ProtectedRoute role="PLAYER">
+              <TournamentsPage />
             </ProtectedRoute>
           }
         />

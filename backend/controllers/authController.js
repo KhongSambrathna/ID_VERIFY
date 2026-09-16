@@ -1,9 +1,16 @@
 const jwt = require("jsonwebtoken");
 const Admin = require("../models/Admin");
+const Athlete = require("../models/Athlete");
+const { sendTelegramMessage } = require("../utils/notify");
 
 function signToken(admin) {
   return jwt.sign(
-    { id: admin._id, role: admin.role, team: admin.team || null },
+    {
+      id: admin._id,
+      role: admin.role,
+      team: admin.team || null,
+      athleteId: admin.athleteId || null,
+    },
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
@@ -15,6 +22,8 @@ function publicAdmin(admin) {
     username: admin.username,
     role: admin.role,
     team: admin.team || null,
+    athleteId: admin.athleteId || null,
+    mustChangePassword: !!admin.mustChangePassword,
     telegramChatId: admin.telegramChatId || "",
   };
 }
@@ -65,13 +74,198 @@ exports.login = async (req, res) => {
   }
 };
 
-// GET /api/auth/users  (admin only) — list every login account
+// GET /api/auth/users  (admin only) — list every ADMIN/HEAD_COACH/legacy
+// shared-Player login account. Individual per-athlete Player accounts
+// (created in bulk for tournament self-registration) are excluded here —
+// there can be one per athlete, so they'd swamp this list; see
+// GET /api/auth/player-accounts for those instead.
 exports.listUsers = async (req, res) => {
   try {
-    const users = await Admin.find()
+    const users = await Admin.find({ athleteId: null })
       .select("username role team telegramChatId createdAt")
       .sort({ createdAt: -1 });
     res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// GET /api/auth/player-accounts  (Admin: every team; Head Coach: own team
+// only) — the individual per-athlete Player logins used for tournament
+// self-registration, one row per athlete that has one.
+exports.listPlayerAccounts = async (req, res) => {
+  try {
+    const filter = { role: "PLAYER", athleteId: { $ne: null } };
+    if (req.adminRole === "HEAD_COACH") filter.team = req.adminTeam;
+    const accounts = await Admin.find(filter)
+      .select("username team athleteId mustChangePassword telegramChatId createdAt")
+      .sort({ username: 1 });
+    res.json(accounts);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// POST /api/auth/player-accounts/generate  (admin only) — creates one
+// individual Player login per athlete that doesn't already have one.
+// Username = that athlete's own verifyId (e.g. "001-100-2991", dash and
+// all — it's already unique and printed on their card, so it's easy for
+// them to find and type). Default password "12345"; mustChangePassword
+// forces them onto the change-password screen the first time they sign in.
+exports.generatePlayerAccounts = async (req, res) => {
+  try {
+    const athletes = await Athlete.find({}).select("verifyId fullName assignments");
+    const existing = await Admin.find({ role: "PLAYER", athleteId: { $ne: null } }).select("athleteId");
+    const already = new Set(existing.map((a) => String(a.athleteId)));
+
+    const created = [];
+    const skipped = [];
+    for (const athlete of athletes) {
+      if (already.has(String(athlete._id))) {
+        skipped.push({ athleteId: athlete._id, fullName: athlete.fullName, reason: "Already has a login" });
+        continue;
+      }
+      if (!athlete.verifyId) {
+        skipped.push({ athleteId: athlete._id, fullName: athlete.fullName, reason: "No verify ID yet" });
+        continue;
+      }
+      try {
+        const usernameTaken = await Admin.exists({ username: athlete.verifyId });
+        if (usernameTaken) {
+          skipped.push({ athleteId: athlete._id, fullName: athlete.fullName, reason: "Username already taken" });
+          continue;
+        }
+        await Admin.create({
+          username: athlete.verifyId,
+          password: "12345",
+          role: "PLAYER",
+          team: athlete.assignments[0]?.team || "",
+          athleteId: athlete._id,
+          mustChangePassword: true,
+        });
+        created.push({ athleteId: athlete._id, fullName: athlete.fullName, username: athlete.verifyId });
+      } catch (err) {
+        skipped.push({ athleteId: athlete._id, fullName: athlete.fullName, reason: err.message });
+      }
+    }
+
+    res.json({ created, skipped });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PUT /api/auth/player-accounts/:id/reset-password  (Admin: any; Head
+// Coach: only an account linked to their own team) — the admin-mediated
+// side of "forgot password": back to the default, forced to change again.
+exports.resetPlayerPassword = async (req, res) => {
+  try {
+    const account = await Admin.findOne({ _id: req.params.id, role: "PLAYER", athleteId: { $ne: null } });
+    if (!account) return res.status(404).json({ message: "Player account not found" });
+    if (req.adminRole === "HEAD_COACH" && account.team !== req.adminTeam) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    account.password = "12345";
+    account.mustChangePassword = true;
+    await account.save();
+    res.json({ message: "Password reset to the default — they'll be asked to change it at next sign-in" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// POST /api/auth/change-password  (any signed-in account) — the forced
+// first-login change, or a voluntary one later. Requires the current
+// password (which they do know: either the default "12345", or whatever a
+// Telegram self-service reset just texted them), so this never needs a
+// separate "old password" recovery path of its own.
+exports.changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Current and new password are required" });
+    }
+    if (newPassword.length < 4) {
+      return res.status(400).json({ message: "New password must be at least 4 characters" });
+    }
+    const account = await Admin.findById(req.adminId);
+    if (!account) return res.status(404).json({ message: "Account not found" });
+
+    const match = await account.comparePassword(currentPassword);
+    if (!match) return res.status(401).json({ message: "Current password is incorrect" });
+
+    account.password = newPassword;
+    account.mustChangePassword = false;
+    await account.save();
+
+    // Issue a fresh token — the old one may still carry mustChangePassword
+    // true, and the frontend swaps it immediately after this call anyway.
+    const token = signToken(account);
+    res.json({ token, admin: publicAdmin(account) });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// POST /api/auth/forgot-password  (public) — body: { username }. Only an
+// individual Player account (athleteId set) with a Telegram chat id
+// already linked can self-serve; anything else (no such account, an
+// Admin/Head Coach account, no Telegram linked) gets the same generic
+// response so this can't be used to probe which usernames exist. The
+// no-Telegram-linked case is the expected fallback: ask your Admin/Head
+// Coach to reset it for you instead (see resetPlayerPassword above).
+exports.forgotPassword = async (req, res) => {
+  const generic = {
+    message: "If that account has Telegram linked, a new temporary password was just sent there.",
+  };
+  try {
+    const { username } = req.body;
+    if (!username) return res.status(400).json({ message: "Username is required" });
+
+    const account = await Admin.findOne({ username, role: "PLAYER", athleteId: { $ne: null } });
+    if (!account || !account.telegramChatId) return res.json(generic);
+
+    const tempPassword = String(Math.floor(100000 + Math.random() * 900000)); // 6-digit code
+    account.password = tempPassword;
+    account.mustChangePassword = true;
+    await account.save();
+
+    sendTelegramMessage(
+      account.telegramChatId,
+      `🔑 Your temporary password is: ${tempPassword}\nSign in with it, then set a new password when asked.`
+    );
+
+    res.json(generic);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PUT /api/auth/me/telegram  (any signed-in account, self-service) — lets
+// an individual Player set up their OWN Telegram chat id, needed for the
+// self-service forgot-password flow above. Same manual one-time lookup as
+// Admin/Head Coach already do (message the bot once, then get the numeric
+// chat id from @userinfobot).
+exports.updateMyTelegram = async (req, res) => {
+  try {
+    const account = await Admin.findById(req.adminId);
+    if (!account) return res.status(404).json({ message: "Account not found" });
+    account.telegramChatId = String(req.body.telegramChatId || "").trim();
+    await account.save();
+    res.json(publicAdmin(account));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// GET /api/auth/me  (any signed-in account) — refetches the current
+// account's own public info, e.g. so the frontend can re-check
+// mustChangePassword without decoding the JWT itself.
+exports.me = async (req, res) => {
+  try {
+    const account = await Admin.findById(req.adminId);
+    if (!account) return res.status(404).json({ message: "Account not found" });
+    res.json(publicAdmin(account));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

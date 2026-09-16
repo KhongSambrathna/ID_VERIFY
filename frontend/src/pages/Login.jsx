@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 
@@ -18,7 +18,13 @@ export default function Login() {
     try {
       const { data } = await api.post("/auth/login", { username, password });
       login(data.token, data.admin);
-      navigate(data.admin?.role === "HEAD_COACH" ? "/coach" : "/admin");
+      if (data.admin?.mustChangePassword) {
+        navigate("/change-password");
+        return;
+      }
+      navigate(
+        data.admin?.role === "HEAD_COACH" ? "/coach" : data.admin?.role === "PLAYER" ? "/player" : "/admin"
+      );
     } catch (err) {
       setError(err.response?.data?.message || "Login failed");
     } finally {
@@ -47,9 +53,12 @@ export default function Login() {
         <button className="btn btn-primary" style={{ width: "100%" }} disabled={loading}>
           {loading ? "Signing in…" : "Sign in"}
         </button>
+        <Link className="link-btn" style={{ marginTop: 10, display: "inline-block" }} to="/forgot-password">
+          Forgot password?
+        </Link>
         <p className="help-text">
-          Head coaches sign in here too — use the username and password your
-          admin created for you.
+          Head coaches and players sign in here too — use the username and
+          password your admin created for you.
         </p>
       </form>
     </div>

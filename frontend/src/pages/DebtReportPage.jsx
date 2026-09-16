@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
+import { resolveFileUrl } from "../utils/fileUrl";
 
 // Debt/fee report — Admin sees every team; a Head Coach only ever sees their
 // own team's people (the backend already scopes GET /athletes that way for
@@ -78,6 +79,7 @@ export default function DebtReportPage() {
               <table className="athletes">
                 <thead>
                   <tr>
+                    <th>Photo</th>
                     <th>ID</th>
                     <th>Name</th>
                     <th>Team</th>
@@ -90,6 +92,13 @@ export default function DebtReportPage() {
                 <tbody>
                   {owing.map((a) => (
                     <tr key={a.assignmentId}>
+                      <td data-label="Photo">
+                        <img
+                          className="small-photo"
+                          src={a.photoUrl ? resolveFileUrl(a.photoUrl) : "https://placehold.co/50x50?text=Photo"}
+                          alt={a.fullName}
+                        />
+                      </td>
                       <td data-label="ID">{a.verifyId}</td>
                       <td data-label="Name">{a.fullName}</td>
                       <td data-label="Team">{a.team || "—"}</td>
@@ -103,7 +112,7 @@ export default function DebtReportPage() {
                           : "—"}
                       </td>
                       <td data-label="Actions" className="actions-cell">
-                        <Link className="link-btn" to={`/admin/athlete/${a._id}/edit`}>
+                        <Link className="action-btn" to={`/admin/athlete/${a._id}/edit`}>
                           Edit
                         </Link>
                       </td>

@@ -12,7 +12,7 @@ const ROLE_OPTIONS = [
 const ROLE_LABELS = { HEAD_COACH: "Head Coach", PLAYER: "Player", ADMIN: "Admin" };
 
 export default function AdminUsers() {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, isAdmin } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -28,6 +28,14 @@ export default function AdminUsers() {
   const [telegramDrafts, setTelegramDrafts] = useState({});
   const [savingTelegramId, setSavingTelegramId] = useState(null);
 
+  // Individual per-athlete Player logins (tournament self-registration) —
+  // kept separate from the table above since there can be one per athlete.
+  const [playerAccounts, setPlayerAccounts] = useState([]);
+  const [playerAccountsLoading, setPlayerAccountsLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [generateSummary, setGenerateSummary] = useState(null);
+  const [resettingId, setResettingId] = useState(null);
+
   const load = async () => {
     setLoading(true);
     try {
@@ -40,9 +48,50 @@ export default function AdminUsers() {
     }
   };
 
+  const loadPlayerAccounts = async () => {
+    setPlayerAccountsLoading(true);
+    try {
+      const { data } = await api.get("/auth/player-accounts");
+      setPlayerAccounts(data);
+    } catch {
+      // Head Coach role also has access, so a failure here is unusual —
+      // just leave the list empty rather than blocking the whole page.
+    } finally {
+      setPlayerAccountsLoading(false);
+    }
+  };
+
   useEffect(() => {
     load();
+    loadPlayerAccounts();
   }, []);
+
+  const generatePlayerAccounts = async () => {
+    setGenerating(true);
+    setGenerateSummary(null);
+    try {
+      const { data } = await api.post("/auth/player-accounts/generate");
+      setGenerateSummary(data);
+      loadPlayerAccounts();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to generate player accounts");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const resetPlayerPassword = async (account) => {
+    if (!confirm(`Reset ${account.username}'s password back to the default? They'll be asked to change it at next sign-in.`)) return;
+    setResettingId(account._id);
+    try {
+      await api.put(`/auth/player-accounts/${account._id}/reset-password`);
+      loadPlayerAccounts();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to reset password");
+    } finally {
+      setResettingId(null);
+    }
+  };
 
   const update = (key) => (e) => setForm({ ...form, [key]: e.target.value });
 
@@ -202,6 +251,72 @@ export default function AdminUsers() {
                 <tr>
                   <td colSpan={5} style={{ textAlign: "center", color: "#777" }}>
                     No users yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="dash-header" style={{ marginTop: 40 }}>
+        <h3>Player accounts (tournament sign-in)</h3>
+        <p>
+          One individual login per athlete — username is their own player ID (e.g. 001-100-2991), default
+          password "12345", forced to set their own at first sign-in. Used for tournament self-registration;
+          separate from the shared team Player login above.
+        </p>
+        {isAdmin && (
+          <div className="dash-actions">
+            <button className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }} onClick={generatePlayerAccounts} disabled={generating}>
+              {generating ? "Generating…" : "Generate missing player logins"}
+            </button>
+          </div>
+        )}
+        {generateSummary && (
+          <p className="help-text">
+            Created {generateSummary.created.length}, skipped {generateSummary.skipped.length}
+            {generateSummary.skipped.length > 0 ? " (already had a login, or no verify ID yet)" : ""}.
+          </p>
+        )}
+      </div>
+
+      {playerAccountsLoading && <p>Loading…</p>}
+
+      {!playerAccountsLoading && (
+        <div className="table-scroll">
+          <table className="athletes">
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Team</th>
+                <th>Must change password</th>
+                <th>Telegram linked</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {playerAccounts.map((a) => (
+                <tr key={a._id}>
+                  <td data-label="Username">{a.username}</td>
+                  <td data-label="Team">{a.team || "—"}</td>
+                  <td data-label="Must change password">{a.mustChangePassword ? "Yes" : "No"}</td>
+                  <td data-label="Telegram linked">{a.telegramChatId ? "Yes" : "No"}</td>
+                  <td data-label="Actions" className="actions-cell">
+                    <button
+                      className="action-btn"
+                      disabled={resettingId === a._id}
+                      onClick={() => resetPlayerPassword(a)}
+                    >
+                      {resettingId === a._id ? "Resetting…" : "Reset password"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {playerAccounts.length === 0 && (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: "center", color: "#777" }}>
+                    No individual player logins yet.
                   </td>
                 </tr>
               )}

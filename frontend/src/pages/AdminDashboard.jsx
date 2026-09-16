@@ -258,13 +258,13 @@ export default function AdminDashboard() {
                   </td>
                   <td data-label="Actions" className="actions-cell">
                     <Link className="action-btn" to={`/admin/athlete/${a._id}?team=${encodeURIComponent(a.team)}`}>
-                      View card
+                      View
                     </Link>
                     <Link className="action-btn" to={`/admin/athlete/${a._id}/edit`}>
                       Edit
                     </Link>
                     <button className="action-btn danger" onClick={() => removeAssignment(a)}>
-                      Remove from team
+                      Delete
                     </button>
                   </td>
                 </tr>
@@ -340,7 +340,7 @@ export default function AdminDashboard() {
                     </td>
                     <td data-label="Actions" className="actions-cell">
                       <Link className="action-btn" to={`/admin/athlete/${a._id}?team=${encodeURIComponent(a.team)}`}>
-                        View card
+                        View
                       </Link>
                       {a.pendingRemoval ? (
                         <>

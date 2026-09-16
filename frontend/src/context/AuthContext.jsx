@@ -40,6 +40,11 @@ export function AuthProvider({ children }) {
         user,
         role,
         team: user?.team || null,
+        // Set only on an individual per-athlete Player login (tournament
+        // self-registration) — null for every other account, including the
+        // older shared team-wide Player login.
+        athleteId: user?.athleteId || null,
+        mustChangePassword: !!user?.mustChangePassword,
         isAuthed: !!token,
         isAdmin: role === "ADMIN",
         isHeadCoach: role === "HEAD_COACH",

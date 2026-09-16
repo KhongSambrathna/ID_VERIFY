@@ -12,6 +12,7 @@ const teamRoutes = require("./routes/teamRoutes");
 const sponsorRoutes = require("./routes/sponsorRoutes");
 const productRoutes = require("./routes/productRoutes");
 const shareRoutes = require("./routes/shareRoutes");
+const tournamentRoutes = require("./routes/tournamentRoutes");
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use("/api/coach", coachRoutes);
 app.use("/api/teams", teamRoutes);
 app.use("/api/sponsors", sponsorRoutes);
 app.use("/api/products", productRoutes);
+app.use("/api/tournaments", tournamentRoutes);
 // Social-media share/preview pages — paste these into Facebook/Telegram
 // instead of the plain frontend links to get a real preview image
 // (see shareController.js for why the SPA can't provide this on its own).
