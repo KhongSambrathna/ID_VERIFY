@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../i18n/LanguageContext";
 
 // Reached two ways: forced (ProtectedRoute redirects here automatically
 // whenever the signed-in account still has mustChangePassword set — a
@@ -16,16 +17,17 @@ export default function ChangePasswordPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     if (newPassword !== confirmPassword) {
-      setError("New password and confirmation don't match");
+      setError(t("changePasswordPage.passwordMismatch"));
       return;
     }
     if (newPassword.length < 4) {
-      setError("New password must be at least 4 characters");
+      setError(t("changePasswordPage.passwordTooShort"));
       return;
     }
     setSaving(true);
@@ -36,7 +38,7 @@ export default function ChangePasswordPage() {
         data.admin?.role === "HEAD_COACH" ? "/coach" : data.admin?.role === "PLAYER" ? "/player" : "/admin"
       );
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to change password");
+      setError(err.response?.data?.message || t("changePasswordPage.changeFailed"));
     } finally {
       setSaving(false);
     }
@@ -45,15 +47,15 @@ export default function ChangePasswordPage() {
   return (
     <div className="auth-wrap">
       <form className="card" onSubmit={handleSubmit}>
-        <h2>{mustChangePassword ? "Set a new password" : "Change password"}</h2>
+        <h2>{mustChangePassword ? t("changePasswordPage.setNewPasswordTitle") : t("changePasswordPage.changePasswordTitle")}</h2>
         {mustChangePassword && (
           <p className="help-text" style={{ marginTop: -8 }}>
-            {user?.username ? `Signed in as ${user.username}. ` : ""}
-            You're using a temporary password — set your own before continuing.
+            {user?.username ? `${t("changePasswordPage.signedInAsPrefix")} ${user.username}. ` : ""}
+            {t("changePasswordPage.temporaryPasswordNotice")}
           </p>
         )}
         <div className="field">
-          <label>Current password</label>
+          <label>{t("changePasswordPage.currentPasswordLabel")}</label>
           <input
             type="password"
             value={currentPassword}
@@ -62,11 +64,11 @@ export default function ChangePasswordPage() {
           />
         </div>
         <div className="field">
-          <label>New password</label>
+          <label>{t("changePasswordPage.newPasswordLabel")}</label>
           <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
         </div>
         <div className="field">
-          <label>Confirm new password</label>
+          <label>{t("changePasswordPage.confirmNewPasswordLabel")}</label>
           <input
             type="password"
             value={confirmPassword}
@@ -76,7 +78,7 @@ export default function ChangePasswordPage() {
         </div>
         {error && <div className="error-text">{error}</div>}
         <button className="btn btn-primary" style={{ width: "100%" }} disabled={saving}>
-          {saving ? "Saving…" : "Save new password"}
+          {saving ? t("common.saving") : t("changePasswordPage.saveNewPassword")}
         </button>
         {mustChangePassword && (
           <button
@@ -88,7 +90,7 @@ export default function ChangePasswordPage() {
               navigate("/login");
             }}
           >
-            Sign out instead
+            {t("changePasswordPage.signOutInstead")}
           </button>
         )}
       </form>

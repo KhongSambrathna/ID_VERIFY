@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
+import { useLanguage } from "../i18n/LanguageContext";
 
 const TELEGRAM_USERNAME = "sambrathnajr";
 
 function stockBadge(stock) {
-  if (stock <= 0) return { cls: "rejected", text: "Out of stock" };
-  if (stock <= 5) return { cls: "pending", text: "Low stock" };
-  return { cls: "verified", text: "In stock" };
+  if (stock <= 0) return { cls: "rejected", key: "shopPage.outOfStock" };
+  if (stock <= 5) return { cls: "pending", key: "shopPage.lowStock" };
+  return { cls: "verified", key: "shopPage.inStock" };
 }
 
 // Opens a chat with the club's Telegram with the product name/price already
@@ -19,6 +20,7 @@ function orderLink(product) {
 
 // Public storefront — no login required. Reads GET /api/products/public.
 export default function ShopPage() {
+  const { t } = useLanguage();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -28,7 +30,7 @@ export default function ShopPage() {
     api
       .get("/products/public")
       .then(({ data }) => setProducts(data))
-      .catch((err) => setError(err.response?.data?.message || "Failed to load products"))
+      .catch((err) => setError(err.response?.data?.message || t("shopPage.failedToLoad")))
       .finally(() => setLoading(false));
   }, []);
 
@@ -38,19 +40,19 @@ export default function ShopPage() {
   return (
     <div className="container">
       <div className="shop-header">
-        <h2>Equipment shop</h2>
-        <p>Browse our sports equipment. Tap "Order" to message us on Telegram and we'll take it from there.</p>
+        <h2>{t("shopPage.title")}</h2>
+        <p>{t("shopPage.description")}</p>
       </div>
 
       <div className="field search-field">
         <input
-          placeholder="Search products…"
+          placeholder={t("shopPage.searchPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
 
-      {loading && <p>Loading…</p>}
+      {loading && <p>{t("common.loading")}</p>}
       {error && <p className="error-text">{error}</p>}
 
       {!loading && !error && (
@@ -67,14 +69,14 @@ export default function ShopPage() {
                 />
                 <div className="shop-card-body">
                   <p className="shop-card-name">{p.name}</p>
-                  <span className={`badge ${badge.cls}`}>{badge.text}</span>
+                  <span className={`badge ${badge.cls}`}>{t(badge.key)}</span>
                   <div className="shop-card-footer">
                     <span className="shop-card-price">${Number(p.price).toFixed(2)}</span>
                     {outOfStock ? (
-                      <span className="shop-order-btn disabled">Order</span>
+                      <span className="shop-order-btn disabled">{t("shopPage.order")}</span>
                     ) : (
                       <a className="shop-order-btn" href={orderLink(p)} target="_blank" rel="noopener noreferrer">
-                        Order
+                        {t("shopPage.order")}
                       </a>
                     )}
                   </div>
@@ -84,7 +86,7 @@ export default function ShopPage() {
           })}
           {filtered.length === 0 && (
             <p className="shop-empty">
-              {products.length === 0 ? "No products yet — check back soon." : "No products match your search."}
+              {products.length === 0 ? t("shopPage.noProductsYet") : t("shopPage.noProductsMatch")}
             </p>
           )}
         </div>

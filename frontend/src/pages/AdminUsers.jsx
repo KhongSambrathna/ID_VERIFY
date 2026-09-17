@@ -2,17 +2,23 @@ import { useEffect, useState } from "react";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import TeamSelect from "../components/TeamSelect";
-
-const ROLE_OPTIONS = [
-  { value: "ADMIN", label: "Admin" },
-  { value: "HEAD_COACH", label: "Head Coach" },
-  { value: "PLAYER", label: "Player (read-only, shared)" },
-];
-
-const ROLE_LABELS = { HEAD_COACH: "Head Coach", PLAYER: "Player", ADMIN: "Admin" };
+import { useLanguage } from "../i18n/LanguageContext";
 
 export default function AdminUsers() {
+  const { t } = useLanguage();
   const { user: currentUser, isAdmin } = useAuth();
+
+  const ROLE_OPTIONS = [
+    { value: "ADMIN", label: t("adminUsers.roleAdmin") },
+    { value: "HEAD_COACH", label: t("adminUsers.roleHeadCoach") },
+    { value: "PLAYER", label: t("adminUsers.rolePlayer") },
+  ];
+
+  const ROLE_LABELS = {
+    HEAD_COACH: t("adminUsers.roleHeadCoach"),
+    PLAYER: t("adminUsers.rolePlayerLabel"),
+    ADMIN: t("adminUsers.roleAdmin"),
+  };
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -42,7 +48,7 @@ export default function AdminUsers() {
       const { data } = await api.get("/auth/users");
       setUsers(data);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load users");
+      setError(err.response?.data?.message || t("adminUsers.failedToLoadUsers"));
     } finally {
       setLoading(false);
     }
@@ -74,20 +80,25 @@ export default function AdminUsers() {
       setGenerateSummary(data);
       loadPlayerAccounts();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to generate player accounts");
+      alert(err.response?.data?.message || t("adminUsers.failedToGenerate"));
     } finally {
       setGenerating(false);
     }
   };
 
   const resetPlayerPassword = async (account) => {
-    if (!confirm(`Reset ${account.username}'s password back to the default? They'll be asked to change it at next sign-in.`)) return;
+    if (
+      !confirm(
+        `${t("adminUsers.confirmResetPasswordPrefix")} ${account.username}${t("adminUsers.confirmResetPasswordSuffix")}`
+      )
+    )
+      return;
     setResettingId(account._id);
     try {
       await api.put(`/auth/player-accounts/${account._id}/reset-password`);
       loadPlayerAccounts();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to reset password");
+      alert(err.response?.data?.message || t("adminUsers.failedToResetPassword"));
     } finally {
       setResettingId(null);
     }
@@ -109,7 +120,7 @@ export default function AdminUsers() {
       setForm({ username: "", password: "", role: "HEAD_COACH", team: "" });
       load();
     } catch (err) {
-      setFormError(err.response?.data?.message || "Failed to create user");
+      setFormError(err.response?.data?.message || t("adminUsers.failedToCreateUser"));
     } finally {
       setSaving(false);
     }
@@ -127,53 +138,44 @@ export default function AdminUsers() {
       });
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to save");
+      alert(err.response?.data?.message || t("common.failedToSave"));
     } finally {
       setSavingTelegramId(null);
     }
   };
 
   const remove = async (id) => {
-    if (!confirm("Delete this user login? They won't be able to sign in anymore.")) return;
+    if (!confirm(t("adminUsers.confirmDeleteUser"))) return;
     try {
       await api.delete(`/auth/users/${id}`);
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to delete user");
+      alert(err.response?.data?.message || t("common.failedToDelete"));
     }
   };
 
   return (
     <div className="container dash-body">
       <div className="dash-header">
-        <h2>Users &amp; roles</h2>
-        <p>
-          Create Head Coach logins so coaches can build their own team's lineups — they can only pull
-          athletes already registered in their team, never add new ones. Create a Player login (one shared
-          account per team) so players can view their team's roster and fee/debt status — read-only, no
-          editing.
-        </p>
+        <h2>{t("adminUsers.title")}</h2>
+        <p>{t("adminUsers.intro")}</p>
         <p className="help-text" style={{ maxWidth: 640 }}>
-          Telegram alerts (new pending approvals, approve/reject, new fees) need a bot token set on the
-          backend first (message @BotFather on Telegram → /newbot → put the token in Render's environment
-          variables as TELEGRAM_BOT_TOKEN). Once that's done, each user below opens a chat with that bot,
-          sends it any message, looks up their own numeric chat id (e.g. via @userinfobot), and pastes it
-          in the "Telegram chat ID" column.
+          {t("adminUsers.telegramHelp")}
         </p>
       </div>
 
       <form className="card" style={{ maxWidth: 480, marginBottom: 24 }} onSubmit={handleCreate}>
-        <h3 style={{ marginTop: 0 }}>Create new user</h3>
+        <h3 style={{ marginTop: 0 }}>{t("adminUsers.createNewUser")}</h3>
         <div className="field">
-          <label>Username</label>
+          <label>{t("common.username")}</label>
           <input value={form.username} onChange={update("username")} required />
         </div>
         <div className="field">
-          <label>Password</label>
+          <label>{t("common.password")}</label>
           <input type="password" value={form.password} onChange={update("password")} required />
         </div>
         <div className="field">
-          <label>Role</label>
+          <label>{t("common.role")}</label>
           <select value={form.role} onChange={update("role")}>
             {ROLE_OPTIONS.map((r) => (
               <option key={r.value} value={r.value}>
@@ -187,17 +189,16 @@ export default function AdminUsers() {
         )}
         {form.role === "PLAYER" && (
           <p className="help-text" style={{ marginTop: -8 }}>
-            One shared login for every player on this team — they can see the whole team's roster and
-            fee/debt status, but can never add, edit, or remove anything.
+            {t("adminUsers.playerHelp")}
           </p>
         )}
         {formError && <div className="error-text">{formError}</div>}
         <button className="btn btn-primary" disabled={saving}>
-          {saving ? "Creating…" : "Create user"}
+          {saving ? t("adminUsers.creating") : t("adminUsers.createUser")}
         </button>
       </form>
 
-      {loading && <p>Loading…</p>}
+      {loading && <p>{t("common.loading")}</p>}
       {error && <p className="error-text">{error}</p>}
 
       {!loading && !error && (
@@ -205,24 +206,24 @@ export default function AdminUsers() {
           <table className="athletes">
             <thead>
               <tr>
-                <th>Username</th>
-                <th>Role</th>
-                <th>Team</th>
-                <th>Telegram chat ID</th>
-                <th>Actions</th>
+                <th>{t("common.username")}</th>
+                <th>{t("common.role")}</th>
+                <th>{t("common.team")}</th>
+                <th>{t("adminUsers.telegramChatId")}</th>
+                <th>{t("common.actions")}</th>
               </tr>
             </thead>
             <tbody>
               {users.map((u) => (
                 <tr key={u._id}>
-                  <td data-label="Username">{u.username}</td>
-                  <td data-label="Role">{ROLE_LABELS[u.role] || "Admin"}</td>
-                  <td data-label="Team">{u.team || "—"}</td>
-                  <td data-label="Telegram chat ID">
+                  <td data-label={t("common.username")}>{u.username}</td>
+                  <td data-label={t("common.role")}>{ROLE_LABELS[u.role] || t("adminUsers.roleAdmin")}</td>
+                  <td data-label={t("common.team")}>{u.team || "—"}</td>
+                  <td data-label={t("adminUsers.telegramChatId")}>
                     <input
                       type="text"
                       style={{ width: 120 }}
-                      placeholder="e.g. 123456789"
+                      placeholder={t("adminUsers.telegramPlaceholder")}
                       value={telegramDrafts[u._id] ?? u.telegramChatId ?? ""}
                       onChange={(e) => setTelegramDrafts({ ...telegramDrafts, [u._id]: e.target.value })}
                       disabled={savingTelegramId === u._id}
@@ -234,14 +235,14 @@ export default function AdminUsers() {
                         disabled={savingTelegramId === u._id}
                         onClick={() => saveTelegram(u)}
                       >
-                        {savingTelegramId === u._id ? "Saving…" : "Save"}
+                        {savingTelegramId === u._id ? t("common.saving") : t("common.save")}
                       </button>
                     )}
                   </td>
-                  <td data-label="Actions" className="actions-cell">
+                  <td data-label={t("common.actions")} className="actions-cell">
                     {u._id !== currentUser?.id && (
                       <button className="link-btn" onClick={() => remove(u._id)}>
-                        Delete
+                        {t("common.delete")}
                       </button>
                     )}
                   </td>
@@ -250,7 +251,7 @@ export default function AdminUsers() {
               {users.length === 0 && (
                 <tr>
                   <td colSpan={5} style={{ textAlign: "center", color: "#777" }}>
-                    No users yet.
+                    {t("adminUsers.noUsers")}
                   </td>
                 </tr>
               )}
@@ -260,55 +261,56 @@ export default function AdminUsers() {
       )}
 
       <div className="dash-header" style={{ marginTop: 40 }}>
-        <h3>Player accounts (tournament sign-in)</h3>
-        <p>
-          One individual login per athlete — username is their own player ID (e.g. 001-100-2991), default
-          password "12345", forced to set their own at first sign-in. Used for tournament self-registration;
-          separate from the shared team Player login above.
-        </p>
+        <h3>{t("adminUsers.playerAccountsTitle")}</h3>
+        <p>{t("adminUsers.playerAccountsIntro")}</p>
         {isAdmin && (
           <div className="dash-actions">
             <button className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }} onClick={generatePlayerAccounts} disabled={generating}>
-              {generating ? "Generating…" : "Generate missing player logins"}
+              {generating ? t("adminUsers.generating") : t("adminUsers.generateMissing")}
             </button>
           </div>
         )}
         {generateSummary && (
           <p className="help-text">
-            Created {generateSummary.created.length}, skipped {generateSummary.skipped.length}
-            {generateSummary.skipped.length > 0 ? " (already had a login, or no verify ID yet)" : ""}.
+            {t("adminUsers.created")} {generateSummary.created.length}, {t("adminUsers.skipped")}{" "}
+            {generateSummary.skipped.length}
+            {generateSummary.skipped.length > 0 ? t("adminUsers.alreadyHadLogin") : ""}.
           </p>
         )}
       </div>
 
-      {playerAccountsLoading && <p>Loading…</p>}
+      {playerAccountsLoading && <p>{t("common.loading")}</p>}
 
       {!playerAccountsLoading && (
         <div className="table-scroll">
           <table className="athletes">
             <thead>
               <tr>
-                <th>Username</th>
-                <th>Team</th>
-                <th>Must change password</th>
-                <th>Telegram linked</th>
-                <th>Actions</th>
+                <th>{t("common.username")}</th>
+                <th>{t("common.team")}</th>
+                <th>{t("adminUsers.mustChangePassword")}</th>
+                <th>{t("adminUsers.telegramLinked")}</th>
+                <th>{t("common.actions")}</th>
               </tr>
             </thead>
             <tbody>
               {playerAccounts.map((a) => (
                 <tr key={a._id}>
-                  <td data-label="Username">{a.username}</td>
-                  <td data-label="Team">{a.team || "—"}</td>
-                  <td data-label="Must change password">{a.mustChangePassword ? "Yes" : "No"}</td>
-                  <td data-label="Telegram linked">{a.telegramChatId ? "Yes" : "No"}</td>
-                  <td data-label="Actions" className="actions-cell">
+                  <td data-label={t("common.username")}>{a.username}</td>
+                  <td data-label={t("common.team")}>{a.team || "—"}</td>
+                  <td data-label={t("adminUsers.mustChangePassword")}>
+                    {a.mustChangePassword ? t("common.yes") : t("common.no")}
+                  </td>
+                  <td data-label={t("adminUsers.telegramLinked")}>
+                    {a.telegramChatId ? t("common.yes") : t("common.no")}
+                  </td>
+                  <td data-label={t("common.actions")} className="actions-cell">
                     <button
                       className="action-btn"
                       disabled={resettingId === a._id}
                       onClick={() => resetPlayerPassword(a)}
                     >
-                      {resettingId === a._id ? "Resetting…" : "Reset password"}
+                      {resettingId === a._id ? t("adminUsers.resetting") : t("adminUsers.resetPassword")}
                     </button>
                   </td>
                 </tr>
@@ -316,7 +318,7 @@ export default function AdminUsers() {
               {playerAccounts.length === 0 && (
                 <tr>
                   <td colSpan={5} style={{ textAlign: "center", color: "#777" }}>
-                    No individual player logins yet.
+                    {t("adminUsers.noPlayerAccounts")}
                   </td>
                 </tr>
               )}

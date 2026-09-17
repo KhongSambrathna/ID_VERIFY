@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import html2canvas from "html2canvas";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { saveCanvasAsImage } from "../utils/saveCanvasAsImage";
+import { useLanguage } from "../i18n/LanguageContext";
 
 function formatDob(dob) {
   if (!dob) return null;
@@ -13,6 +14,7 @@ function formatDob(dob) {
 }
 
 export default function IDCard({ athlete, hideActions }) {
+  const { t } = useLanguage();
   const cardRef = useRef(null);
   const [saving, setSaving] = useState(false);
 
@@ -32,7 +34,7 @@ export default function IDCard({ athlete, hideActions }) {
       await saveCanvasAsImage(canvas, `${athlete.verifyId || athlete.fullName || "id-card"}.jpg`);
     } catch (err) {
       console.error("Failed to save card as JPG:", err);
-      alert("Couldn't save the card as an image. Please try again.");
+      alert(t("idCard.couldNotSaveJpg"));
     } finally {
       setSaving(false);
     }
@@ -43,7 +45,7 @@ export default function IDCard({ athlete, hideActions }) {
       {!hideActions && (
         <div className="id-card-actions no-print">
           <button className="btn btn-primary" onClick={() => window.print()}>
-            Export / Print card
+            {t("idCard.exportPrint")}
           </button>
           <button
             className="btn btn-outline card-jpg-btn"
@@ -51,7 +53,7 @@ export default function IDCard({ athlete, hideActions }) {
             onClick={saveAsJpg}
             disabled={saving}
           >
-            {saving ? "Saving…" : "Save as JPG"}
+            {saving ? t("common.saving") : t("idCard.saveAsJpg")}
           </button>
         </div>
       )}

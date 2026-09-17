@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import TeamSelect from "../components/TeamSelect";
+import { useLanguage } from "../i18n/LanguageContext";
 
 function formatDate(d) {
   if (!d) return "";
@@ -12,12 +13,14 @@ function formatDate(d) {
 }
 
 // One-line summary of a tournament's age rule, for the list table.
-function ageRuleSummary(t) {
-  if (!t.ageLimitYear) return "No age limit";
-  let s = `Born ${t.ageLimitYear}+`;
-  if (t.overageSlots > 0) {
-    s += `, up to ${t.overageSlots} over-age (${t.overageUsed || 0} used)`;
-    if (t.overageLimitYear) s += ` — no earlier than ${t.overageLimitYear}`;
+function ageRuleSummary(tour, t) {
+  if (!tour.ageLimitYear) return t("adminTournaments.noAgeLimit");
+  let s = t("adminTournaments.bornYearPlus").replace("{year}", tour.ageLimitYear);
+  if (tour.overageSlots > 0) {
+    s += t("adminTournaments.overageSummary")
+      .replace("{slots}", tour.overageSlots)
+      .replace("{used}", tour.overageUsed || 0);
+    if (tour.overageLimitYear) s += t("adminTournaments.noEarlierThan").replace("{year}", tour.overageLimitYear);
   }
   return s;
 }
@@ -39,6 +42,7 @@ const emptyForm = {
 // Coach is always forced onto their own team (server-enforced too); only
 // Admin can leave a tournament open to every team.
 export default function AdminTournaments() {
+  const { t } = useLanguage();
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const [tournaments, setTournaments] = useState([]);
@@ -64,7 +68,7 @@ export default function AdminTournaments() {
       const { data } = await api.get("/tournaments");
       setTournaments(data);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load tournaments");
+      setError(err.response?.data?.message || t("common.failedToLoad"));
     } finally {
       setLoading(false);
     }
@@ -107,20 +111,20 @@ export default function AdminTournaments() {
       // they sign up, and where the register-on-behalf search lives too.
       navigate(`/tournaments/${data._id}/squad`);
     } catch (err) {
-      setFormError(err.response?.data?.message || "Failed to create tournament");
+      setFormError(err.response?.data?.message || t("adminTournaments.failedToCreate"));
     } finally {
       setSaving(false);
     }
   };
 
   const remove = async (id) => {
-    if (!confirm("Delete this tournament and its whole registration list?")) return;
+    if (!confirm(t("adminTournaments.confirmDeleteTournament"))) return;
     try {
       await api.delete(`/tournaments/${id}`);
       if (expandedId === id) setExpandedId(null);
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to delete tournament");
+      alert(err.response?.data?.message || t("common.failedToDelete"));
     }
   };
 
@@ -130,23 +134,23 @@ export default function AdminTournaments() {
       const { data } = await api.get(`/tournaments/${id}`);
       setDetail(data);
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to load tournament");
+      alert(err.response?.data?.message || t("common.failedToLoad"));
     } finally {
       setDetailLoading(false);
     }
   };
 
-  const toggleExpand = (t) => {
-    if (expandedId === t._id) {
+  const toggleExpand = (tour) => {
+    if (expandedId === tour._id) {
       setExpandedId(null);
       setDetail(null);
       setAthletes([]);
       setAthleteSearch("");
       return;
     }
-    setExpandedId(t._id);
+    setExpandedId(tour._id);
     setDetail(null);
-    loadDetail(t._id);
+    loadDetail(tour._id);
   };
 
   const searchAthletes = async (q) => {
@@ -182,48 +186,45 @@ export default function AdminTournaments() {
       setAthleteSearch("");
       setAthletes([]);
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to register");
+      alert(err.response?.data?.message || t("adminTournaments.failedToRegister"));
     } finally {
       setRegistering(null);
     }
   };
 
   const removeRegistration = async (registrationId) => {
-    if (!confirm("Remove this player from the tournament?")) return;
+    if (!confirm(t("adminTournaments.confirmRemovePlayer"))) return;
     try {
       await api.delete(`/tournaments/${expandedId}/registrations/${registrationId}`);
       await loadDetail(expandedId);
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to remove");
+      alert(err.response?.data?.message || t("adminTournaments.failedToRemove"));
     }
   };
 
-  const exportCsv = async (t) => {
+  const exportCsv = async (tour) => {
     try {
-      const { data } = await api.get(`/tournaments/${t._id}/export.csv`, { responseType: "blob" });
+      const { data } = await api.get(`/tournaments/${tour._id}/export.csv`, { responseType: "blob" });
       const url = window.URL.createObjectURL(data);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${t.name.replace(/[^a-z0-9]+/gi, "-")}-registrations.csv`;
+      link.download = `${tour.name.replace(/[^a-z0-9]+/gi, "-")}-registrations.csv`;
       link.click();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to export");
+      alert(err.response?.data?.message || t("adminTournaments.failedToExport"));
     }
   };
 
   return (
     <div className="container dash-body">
       <div className="dash-header">
-        <h2>Tournaments</h2>
-        <p>
-          Create a tournament for players to register into themselves. Anyone owing a fee on the team
-          they're registering under is blocked until it's paid — settle it first (Edit athlete → fees).
-        </p>
+        <h2>{t("adminTournaments.title")}</h2>
+        <p>{t("adminTournaments.subtitle")}</p>
         <div className="dash-actions">
           <button className="btn btn-primary" onClick={() => setShowCreate((v) => !v)}>
-            {showCreate ? "Cancel" : "+ New tournament"}
+            {showCreate ? t("common.cancel") : t("adminTournaments.newButton")}
           </button>
         </div>
       </div>
@@ -231,82 +232,81 @@ export default function AdminTournaments() {
       {showCreate && (
         <form className="card" style={{ maxWidth: 520, marginBottom: 24 }} onSubmit={handleCreate}>
           <div className="field">
-            <label>Name</label>
+            <label>{t("common.name")}</label>
             <input value={form.name} onChange={update("name")} required />
           </div>
           <div className="field">
-            <label>Description (optional)</label>
+            <label>{t("adminTournaments.descriptionLabel")}</label>
             <textarea value={form.description} onChange={update("description")} rows={2} />
           </div>
           <div className="field">
-            <label>Entry fee ($)</label>
+            <label>{t("adminTournaments.entryFeeLabel")}</label>
             <input type="number" min="0" step="0.01" value={form.entryFee} onChange={update("entryFee")} />
           </div>
           <div className="field">
-            <label>Match date(s)</label>
+            <label>{t("adminTournaments.matchDatesLabel")}</label>
             {form.matchDates.map((d, i) => (
               <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
                 <input type="date" value={d} onChange={(e) => setDateAt(i, e.target.value)} />
                 {form.matchDates.length > 1 && (
                   <button type="button" className="link-btn" onClick={() => removeDateField(i)}>
-                    Remove
+                    {t("common.remove")}
                   </button>
                 )}
               </div>
             ))}
             <button type="button" className="link-btn" onClick={addDateField}>
-              + Add another date
+              {t("adminTournaments.addDateButton")}
             </button>
           </div>
           {isAdmin ? (
             <>
-              <TeamSelect value={form.team} onChange={(team) => setForm({ ...form, team })} label="Team (leave blank for open to all)" />
+              <TeamSelect value={form.team} onChange={(team) => setForm({ ...form, team })} label={t("adminTournaments.teamSelectLabel")} />
             </>
           ) : (
             <p className="help-text" style={{ marginTop: -8 }}>
-              This tournament will be scoped to your own team only.
+              {t("adminTournaments.teamScopedHelp")}
             </p>
           )}
 
           <div className="field">
-            <label>Max participants (leave blank for no cap)</label>
+            <label>{t("adminTournaments.maxParticipantsLabel")}</label>
             <input type="number" min="1" value={form.maxParticipants} onChange={update("maxParticipants")} />
           </div>
 
           <div className="field">
-            <label>Age limit — born in this year or later (leave blank for no age limit)</label>
-            <input type="number" min="1900" placeholder="e.g. 2010" value={form.ageLimitYear} onChange={update("ageLimitYear")} />
+            <label>{t("adminTournaments.ageLimitLabel")}</label>
+            <input type="number" min="1900" placeholder={t("adminTournaments.ageLimitPlaceholder")} value={form.ageLimitYear} onChange={update("ageLimitYear")} />
           </div>
           {form.ageLimitYear && (
             <>
               <div className="field">
-                <label>Over-age exceptions allowed</label>
+                <label>{t("adminTournaments.overageSlotsLabel")}</label>
                 <input type="number" min="0" value={form.overageSlots} onChange={update("overageSlots")} />
               </div>
               <div className="field">
-                <label>Oldest birth year still allowed (for those exceptions)</label>
+                <label>{t("adminTournaments.overageLimitYearLabel")}</label>
                 <input
                   type="number"
                   min="1900"
-                  placeholder="e.g. 2008"
+                  placeholder={t("adminTournaments.overageLimitYearPlaceholder")}
                   value={form.overageLimitYear}
                   onChange={update("overageLimitYear")}
                 />
               </div>
               <p className="help-text" style={{ marginTop: -8 }}>
-                Example: age limit 2010 with 4 over-age exceptions down to 2008 means players born 2010+
-                register normally, and up to 4 players born 2008–2009 may also register.
+                {t("adminTournaments.overageHelp")}
               </p>
             </>
           )}
           {formError && <div className="error-text">{formError}</div>}
           <button className="btn btn-primary" disabled={saving}>
-            {saving ? "Creating…" : "Create tournament"}
+            {saving ? t("adminTournaments.creating") : t("adminTournaments.createButton")}
           </button>
         </form>
       )}
 
-      {loading && <p>Loading…</p>}
+      {loading && <p>{t("common.loading")}</p>}
       {error && <p className="error-text">{error}</p>}
 
       {!loading && !error && (
@@ -314,56 +314,60 @@ export default function AdminTournaments() {
           <table className="athletes">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Team</th>
-                <th>Entry fee</th>
-                <th>Dates</th>
-                <th>Rules</th>
-                <th>Registered</th>
-                <th>Actions</th>
+                <th>{t("common.name")}</th>
+                <th>{t("common.team")}</th>
+                <th>{t("adminTournaments.entryFeeHeader")}</th>
+                <th>{t("adminTournaments.datesHeader")}</th>
+                <th>{t("adminTournaments.rulesHeader")}</th>
+                <th>{t("adminTournaments.registeredHeader")}</th>
+                <th>{t("common.actions")}</th>
               </tr>
             </thead>
             <tbody>
-              {tournaments.map((t) => (
-                <Fragment key={t._id}>
+              {tournaments.map((tour) => (
+                <Fragment key={tour._id}>
                   <tr>
-                    <td data-label="Name">{t.name}</td>
-                    <td data-label="Team">{t.team || "All teams"}</td>
-                    <td data-label="Entry fee">${t.entryFee || 0}</td>
-                    <td data-label="Dates">
-                      {t.matchDates?.length ? t.matchDates.map(formatDate).join(", ") : "—"}
+                    <td data-label={t("common.name")}>{tour.name}</td>
+                    <td data-label={t("common.team")}>{tour.team || t("adminTournaments.allTeams")}</td>
+                    <td data-label={t("adminTournaments.entryFeeHeader")}>${tour.entryFee || 0}</td>
+                    <td data-label={t("adminTournaments.datesHeader")}>
+                      {tour.matchDates?.length ? tour.matchDates.map(formatDate).join(", ") : "—"}
                     </td>
-                    <td data-label="Rules">
-                      {ageRuleSummary(t)}
-                      {t.maxParticipants ? ` · Cap ${t.registrationCount}/${t.maxParticipants}` : ""}
+                    <td data-label={t("adminTournaments.rulesHeader")}>
+                      {ageRuleSummary(tour, t)}
+                      {tour.maxParticipants
+                        ? t("adminTournaments.capSuffix").replace("{count}", tour.registrationCount).replace("{max}", tour.maxParticipants)
+                        : ""}
                     </td>
-                    <td data-label="Registered">{t.registrationCount}</td>
-                    <td data-label="Actions" className="actions-cell">
-                      <button className="action-btn" onClick={() => toggleExpand(t)}>
-                        {expandedId === t._id ? "Hide" : "View / register"}
+                    <td data-label={t("adminTournaments.registeredHeader")}>{tour.registrationCount}</td>
+                    <td data-label={t("common.actions")} className="actions-cell">
+                      <button className="action-btn" onClick={() => toggleExpand(tour)}>
+                        {expandedId === tour._id ? t("adminTournaments.hide") : t("adminTournaments.viewRegister")}
                       </button>
-                      <button className="action-btn" onClick={() => navigate(`/tournaments/${t._id}/squad`)}>
-                        View squad
+                      <button className="action-btn" onClick={() => navigate(`/tournaments/${tour._id}/squad`)}>
+                        {t("adminTournaments.viewSquad")}
                       </button>
-                      <button className="action-btn" onClick={() => exportCsv(t)}>
-                        Export
+                      <button className="action-btn" onClick={() => exportCsv(tour)}>
+                        {t("common.export")}
                       </button>
-                      <button className="action-btn danger" onClick={() => remove(t._id)}>
-                        Delete
+                      <button className="action-btn danger" onClick={() => remove(tour._id)}>
+                        {t("common.delete")}
                       </button>
                     </td>
                   </tr>
-                  {expandedId === t._id && (
+                  {expandedId === tour._id && (
                     <tr>
                       <td colSpan={7} style={{ background: "var(--cream)" }}>
-                        {detailLoading && <p>Loading…</p>}
+                        {detailLoading && <p>{t("common.loading")}</p>}
                         {!detailLoading && detail && (
                           <div style={{ padding: "8px 4px" }}>
                             {detail.description && <p className="help-text">{detail.description}</p>}
-                            <h4 style={{ marginBottom: 6 }}>Registered players ({detail.registrations.length})</h4>
+                            <h4 style={{ marginBottom: 6 }}>
+                              {t("adminTournaments.registeredPlayersHeading").replace("{count}", detail.registrations.length)}
+                            </h4>
                             {detail.teamLineups?.length > 0 && (
                               <p className="help-text" style={{ marginTop: -4 }}>
-                                Kept in sync with each team's Squad list, ready for Formation/Starting XI —{" "}
+                                {t("adminTournaments.syncHelpPrefix")}{" "}
                                 {detail.teamLineups.map((tl, i) => (
                                   <span key={tl.team}>
                                     {i > 0 && " · "}
@@ -371,14 +375,14 @@ export default function AdminTournaments() {
                                       className="link-btn"
                                       to={isAdmin ? `/admin/matchday?team=${encodeURIComponent(tl.team)}&tab=lineups` : `/coach?tab=lineups`}
                                     >
-                                      Open {tl.team}'s Squad list
+                                      {t("adminTournaments.openSquadList").replace("{team}", tl.team)}
                                     </Link>
                                   </span>
                                 ))}
                               </p>
                             )}
                             {detail.registrations.length === 0 ? (
-                              <p className="help-text">Nobody registered yet.</p>
+                              <p className="help-text">{t("adminTournaments.nobodyRegistered")}</p>
                             ) : (
                               <ul className="fee-items" style={{ marginBottom: 12 }}>
                                 {detail.registrations.map((r) => (
@@ -386,20 +390,20 @@ export default function AdminTournaments() {
                                     <span>
                                       {r.fullName} {r.khmerName ? `(${r.khmerName})` : ""} — {r.team}
                                       {r.jerseyNumber != null ? ` · #${r.jerseyNumber}` : ""}
-                                      {r.isOverage ? " · over-age" : ""}
-                                      {r.registeredBy ? " · registered by staff" : ""}
+                                      {r.isOverage ? ` · ${t("adminTournaments.overageSuffix")}` : ""}
+                                      {r.registeredBy ? ` · ${t("adminTournaments.registeredByStaffSuffix")}` : ""}
                                     </span>
                                     <button className="link-btn" onClick={() => removeRegistration(r._id)}>
-                                      Remove
+                                      {t("common.remove")}
                                     </button>
                                   </li>
                                 ))}
                               </ul>
                             )}
                             <div className="field search-field" style={{ maxWidth: 340 }}>
-                              <label>Register a player (no phone / on their behalf)</label>
+                              <label>{t("adminTournaments.registerOnBehalfLabel")}</label>
                               <input
-                                placeholder="Search by name or ID…"
+                                placeholder={t("adminTournaments.searchPlaceholder")}
                                 value={athleteSearch}
                                 onChange={(e) => searchAthletes(e.target.value)}
                               />
@@ -410,14 +414,14 @@ export default function AdminTournaments() {
                                   <li key={a.assignmentId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                     <span>
                                       {a.fullName} — {a.team}
-                                      {a.feeOwed > 0 ? ` (owes $${a.feeOwed})` : ""}
+                                      {a.feeOwed > 0 ? ` (${t("adminTournaments.owes")} $${a.feeOwed})` : ""}
                                     </span>
                                     <button
                                       className="action-btn positive"
                                       disabled={registering === a._id}
                                       onClick={() => registerOnBehalf(a)}
                                     >
-                                      {registering === a._id ? "Registering…" : "Register"}
+                                      {registering === a._id ? t("adminTournaments.registering") : t("adminTournaments.registerButton")}
                                     </button>
                                   </li>
                                 ))}
@@ -433,7 +437,7 @@ export default function AdminTournaments() {
               {tournaments.length === 0 && (
                 <tr>
                   <td colSpan={7} style={{ textAlign: "center", color: "#777" }}>
-                    No tournaments yet.
+                    {t("adminTournaments.noneYet")}
                   </td>
                 </tr>
               )}

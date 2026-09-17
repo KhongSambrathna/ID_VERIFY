@@ -11,24 +11,13 @@
 
   --font-display: "Barlow Condensed", sans-serif;
   --font-body: "Inter", sans-serif;
-  --font-khmer-name: "Khmer OS Moul Light", "Moul", serif;
-  --font-khmer-body: "Khmer OS Siem Reap", "Nokora", sans-serif;
+  --font-khmer-name: "Moul", serif;
+  --font-khmer-body: "Siemreap", "Battambang", "Nokora", sans-serif;
 
   /* Navbar is fixed to the top of the viewport (see .navbar below), so its
      height is kept constant across breakpoints and reused as body padding
      to stop page content sliding underneath it. */
   --navbar-h: 62px;
-}
-
-@font-face {
-  font-family: "Khmer OS Moul Light";
-  src: url("/fonts/KhmerOSMoulLight.ttf") format("truetype");
-  font-display: swap;
-}
-@font-face {
-  font-family: "Khmer OS Siem Reap";
-  src: url("/fonts/KhmerOSSiemReap.ttf") format("truetype");
-  font-display: swap;
 }
 
 * {
@@ -43,6 +32,12 @@ body {
   line-height: 1.5;
   /* Offsets the fixed .navbar so it never overlaps page content. */
   padding-top: var(--navbar-h);
+}
+
+/* LanguageContext sets <html lang="km"|"en">, so body text automatically
+   switches to the Khmer-friendly body font when Khmer is selected. */
+:lang(km) {
+  font-family: var(--font-khmer-body);
 }
 
 h1, h2, h3 {
@@ -146,6 +141,76 @@ a {
   transform: translateY(-7px) rotate(-45deg);
 }
 
+/* Grouped nav dropdowns (e.g. "Reports", "Manage") — click-to-open panel
+   on desktop; the mobile breakpoint below turns the panel into an inline
+   stacked section instead, using the same open/closed state. */
+.nav-group {
+  position: relative;
+  margin-left: 24px;
+}
+.nav-group-btn {
+  background: none;
+  border: none;
+  color: #d6dce6;
+  font-size: 15px;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.nav-group-btn:hover {
+  color: white;
+}
+.nav-caret {
+  font-size: 11px;
+}
+.nav-group-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 14px);
+  left: 0;
+  min-width: 180px;
+  background: var(--navy-deep);
+  border-radius: 6px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+  padding: 6px 0;
+  flex-direction: column;
+  z-index: 210;
+}
+.nav-group.open .nav-group-menu {
+  display: flex;
+}
+.nav-group-menu a {
+  margin-left: 0;
+  padding: 9px 16px;
+  color: #d6dce6;
+  white-space: nowrap;
+}
+.nav-group-menu a:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Khmer/English toggle button in the navbar. */
+.lang-switch {
+  margin-left: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: white;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.lang-switch:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
 /* ---------- Landing ---------- */
 .hero {
   background: var(--navy);
@@ -171,6 +236,14 @@ a {
   font-size: 56px;
   max-width: 680px;
   line-height: 1.05;
+}
+/* Khmer script stacks vowel signs and subscript consonants both above and
+   below each letter, so the hero heading's dramatic line-height: 1.05
+   above (tuned for the tighter Latin tagline) crowds those marks into the
+   line before/after when the heading is Khmer — give it real breathing
+   room in that language only, across every breakpoint above. */
+:lang(km) .hero h1 {
+  line-height: 1.5;
 }
 .hero p {
   max-width: 540px;
@@ -627,6 +700,136 @@ a {
   color: #777;
   padding: 40px 0;
   grid-column: 1 / -1;
+}
+
+/* ---------- Public pricing page ---------- */
+.pricing-hero {
+  padding: 44px 0 8px;
+  text-align: center;
+}
+.pricing-hero h1 {
+  margin-bottom: 6px;
+}
+.pricing-hero p {
+  color: #666;
+  max-width: 560px;
+  margin: 0 auto;
+}
+.pricing-section-title {
+  margin: 44px 0 4px;
+  text-align: center;
+}
+.pricing-section-intro {
+  color: #666;
+  text-align: center;
+  max-width: 620px;
+  margin: 0 auto 28px;
+}
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  padding-bottom: 8px;
+}
+.pricing-card {
+  position: relative;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 26px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pricing-card.featured {
+  border-color: var(--gold);
+  box-shadow: 0 4px 18px rgba(216, 163, 78, 0.18);
+}
+.pricing-ribbon {
+  position: absolute;
+  top: -12px;
+  left: 22px;
+  background: var(--gold);
+  color: var(--navy-deep);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+.pricing-card-name {
+  font-size: 20px;
+  margin: 4px 0 0;
+}
+.pricing-card-cap {
+  color: #777;
+  font-size: 13.5px;
+  margin: 0 0 10px;
+}
+.pricing-card-price {
+  margin: 0;
+  line-height: 1;
+}
+.pricing-amount {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 34px;
+  color: var(--navy);
+}
+.pricing-per {
+  color: #777;
+  font-size: 14px;
+}
+.pricing-card-billed {
+  color: #999;
+  font-size: 12.5px;
+  margin: 2px 0 16px;
+  min-height: 15px;
+}
+.pricing-card-cycles {
+  list-style: none;
+  margin: 0;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13.5px;
+  color: #555;
+}
+/* The Referee/Trophy service cards reuse the exact .pricing-card look from
+   the subscription plans above (same name/cap/price/divider/list layout)
+   so the whole page reads as one consistent design — just capped to a
+   wider minimum column so 2 cards don't stretch as thin as 4 plan cards
+   would. */
+.pricing-grid-services {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+.pricing-amount-contact {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--navy);
+}
+/* The Shop tile isn't priced like the others — it's a link out to the
+   existing storefront (each product has its own price there) — so it
+   just needs its CTA button pushed to the bottom, flush with the other
+   cards' price rows. */
+.pricing-card-link {
+  justify-content: space-between;
+}
+.pricing-card-link-btn {
+  margin-top: 12px;
+  align-self: flex-start;
+  text-decoration: none;
+}
+.pricing-contact-note {
+  text-align: center;
+  color: #777;
+  font-size: 13.5px;
+  margin: 20px 0 0;
+}
+.pricing-page {
+  padding-bottom: 60px;
 }
 
 /* ---------- Dashboard ---------- */
@@ -1142,6 +1345,34 @@ table.athletes .actions-cell {
     border-bottom: none;
   }
 
+  /* On mobile the whole nav is already a stacked vertical panel, so a
+     group's menu just flows inline (indented) instead of floating. */
+  .navbar nav .nav-group {
+    margin-left: 0;
+    width: 100%;
+  }
+  .navbar nav .nav-group-btn {
+    width: 100%;
+    padding: 12px 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    justify-content: space-between;
+  }
+  .navbar nav .nav-group-menu {
+    position: static;
+    box-shadow: none;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 0;
+    padding: 0;
+  }
+  .navbar nav .nav-group-menu a {
+    padding: 10px 4px 10px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .navbar nav .lang-switch {
+    margin: 10px 4px;
+    align-self: flex-start;
+  }
+
   /* Shop storefront — force 2 columns instead of the 1 huge column
      auto-fill would otherwise produce at phone widths, and shrink the
      card content to match. */
@@ -1171,6 +1402,16 @@ table.athletes .actions-cell {
   .shop-card .badge {
     font-size: 11px;
     padding: 2px 8px;
+  }
+
+  .pricing-hero {
+    padding: 26px 0 4px;
+  }
+  .pricing-grid {
+    grid-template-columns: 1fr;
+  }
+  .pricing-section-title {
+    margin: 32px 0 4px;
   }
 
   .hero {
@@ -2194,5 +2435,42 @@ table.athletes .actions-cell {
   border-radius: 6px;
   font-size: 14px;
   text-align: center;
+}
+
+/* Shown in place of a Head Coach's management screens (Squad list,
+   Formation, Starting XI, add/edit athlete) when their team's yearly
+   subscription has lapsed — see RequireActiveSubscription.jsx. */
+.subscription-lock {
+  max-width: 480px;
+  margin: 48px auto;
+  text-align: center;
+}
+.subscription-lock-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.subscription-lock-actions .btn {
+  text-decoration: none;
+}
+
+/* The plain `:lang(km)` rule near the top of this file sets the Khmer body
+   font, but many components below it set their own font-family on a class
+   selector (buttons, tabs, table headers, headings, poster/export titles)
+   with the SAME or higher CSS specificity — so on a specificity tie, the
+   rule that appears later in the file wins, which left those spots stuck
+   in the Latin font even while the rest of the page switched to Khmer.
+   This rule is deliberately placed at the very end of the stylesheet and
+   given a two-part selector (html + :lang(km), i.e. type + pseudo-class)
+   so it out-specifies every single- and two-part selector above it and
+   wins any specificity tie by being last — without using !important, so
+   it still correctly loses to the ID card / squad export / formation and
+   starting-XI poster rules (two-or-more class selectors, e.g.
+   ".id-card-field .value-kh") that intentionally keep their own fixed
+   bilingual font choices regardless of the site-wide language toggle. */
+html:lang(km) body {
+  font-family: var(--font-khmer-body);
 }
 

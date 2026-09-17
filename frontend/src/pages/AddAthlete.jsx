@@ -4,8 +4,11 @@ import api from "../api/axios";
 import TeamSelect from "../components/TeamSelect";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../i18n/LanguageContext";
+import RequireActiveSubscription from "../components/RequireActiveSubscription";
 
 export default function AddAthlete() {
+  const { t } = useLanguage();
   const { isHeadCoach, team: coachTeam } = useAuth();
   const [form, setForm] = useState({
     fullName: "",
@@ -73,7 +76,7 @@ export default function AddAthlete() {
       });
       navigate(isHeadCoach ? "/coach" : `/admin/athlete/${athleteId}`);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to add team/role to that person");
+      setError(err.response?.data?.message || t("addAthlete.failedToLoad"));
     } finally {
       setAddingToId(null);
     }
@@ -85,9 +88,7 @@ export default function AddAthlete() {
 
     if (duplicates.length > 0) {
       const names = duplicates.map((d) => `${d.fullName}`).join(", ");
-      const proceed = confirm(
-        `A player with this name is already registered: ${names}.\n\nRegister this as a new, separate person anyway? (If it's actually the same person, use "Add this team/role to them" above instead.)`
-      );
+      const proceed = confirm(t("addAthlete.duplicateConfirm").replace("{names}", names));
       if (!proceed) return;
     }
 
@@ -103,37 +104,38 @@ export default function AddAthlete() {
       });
       navigate(isHeadCoach ? "/coach" : `/admin/athlete/${athlete._id}`);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to save athlete");
+      setError(err.response?.data?.message || t("addAthlete.failedToSave"));
     } finally {
       setLoading(false);
     }
   };
 
   return (
+    <RequireActiveSubscription>
     <div className="container" style={{ paddingBottom: 60 }}>
       <div className="dash-header">
-        <h2>Add athlete</h2>
+        <h2>{t("addAthlete.title")}</h2>
       </div>
       {isHeadCoach && (
         <p className="help-text" style={{ maxWidth: 640 }}>
-          This player will be added as <strong>Pending</strong> — an Admin needs to approve the record
-          before it shows up in public search or the QR verify page.
+          {t("addAthlete.pendingNotice")} <strong>{t("addAthlete.pendingNoticePending")}</strong>
+          {t("addAthlete.pendingNoticeRest")}
         </p>
       )}
       <form className="card" style={{ maxWidth: 640 }} onSubmit={handleSubmit}>
         <div className="field">
-          <label>Full name</label>
+          <label>{t("addAthlete.fullName")}</label>
           <input value={form.fullName} onChange={update("fullName")} required />
         </div>
         <div className="field">
-          <label>Khmer name</label>
+          <label>{t("addAthlete.khmerName")}</label>
           <input value={form.khmerName} onChange={update("khmerName")} />
         </div>
 
-        {checkingDuplicate && <p className="help-text">Checking for existing players with this name…</p>}
+        {checkingDuplicate && <p className="help-text">{t("addAthlete.checkingDuplicate")}</p>}
         {!checkingDuplicate && duplicates.length > 0 && (
           <div className="duplicate-warning">
-            <p className="duplicate-warning-title">⚠ Already registered — same person?</p>
+            <p className="duplicate-warning-title">{t("addAthlete.duplicateWarningTitle")}</p>
             {duplicates.map((d) => (
               <div key={d._id} className="duplicate-warning-row">
                 <img
@@ -146,8 +148,9 @@ export default function AddAthlete() {
                     {d.khmerName ? ` · ${d.khmerName}` : ""}
                   </p>
                   <p className="meta">
-                    {(d.assignments || []).map((a) => `${a.team} · ${a.role}`).join(", ") || "No team yet"} ·
-                    ID {d.verifyId}
+                    {(d.assignments || []).map((a) => `${a.team} · ${a.role}`).join(", ") ||
+                      t("addAthlete.noTeamYet")}{" "}
+                    · {t("addAthlete.idLabel")} {d.verifyId}
                   </p>
                 </div>
                 <button
@@ -158,65 +161,64 @@ export default function AddAthlete() {
                   style={{ flexShrink: 0 }}
                 >
                   {addingToId === d._id
-                    ? "Adding…"
-                    : `Add ${form.role || "role"} @ ${form.team || "team"} to them`}
+                    ? t("addAthlete.adding")
+                    : t("addAthlete.addRoleTeamToThem")
+                        .replace("{role}", form.role || t("addAthlete.role"))
+                        .replace("{team}", form.team || t("addAthlete.team"))}
                 </button>
               </div>
             ))}
-            <p className="help-text">
-              If this is the same person, use the button above instead of saving a new, separate record
-              below.
-            </p>
+            <p className="help-text">{t("addAthlete.duplicateHelpText")}</p>
           </div>
         )}
 
         <div className="field">
-          <label>Date of birth</label>
+          <label>{t("addAthlete.dateOfBirth")}</label>
           <input type="date" value={form.dateOfBirth} onChange={update("dateOfBirth")} />
         </div>
         <div className="field">
-          <label>Gender</label>
+          <label>{t("addAthlete.gender")}</label>
           <select value={form.gender} onChange={update("gender")}>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-            <option value="other">Other</option>
+            <option value="male">{t("addAthlete.genderMale")}</option>
+            <option value="female">{t("addAthlete.genderFemale")}</option>
+            <option value="other">{t("addAthlete.genderOther")}</option>
           </select>
         </div>
         {isHeadCoach ? (
           <div className="field">
-            <label>Team</label>
+            <label>{t("addAthlete.team.label")}</label>
             <input value={form.team} disabled />
           </div>
         ) : (
           <TeamSelect value={form.team} onChange={(team) => setForm({ ...form, team })} required />
         )}
         <div className="field">
-          <label>Role</label>
+          <label>{t("addAthlete.roleLabel")}</label>
           <select value={form.role} onChange={update("role")}>
-            <option value="PLAYER">Player</option>
-            <option value="ASSISTAN COACH">Assistant Coach</option>
-            <option value="HEAD COACH">Head Coach</option>
-            <option value="TECHNICAL">Technical</option>
-            <option value="MEDIC">Medic</option>
+            <option value="PLAYER">{t("addAthlete.rolePlayer")}</option>
+            <option value="ASSISTAN COACH">{t("addAthlete.roleAssistantCoach")}</option>
+            <option value="HEAD COACH">{t("addAthlete.roleHeadCoach")}</option>
+            <option value="TECHNICAL">{t("addAthlete.roleTechnical")}</option>
+            <option value="MEDIC">{t("addAthlete.roleMedic")}</option>
           </select>
         </div>
         <div className="field">
-          <label>Address</label>
+          <label>{t("addAthlete.address")}</label>
           <input value={form.address} onChange={update("address")} />
         </div>
         <div className="field">
-          <label>Availability</label>
+          <label>{t("addAthlete.availability")}</label>
           <select value={form.isAvailable} onChange={update("isAvailable")}>
-            <option value="true">Available</option>
-            <option value="false">Not available</option>
+            <option value="true">{t("addAthlete.available")}</option>
+            <option value="false">{t("addAthlete.notAvailable")}</option>
           </select>
         </div>
         <div className="field">
-          <label>Photo</label>
+          <label>{t("addAthlete.photo")}</label>
           <input type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files[0])} />
         </div>
         <div className="field">
-          <label>Supporting documents (ID copy, birth certificate, etc.)</label>
+          <label>{t("addAthlete.supportingDocuments")}</label>
           <input
             type="file"
             multiple
@@ -228,9 +230,10 @@ export default function AddAthlete() {
         {error && <div className="error-text">{error}</div>}
 
         <button className="btn btn-primary" disabled={loading}>
-          {loading ? "Saving…" : "Save & generate ID (new, separate person)"}
+          {loading ? t("addAthlete.saving") : t("addAthlete.saveAndGenerateId")}
         </button>
       </form>
     </div>
+    </RequireActiveSubscription>
   );
 }

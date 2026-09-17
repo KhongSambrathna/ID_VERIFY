@@ -1,5 +1,6 @@
 import { useAuth } from "../context/AuthContext";
 import SquadListManager from "../components/SquadListManager";
+import { useLanguage } from "../i18n/LanguageContext";
 
 // Read-only view of your own team's squad lists (match-day rosters) — the
 // same lists a Head Coach/Admin manages under My Team > Squad list, and the
@@ -7,12 +8,13 @@ import SquadListManager from "../components/SquadListManager";
 // who's in each list and export it as an image/PDF, but never create, edit,
 // or delete one.
 export default function PlayerSquadListPage() {
+  const { t } = useLanguage();
   const { team } = useAuth();
 
   if (!team) {
     return (
       <div className="container dash-body">
-        <p className="error-text">No team is set on your account — ask your Admin/Head Coach to check it.</p>
+        <p className="error-text">{t("playerSquadListPage.noTeam")}</p>
       </div>
     );
   }
@@ -20,8 +22,8 @@ export default function PlayerSquadListPage() {
   return (
     <div className="container dash-body">
       <div className="dash-header">
-        <h2>Squad lists</h2>
-        <p>Match-day squad lists for {team}. You can view and export these, but only your coach can create or edit them.</p>
+        <h2>{t("playerSquadListPage.title")}</h2>
+        <p>{t("playerSquadListPage.intro").replace("{team}", team)}</p>
       </div>
       <SquadListManager team={team} athletes={[]} readOnly />
     </div>

@@ -1,22 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/axios";
+import { useLanguage } from "../i18n/LanguageContext";
 
 // Secondary tools tucked into one dropdown instead of a row of buttons —
 // this page was accumulating one new button per feature and getting
 // cluttered. "+ Add athlete" stays a primary button since it's the most
 // common action; everything else lives here.
 const TOOL_LINKS = [
-  { to: "/admin/users", label: "Manage users" },
-  { to: "/admin/sponsors", label: "Trusted by logos" },
-  { to: "/admin/matchday", label: "Match day" },
-  { to: "/admin/shop", label: "Shop" },
-  { to: "/admin/cards", label: "Export all cards" },
-  { to: "/admin/stats", label: "Pending & debt report" },
-  { to: "/admin/renew", label: "ID renewal" },
+  { to: "/admin/users", labelKey: "adminDashboard.manageUsers" },
+  { to: "/admin/sponsors", labelKey: "adminDashboard.trustedByLogos" },
+  { to: "/admin/matchday", labelKey: "adminDashboard.matchDay" },
+  { to: "/admin/shop", labelKey: "adminDashboard.shop" },
+  { to: "/admin/cards", labelKey: "adminDashboard.exportAllCards" },
+  { to: "/admin/stats", labelKey: "adminDashboard.pendingDebtReport" },
+  { to: "/admin/renew", labelKey: "adminDashboard.idRenewal" },
 ];
 
 export default function AdminDashboard() {
+  const { t } = useLanguage();
   const [athletes, setAthletes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -34,7 +36,7 @@ export default function AdminDashboard() {
       const { data } = await api.get("/athletes");
       setAthletes(data);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load athletes");
+      setError(err.response?.data?.message || t("adminDashboard.failedToLoadAthletes"));
     } finally {
       setLoading(false);
     }
@@ -66,7 +68,7 @@ export default function AdminDashboard() {
       link.click();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to export roster");
+      alert(err.response?.data?.message || t("adminDashboard.failedToExportRoster"));
     } finally {
       setExportingCsv(false);
     }
@@ -88,7 +90,7 @@ export default function AdminDashboard() {
       setSelectedPending([]);
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to bulk-approve");
+      alert(err.response?.data?.message || t("adminDashboard.failedToBulkApprove"));
     } finally {
       setBulkApproving(false);
     }
@@ -109,8 +111,8 @@ export default function AdminDashboard() {
   const removeAssignment = async (a) => {
     const isLast = athletes.filter((x) => x._id === a._id).length === 1;
     const msg = isLast
-      ? "This is their only team — removing it will delete this person's whole record. Continue?"
-      : "Remove this team/role?";
+      ? t("adminDashboard.confirmDeleteWholeRecord")
+      : t("adminDashboard.confirmRemoveAssignment");
     if (!confirm(msg)) return;
     await api.delete(`/athletes/${a._id}/assignments/${a.assignmentId}`);
     load();
@@ -147,10 +149,10 @@ export default function AdminDashboard() {
   return (
     <div className="container dash-body">
       <div className="dash-header">
-        <h2>Athlete records</h2>
+        <h2>{t("adminDashboard.title")}</h2>
         <div className="dash-actions">
           <Link to="/admin/new" className="btn btn-primary">
-            + Add athlete
+            {t("adminDashboard.addAthlete")}
           </Link>
           <div className="tools-dropdown" ref={toolsRef}>
             <button
@@ -159,17 +161,17 @@ export default function AdminDashboard() {
               style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
               onClick={() => setToolsOpen((v) => !v)}
             >
-              Tools ▾
+              {t("adminDashboard.tools")}
             </button>
             {toolsOpen && (
               <div className="tools-dropdown-menu">
                 {TOOL_LINKS.map((l) => (
                   <Link key={l.to} to={l.to} onClick={() => setToolsOpen(false)}>
-                    {l.label}
+                    {t(l.labelKey)}
                   </Link>
                 ))}
                 <button type="button" onClick={exportCsv} disabled={exportingCsv}>
-                  {exportingCsv ? "Exporting…" : "Export roster (CSV)"}
+                  {exportingCsv ? t("adminDashboard.exporting") : t("adminDashboard.exportRosterCsv")}
                 </button>
               </div>
             )}
@@ -179,7 +181,7 @@ export default function AdminDashboard() {
 
       <div className="field search-field">
         <input
-          placeholder="Search by name, team, role, or ID…"
+          placeholder={t("adminDashboard.searchPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -187,17 +189,17 @@ export default function AdminDashboard() {
 
       <div className="tabs">
         <button className={`tab-btn ${activeTab === "all" ? "active" : ""}`} onClick={() => setActiveTab("all")}>
-          All athletes ({all.length})
+          {t("adminDashboard.allAthletesTab").replace("{count}", all.length)}
         </button>
         <button
           className={`tab-btn ${activeTab === "pending" ? "active" : ""}`}
           onClick={() => setActiveTab("pending")}
         >
-          Pending approval ({pendingCount})
+          {t("adminDashboard.pendingApprovalTab").replace("{count}", pendingCount)}
         </button>
       </div>
 
-      {loading && <p>Loading…</p>}
+      {loading && <p>{t("adminDashboard.loading")}</p>}
       {error && <p className="error-text">{error}</p>}
 
       {/* ALL ATHLETES TAB — browse/manage everything; approve/reject moved to
@@ -207,64 +209,64 @@ export default function AdminDashboard() {
           <table className="athletes">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Role</th>
-                <th>Team</th>
-                <th>Jersey #</th>
-                <th>Available</th>
-                <th>Status</th>
-                <th>Approval</th>
-                <th>Fee</th>
-                <th>Actions</th>
+                <th>{t("adminDashboard.colId")}</th>
+                <th>{t("adminDashboard.colName")}</th>
+                <th>{t("adminDashboard.colRole")}</th>
+                <th>{t("adminDashboard.colTeam")}</th>
+                <th>{t("adminDashboard.colJersey")}</th>
+                <th>{t("adminDashboard.colAvailable")}</th>
+                <th>{t("adminDashboard.colStatus")}</th>
+                <th>{t("adminDashboard.colApproval")}</th>
+                <th>{t("adminDashboard.colFee")}</th>
+                <th>{t("adminDashboard.colActions")}</th>
               </tr>
             </thead>
             <tbody>
               {all.map((a) => (
                 <tr key={a.assignmentId}>
-                  <td data-label="ID">{a.verifyId}</td>
-                  <td data-label="Name">{a.fullName}</td>
-                  <td data-label="Role">{a.role || "—"}</td>
-                  <td data-label="Team">{a.team || "—"}</td>
-                  <td data-label="Jersey #">{a.jerseyNumber ?? "—"}</td>
-                  <td data-label="Available">
+                  <td data-label={t("adminDashboard.colId")}>{a.verifyId}</td>
+                  <td data-label={t("adminDashboard.colName")}>{a.fullName}</td>
+                  <td data-label={t("adminDashboard.colRole")}>{a.role || "—"}</td>
+                  <td data-label={t("adminDashboard.colTeam")}>{a.team || "—"}</td>
+                  <td data-label={t("adminDashboard.colJersey")}>{a.jerseyNumber ?? "—"}</td>
+                  <td data-label={t("adminDashboard.colAvailable")}>
                     <span className={`badge ${a.isAvailable ? "verified" : "rejected"}`}>
-                      {a.isAvailable ? "Available" : "Not available"}
+                      {a.isAvailable ? t("adminDashboard.available") : t("adminDashboard.notAvailable")}
                     </span>
                   </td>
-                  <td data-label="Status">
+                  <td data-label={t("adminDashboard.colStatus")}>
                     <span className={`badge ${a.status}`}>{a.status}</span>
                   </td>
-                  <td data-label="Approval">
+                  <td data-label={t("adminDashboard.colApproval")}>
                     {a.pendingRemoval ? (
-                      <span className="badge rejected">Removal requested</span>
+                      <span className="badge rejected">{t("adminDashboard.removalRequested")}</span>
                     ) : a.approvalStatus === "pending" ? (
-                      <span className="badge rejected">Pending</span>
+                      <span className="badge rejected">{t("adminDashboard.pending")}</span>
                     ) : (
-                      <span className="badge verified">Approved</span>
+                      <span className="badge verified">{t("adminDashboard.approved")}</span>
                     )}
                   </td>
-                  <td data-label="Fee">
+                  <td data-label={t("adminDashboard.colFee")}>
                     {a.feeOwed > 0 ? (
                       <span
                         className="badge rejected"
                         title={(a.fees || []).map((f) => `$${f.amount}${f.note ? ` — ${f.note}` : ""}`).join(", ")}
                       >
-                        Owes ${a.feeOwed}
+                        {t("adminDashboard.owes").replace("{amount}", a.feeOwed)}
                       </span>
                     ) : (
-                      <span className="badge verified">Paid</span>
+                      <span className="badge verified">{t("adminDashboard.paid")}</span>
                     )}
                   </td>
-                  <td data-label="Actions" className="actions-cell">
+                  <td data-label={t("adminDashboard.colActions")} className="actions-cell">
                     <Link className="action-btn" to={`/admin/athlete/${a._id}?team=${encodeURIComponent(a.team)}`}>
-                      View
+                      {t("adminDashboard.view")}
                     </Link>
                     <Link className="action-btn" to={`/admin/athlete/${a._id}/edit`}>
-                      Edit
+                      {t("adminDashboard.edit")}
                     </Link>
                     <button className="action-btn danger" onClick={() => removeAssignment(a)}>
-                      Delete
+                      {t("adminDashboard.delete")}
                     </button>
                   </td>
                 </tr>
@@ -273,8 +275,8 @@ export default function AdminDashboard() {
                 <tr>
                   <td colSpan={10} style={{ textAlign: "center", color: "#777" }}>
                     {athletes.length === 0
-                      ? "No athletes yet — add your first one."
-                      : "No matches for your search."}
+                      ? t("adminDashboard.noAthletesYet")
+                      : t("adminDashboard.noSearchMatches")}
                   </td>
                 </tr>
               )}
@@ -288,15 +290,17 @@ export default function AdminDashboard() {
       {!loading && !error && activeTab === "pending" && (
         <>
           <p className="help-text" style={{ marginTop: 0 }}>
-            Hidden from public search and QR verify until approved.
+            {t("adminDashboard.hiddenUntilApproved")}
           </p>
           {selectedPending.length > 0 && (
             <div className="dash-actions" style={{ marginBottom: 12 }}>
               <button className="btn btn-primary" onClick={bulkApproveSelected} disabled={bulkApproving}>
-                {bulkApproving ? "Approving…" : `Approve selected (${selectedPending.length})`}
+                {bulkApproving
+                  ? t("adminDashboard.approving")
+                  : t("adminDashboard.approveSelected").replace("{count}", selectedPending.length)}
               </button>
               <button className="btn btn-outline" onClick={() => setSelectedPending([])} disabled={bulkApproving}>
-                Clear selection
+                {t("adminDashboard.clearSelection")}
               </button>
             </div>
           )}
@@ -307,12 +311,12 @@ export default function AdminDashboard() {
                   <th>
                     <input type="checkbox" checked={allPendingSelected} onChange={toggleAllPending} />
                   </th>
-                  <th>ID</th>
-                  <th>Name</th>
-                  <th>Role</th>
-                  <th>Team</th>
-                  <th>Approval</th>
-                  <th>Actions</th>
+                  <th>{t("adminDashboard.colId")}</th>
+                  <th>{t("adminDashboard.colName")}</th>
+                  <th>{t("adminDashboard.colRole")}</th>
+                  <th>{t("adminDashboard.colTeam")}</th>
+                  <th>{t("adminDashboard.colApproval")}</th>
+                  <th>{t("adminDashboard.colActions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -327,37 +331,37 @@ export default function AdminDashboard() {
                         />
                       )}
                     </td>
-                    <td data-label="ID">{a.verifyId}</td>
-                    <td data-label="Name">{a.fullName}</td>
-                    <td data-label="Role">{a.role || "—"}</td>
-                    <td data-label="Team">{a.team || "—"}</td>
-                    <td data-label="Approval">
+                    <td data-label={t("adminDashboard.colId")}>{a.verifyId}</td>
+                    <td data-label={t("adminDashboard.colName")}>{a.fullName}</td>
+                    <td data-label={t("adminDashboard.colRole")}>{a.role || "—"}</td>
+                    <td data-label={t("adminDashboard.colTeam")}>{a.team || "—"}</td>
+                    <td data-label={t("adminDashboard.colApproval")}>
                       {a.pendingRemoval ? (
-                        <span className="badge rejected">Removal requested</span>
+                        <span className="badge rejected">{t("adminDashboard.removalRequested")}</span>
                       ) : (
-                        <span className="badge rejected">Pending</span>
+                        <span className="badge rejected">{t("adminDashboard.pending")}</span>
                       )}
                     </td>
-                    <td data-label="Actions" className="actions-cell">
+                    <td data-label={t("adminDashboard.colActions")} className="actions-cell">
                       <Link className="action-btn" to={`/admin/athlete/${a._id}?team=${encodeURIComponent(a.team)}`}>
-                        View
+                        {t("adminDashboard.view")}
                       </Link>
                       {a.pendingRemoval ? (
                         <>
                           <button className="action-btn danger" onClick={() => approveAssignment(a)}>
-                            Confirm removal
+                            {t("adminDashboard.confirmRemoval")}
                           </button>
                           <button className="action-btn positive" onClick={() => rejectAssignment(a)}>
-                            Keep
+                            {t("adminDashboard.keep")}
                           </button>
                         </>
                       ) : (
                         <>
                           <button className="action-btn positive" onClick={() => approveAssignment(a)}>
-                            Approve
+                            {t("adminDashboard.approve")}
                           </button>
                           <button className="action-btn danger" onClick={() => rejectAssignment(a)}>
-                            Reject
+                            {t("adminDashboard.reject")}
                           </button>
                         </>
                       )}
@@ -367,7 +371,7 @@ export default function AdminDashboard() {
                 {pending.length === 0 && (
                   <tr>
                     <td colSpan={7} style={{ textAlign: "center", color: "#777" }}>
-                      Nothing pending.
+                      {t("adminDashboard.nothingPending")}
                     </td>
                   </tr>
                 )}

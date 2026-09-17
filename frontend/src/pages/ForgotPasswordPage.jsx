@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/axios";
+import { useLanguage } from "../i18n/LanguageContext";
 
 // Self-service password recovery — only works for an individual Player
 // account that has already linked its own Telegram chat id (set from the
@@ -15,6 +16,7 @@ export default function ForgotPasswordPage() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { t } = useLanguage();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,7 +26,7 @@ export default function ForgotPasswordPage() {
       await api.post("/auth/forgot-password", { username });
       setSubmitted(true);
     } catch (err) {
-      setError(err.response?.data?.message || "Something went wrong");
+      setError(err.response?.data?.message || t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -33,37 +35,30 @@ export default function ForgotPasswordPage() {
   return (
     <div className="auth-wrap">
       <div className="card">
-        <h2>Forgot password</h2>
+        <h2>{t("forgotPasswordPage.title")}</h2>
         {submitted ? (
           <>
-            <p>
-              If that account has a Telegram chat linked, a new temporary password was just sent there — sign
-              in with it, then set your own password when asked.
-            </p>
-            <p className="help-text">
-              Didn't get anything, or don't have Telegram linked yet? Ask your Admin or Head Coach to reset
-              your password for you.
-            </p>
+            <p>{t("forgotPasswordPage.successMessage")}</p>
+            <p className="help-text">{t("forgotPasswordPage.noTelegramHelp")}</p>
             <Link className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }} to="/login">
-              Back to sign in
+              {t("forgotPasswordPage.backToSignIn")}
             </Link>
           </>
         ) : (
           <form onSubmit={handleSubmit}>
             <p className="help-text" style={{ marginTop: 0 }}>
-              Enter your username (your player ID, e.g. 001-100-2991). If it's an individual player account
-              with Telegram linked, we'll send a temporary password there.
+              {t("forgotPasswordPage.instructions")}
             </p>
             <div className="field">
-              <label>Username</label>
+              <label>{t("common.username")}</label>
               <input value={username} onChange={(e) => setUsername(e.target.value)} required />
             </div>
             {error && <div className="error-text">{error}</div>}
             <button className="btn btn-primary" style={{ width: "100%" }} disabled={loading}>
-              {loading ? "Sending…" : "Send temporary password"}
+              {loading ? t("forgotPasswordPage.sending") : t("forgotPasswordPage.sendButton")}
             </button>
             <Link className="link-btn" style={{ marginTop: 10, display: "inline-block" }} to="/login">
-              Back to sign in
+              {t("forgotPasswordPage.backToSignIn")}
             </Link>
           </form>
         )}

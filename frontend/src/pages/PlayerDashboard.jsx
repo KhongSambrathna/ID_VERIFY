@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { resolveFileUrl } from "../utils/fileUrl";
+import { useLanguage } from "../i18n/LanguageContext";
 
 function formatDob(dob) {
   if (!dob) return null;
@@ -20,6 +21,7 @@ function formatDob(dob) {
 // the whole point of this account existing) but never editable — the
 // backend never lets a PLAYER-role account past a GET request.
 export default function PlayerDashboard() {
+  const { t } = useLanguage();
   const { team } = useAuth();
   const [athletes, setAthletes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,22 +46,22 @@ export default function PlayerDashboard() {
         setAthletes(data);
         setError("");
       })
-      .catch((err) => setError(err.response?.data?.message || "Failed to load team roster"))
+      .catch((err) => setError(err.response?.data?.message || t("playerDashboard.failedToLoadRoster")))
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="container"><p>Loading…</p></div>;
+  if (loading) return <div className="container"><p>{t("common.loading")}</p></div>;
   if (error) return <div className="container"><p className="error-text">{error}</p></div>;
 
   return (
     <div className="container dash-body">
       <div className="dash-header">
-        <h2>{team ? `${team} — Team roster` : "Team roster"}</h2>
-        <p>View-only — everyone on this team, their ID card, and fee/debt status. Nothing here can be edited.</p>
+        <h2>{team ? `${team} — ${t("playerDashboard.teamRoster")}` : t("playerDashboard.teamRoster")}</h2>
+        <p>{t("playerDashboard.description")}</p>
       </div>
 
       {athletes.length === 0 ? (
-        <p>No athletes on this team yet.</p>
+        <p>{t("playerDashboard.noAthletes")}</p>
       ) : (
         <div className="athletes-grid">
           {athletes.map((athlete) => (
@@ -76,13 +78,13 @@ export default function PlayerDashboard() {
               <h4>{athlete.fullName}</h4>
               {athlete.khmerName && <p className="khmer-name">{athlete.khmerName}</p>}
               <p className="role">{athlete.role || "PLAYER"}</p>
-              <p className="verify-id">ID: {athlete.verifyId}</p>
+              <p className="verify-id">{t("common.verifyId")}: {athlete.verifyId}</p>
               <p className="athlete-meta">
-                {formatDob(athlete.dateOfBirth) || "DOB —"} · {athlete.gender || "—"}
+                {formatDob(athlete.dateOfBirth) || t("playerDashboard.dobDash")} · {athlete.gender || "—"}
               </p>
               <div className="athlete-status">
                 <span className={`badge ${athlete.isAvailable ? "verified" : "rejected"}`}>
-                  {athlete.isAvailable ? "Available" : "Not available"}
+                  {athlete.isAvailable ? t("common.available") : t("common.notAvailable")}
                 </span>
                 {athlete.feeOwed > 0 ? (
                   <button
@@ -90,10 +92,10 @@ export default function PlayerDashboard() {
                     className="badge rejected fee-toggle"
                     onClick={() => toggleExpanded(athlete.assignmentId)}
                   >
-                    Owes ${athlete.feeOwed} {expandedIds.has(athlete.assignmentId) ? "▲" : "▼"}
+                    {t("playerDashboard.owes")} ${athlete.feeOwed} {expandedIds.has(athlete.assignmentId) ? "▲" : "▼"}
                   </button>
                 ) : (
-                  <span className="badge verified">Fee paid</span>
+                  <span className="badge verified">{t("playerDashboard.feePaid")}</span>
                 )}
               </div>
               {athlete.feeOwed > 0 && expandedIds.has(athlete.assignmentId) && (
@@ -110,7 +112,7 @@ export default function PlayerDashboard() {
               )}
               <div className="athlete-status" style={{ marginTop: 8 }}>
                 <Link className="link-btn" to={`/admin/athlete/${athlete._id}?team=${encodeURIComponent(athlete.team)}`}>
-                  View card
+                  {t("common.viewCard")}
                 </Link>
               </div>
             </div>

@@ -1,4 +1,5 @@
 import { Routes, Route } from "react-router-dom";
+import { LanguageProvider } from "./i18n/LanguageContext";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Landing from "./pages/Landing";
@@ -13,6 +14,7 @@ import SearchPage from "./pages/SearchPage";
 import AboutUs from "./pages/AboutUs";
 import CoachDashboard from "./pages/CoachDashboard";
 import AdminUsers from "./pages/AdminUsers";
+import AdminSubscriptions from "./pages/AdminSubscriptions";
 import AdminSponsors from "./pages/AdminSponsors";
 import AdminMatchDay from "./pages/AdminMatchDay";
 import AdminShop from "./pages/AdminShop";
@@ -27,10 +29,11 @@ import AdminTournaments from "./pages/AdminTournaments";
 import TournamentsPage from "./pages/TournamentsPage";
 import TournamentSquadPage from "./pages/TournamentSquadPage";
 import PlayerSquadListPage from "./pages/PlayerSquadListPage";
+import PricingPage from "./pages/PricingPage";
 
 export default function App() {
   return (
-    <>
+    <LanguageProvider>
       <Navbar />
       <Routes>
         <Route path="/" element={<Landing />} />
@@ -47,6 +50,7 @@ export default function App() {
         <Route path="/verify/:verifyId" element={<VerifyPage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/shop" element={<ShopPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
         <Route path="/about" element={<AboutUs />} />
         <Route
           path="/admin"
@@ -101,6 +105,14 @@ export default function App() {
           element={
             <ProtectedRoute role="ADMIN">
               <AdminSponsors />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/subscriptions"
+          element={
+            <ProtectedRoute role="ADMIN">
+              <AdminSubscriptions />
             </ProtectedRoute>
           }
         />
@@ -193,6 +205,6 @@ export default function App() {
           }
         />
       </Routes>
-    </>
+    </LanguageProvider>
   );
 }

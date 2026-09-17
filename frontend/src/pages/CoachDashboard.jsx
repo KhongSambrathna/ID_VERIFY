@@ -6,6 +6,8 @@ import { resolveFileUrl } from "../utils/fileUrl";
 import SquadListManager from "../components/SquadListManager";
 import FormationManager from "../components/FormationManager";
 import StartingXIManager from "../components/StartingXIManager";
+import RequireActiveSubscription from "../components/RequireActiveSubscription";
+import { useLanguage } from "../i18n/LanguageContext";
 
 function formatDob(dob) {
   if (!dob) return null;
@@ -17,6 +19,7 @@ function formatDob(dob) {
 }
 
 export default function CoachDashboard() {
+  const { t } = useLanguage();
   const { team } = useAuth();
   const [athletes, setAthletes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +41,7 @@ export default function CoachDashboard() {
       const { data } = await api.get("/coach/my-team");
       setAthletes(data);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load data");
+      setError(err.response?.data?.message || t("common.failedToLoad"));
     } finally {
       setLoading(false);
     }
@@ -48,34 +51,44 @@ export default function CoachDashboard() {
   // here shows up as 2 cards). Removing one isn't immediate — it's flagged
   // for an Admin to confirm, same as adding a new one needs their approval.
   const removeAssignment = async (athlete) => {
-    if (!confirm("Request removal of this team/role? An Admin needs to confirm it.")) return;
+    if (!confirm(t("coachDashboard.confirmRemoveAssignment"))) return;
     try {
       await api.delete(`/athletes/${athlete._id}/assignments/${athlete.assignmentId}`);
       loadData();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to request removal");
+      alert(err.response?.data?.message || t("coachDashboard.failedToRequestRemoval"));
     }
   };
 
-  if (loading) return <div className="container"><p>Loading...</p></div>;
-  if (error) return <div className="container"><p className="error-text">{error}</p></div>;
-
   const pendingCount = athletes.filter((a) => a.approvalStatus === "pending" || a.pendingRemoval).length;
 
+  // loading/error are checked INSIDE RequireActiveSubscription, not as an
+  // early return before it. This dashboard's own data fetch
+  // (GET /coach/my-team) is gated by the exact same subscription check as
+  // everything else on the coach router, so an expired Head Coach's fetch
+  // always fails with a 402 — if that failure short-circuited the render
+  // before reaching the wrapper below, they'd see this raw error text
+  // instead of the proper "subscription required" lock screen every time
+  // they opened this page.
   return (
+    <RequireActiveSubscription>
+    {loading ? (
+      <div className="container"><p>{t("common.loading")}</p></div>
+    ) : error ? (
+      <div className="container"><p className="error-text">{error}</p></div>
+    ) : (
     <div className="container dash-body">
       <div className="dash-header">
-        <h2>Coach Dashboard</h2>
+        <h2>{t("coachDashboard.title")}</h2>
         <p>
-          Add, edit, and manage athletes on your own team. New records and edits go out as{" "}
-          <strong>Pending</strong> until an Admin approves them — they stay hidden from public search and the
-          QR verify page until then.
+          {t("coachDashboard.descBefore")}{" "}
+          <strong>{t("common.pending")}</strong>{t("coachDashboard.descAfter")}
         </p>
         <Link to="/admin/stats" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
-          Pending &amp; debt report
+          {t("coachDashboard.pendingDebtReport")}
         </Link>
         <Link to="/admin/renew" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
-          ID renewal
+          {t("coachDashboard.idRenewal")}
         </Link>
       </div>
 
@@ -84,25 +97,25 @@ export default function CoachDashboard() {
           className={`tab-btn ${activeTab === "athletes" ? "active" : ""}`}
           onClick={() => setActiveTab("athletes")}
         >
-          My Team ({athletes.length})
+          {t("coachDashboard.tabMyTeam")} ({athletes.length})
         </button>
         <button
           className={`tab-btn ${activeTab === "lineups" ? "active" : ""}`}
           onClick={() => setActiveTab("lineups")}
         >
-          Squad list
+          {t("coachDashboard.tabSquadList")}
         </button>
         <button
           className={`tab-btn ${activeTab === "formations" ? "active" : ""}`}
           onClick={() => setActiveTab("formations")}
         >
-          Formation
+          {t("coachDashboard.tabFormation")}
         </button>
         <button
           className={`tab-btn ${activeTab === "startingxi" ? "active" : ""}`}
           onClick={() => setActiveTab("startingxi")}
         >
-          Starting XI
+          {t("coachDashboard.tabStartingXI")}
         </button>
       </div>
 
@@ -111,14 +124,15 @@ export default function CoachDashboard() {
         <div className="tab-content">
           <div className="dash-header" style={{ marginBottom: 12 }}>
             <h3 style={{ margin: 0 }}>
-              My Team Athletes {pendingCount > 0 && `(${pendingCount} pending approval)`}
+              {t("coachDashboard.myTeamAthletes")}{" "}
+              {pendingCount > 0 && `(${pendingCount} ${t("coachDashboard.pendingApproval")})`}
             </h3>
             <Link to="/admin/new" className="btn btn-primary">
-              + Add athlete
+              {t("coachDashboard.addAthlete")}
             </Link>
           </div>
           {athletes.length === 0 ? (
-            <p>No athletes in your team yet.</p>
+            <p>{t("coachDashboard.noAthletes")}</p>
           ) : (
             <div className="athletes-grid">
               {athletes.map((athlete) => (
@@ -138,19 +152,19 @@ export default function CoachDashboard() {
                     {athlete.role || "PLAYER"}
                     {athlete.jerseyNumber != null && ` · #${athlete.jerseyNumber}`}
                   </p>
-                  <p className="verify-id">ID: {athlete.verifyId}</p>
+                  <p className="verify-id">{t("common.verifyId")}: {athlete.verifyId}</p>
                   <p className="athlete-meta">
-                    {formatDob(athlete.dateOfBirth) || "DOB —"} · {athlete.gender || "—"}
+                    {formatDob(athlete.dateOfBirth) || t("coachDashboard.dobDash")} · {athlete.gender || "—"}
                   </p>
                   <div className="athlete-status">
                     <span className={`badge ${athlete.isAvailable ? "verified" : "rejected"}`}>
-                      {athlete.isAvailable ? "Available" : "Not available"}
+                      {athlete.isAvailable ? t("common.available") : t("common.notAvailable")}
                     </span>
                     {athlete.pendingRemoval ? (
-                      <span className="badge rejected">Removal requested</span>
+                      <span className="badge rejected">{t("coachDashboard.removalRequested")}</span>
                     ) : (
                       athlete.approvalStatus === "pending" && (
-                        <span className="badge rejected">Pending approval</span>
+                        <span className="badge rejected">{t("coachDashboard.pendingApprovalBadge")}</span>
                       )
                     )}
                     {athlete.feeOwed > 0 && (
@@ -160,12 +174,12 @@ export default function CoachDashboard() {
                           .map((f) => `$${f.amount}${f.note ? ` — ${f.note}` : ""}`)
                           .join(", ")}
                       >
-                        Owes ${athlete.feeOwed}
+                        {t("coachDashboard.owes")} ${athlete.feeOwed}
                       </span>
                     )}
                     {(!athlete.lastVerifiedAt ||
                       Date.now() - new Date(athlete.lastVerifiedAt).getTime() > 365 * 24 * 60 * 60 * 1000) && (
-                      <span className="badge rejected">Needs renewal</span>
+                      <span className="badge rejected">{t("coachDashboard.needsRenewal")}</span>
                     )}
                   </div>
                   <div className="athlete-status" style={{ marginTop: 8 }}>
@@ -173,14 +187,14 @@ export default function CoachDashboard() {
                       className="link-btn"
                       to={`/admin/athlete/${athlete._id}?team=${encodeURIComponent(athlete.team)}`}
                     >
-                      View card
+                      {t("common.viewCard")}
                     </Link>
                     <Link className="link-btn" to={`/admin/athlete/${athlete._id}/edit`}>
-                      Edit
+                      {t("common.edit")}
                     </Link>
                     {!athlete.pendingRemoval && (
                       <button className="link-btn" onClick={() => removeAssignment(athlete)}>
-                        Request removal
+                        {t("coachDashboard.requestRemoval")}
                       </button>
                     )}
                   </div>
@@ -212,5 +226,7 @@ export default function CoachDashboard() {
         </div>
       )}
     </div>
+    )}
+    </RequireActiveSubscription>
   );
 }

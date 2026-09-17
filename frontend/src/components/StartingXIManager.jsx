@@ -3,6 +3,7 @@ import api from "../api/axios";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { exportPosterAsImage } from "../utils/exportPoster";
 import { isPlayerOnTeam, jerseyNumberForTeam } from "../utils/rolesForTeam";
+import { useLanguage } from "../i18n/LanguageContext";
 
 // This club mostly plays 8, 9, 10, or 11-a-side — this only changes the
 // "usually N players" hint below, it never caps how many starters can be
@@ -14,11 +15,12 @@ const SQUAD_SIZES = [11, 10, 9, 8];
 // from FormationManager's tactical pitch diagram; this is just a lineup
 // announcement graphic, not a positional layout.
 function StartingXIPoster({ posterRef, team, name, opponent, competition, starterAthletes, subAthletes }) {
+  const { t } = useLanguage();
   return (
     <div className="startingxi-poster" ref={posterRef}>
       <div className="startingxi-header">
         <div className="startingxi-matchup">
-          {team} <span className="startingxi-vs">vs</span> {opponent || "Opponent"}
+          {team} <span className="startingxi-vs">{t("startingXIManager.vs")}</span> {opponent || t("startingXIManager.opponentFallback")}
         </div>
         {name && <div className="startingxi-subtitle">{name}</div>}
       </div>
@@ -37,14 +39,14 @@ function StartingXIPoster({ posterRef, team, name, opponent, competition, starte
               </span>
             </div>
           ))}
-          {starterAthletes.length === 0 && <p className="startingxi-empty">No starters selected yet.</p>}
+          {starterAthletes.length === 0 && <p className="startingxi-empty">{t("startingXIManager.noStartersYet")}</p>}
         </div>
 
         <div className="startingxi-side">
-          <div className="startingxi-side-title">Starting XI</div>
+          <div className="startingxi-side-title">{t("startingXIManager.startingXI")}</div>
           {subAthletes.length > 0 && (
             <>
-              <p className="startingxi-subs-title">Substitutes</p>
+              <p className="startingxi-subs-title">{t("startingXIManager.substitutes")}</p>
               <ul className="startingxi-subs-list">
                 {subAthletes.map((a) => (
                   <li key={a._id}>
@@ -64,6 +66,7 @@ function StartingXIPoster({ posterRef, team, name, opponent, competition, starte
 }
 
 export default function StartingXIManager({ team }) {
+  const { t } = useLanguage();
   const [list, setList] = useState([]);
   const [lineups, setLineups] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -100,7 +103,7 @@ export default function StartingXIManager({ team }) {
       setLineups(lineupsRes.data);
       setError("");
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load data");
+      setError(err.response?.data?.message || t("common.failedToLoad"));
     } finally {
       setLoading(false);
     }
@@ -120,7 +123,7 @@ export default function StartingXIManager({ team }) {
 
   const startNew = () => {
     if (lineups.length === 0) {
-      alert("Create a squad list first — a Starting XI can only use players who are already in one.");
+      alert(t("startingXIManager.needSquadFirst"));
       return;
     }
     setEditingId(null);
@@ -163,7 +166,7 @@ export default function StartingXIManager({ team }) {
 
   const changeLineup = (id) => {
     if (starterIds.length > 0) {
-      if (!confirm("Switching squad lists clears the players already picked. Continue?")) return;
+      if (!confirm(t("startingXIManager.confirmChangeLineup"))) return;
     }
     setSelectedLineupId(id);
     setStarterIds([]);
@@ -178,15 +181,15 @@ export default function StartingXIManager({ team }) {
 
   const saveItem = async () => {
     if (!name.trim()) {
-      alert("Please enter a name for this Starting XI");
+      alert(t("startingXIManager.nameRequired"));
       return;
     }
     if (!selectedLineupId) {
-      alert("Please choose a squad list first");
+      alert(t("startingXIManager.lineupRequired"));
       return;
     }
     if (starterIds.length === 0) {
-      alert("Pick at least one starter first");
+      alert(t("startingXIManager.pickStarterFirst"));
       return;
     }
     setSaving(true);
@@ -209,19 +212,19 @@ export default function StartingXIManager({ team }) {
       await load();
       backToList();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to save");
+      alert(err.response?.data?.message || t("startingXIManager.failedToSave"));
     } finally {
       setSaving(false);
     }
   };
 
   const deleteItem = async (id) => {
-    if (!confirm("Delete this Starting XI?")) return;
+    if (!confirm(t("startingXIManager.confirmDelete"))) return;
     try {
       await api.delete(`/coach/startingxi/${id}`);
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to delete");
+      alert(err.response?.data?.message || t("startingXIManager.failedToDelete"));
     }
   };
 
@@ -240,56 +243,58 @@ export default function StartingXIManager({ team }) {
       });
     } catch (err) {
       console.error(err);
-      alert(`Couldn't export the Starting XI as a ${format.toUpperCase()}. Please try again.`);
+      alert(
+        `${t("startingXIManager.exportFailedPrefix")} ${format.toUpperCase()}. ${t("startingXIManager.exportFailedSuffix")}`
+      );
     } finally {
       setExporting(null);
     }
   };
 
-  if (!team) return <p className="help-text">Choose a team first.</p>;
-  if (loading) return <p>Loading…</p>;
+  if (!team) return <p className="help-text">{t("startingXIManager.chooseTeamFirst")}</p>;
+  if (loading) return <p>{t("common.loading")}</p>;
   if (error) return <p className="error-text">{error}</p>;
 
   if (mode === "board") {
     return (
       <div>
         <div className="lineup-header">
-          <h3>{editingId ? "Edit Starting XI" : "New Starting XI"} — {team}</h3>
+          <h3>{editingId ? t("startingXIManager.editStartingXI") : t("startingXIManager.newStartingXI")} — {team}</h3>
           <button className="link-btn" onClick={backToList}>
-            ← Back to Starting XIs
+            {t("startingXIManager.backToList")}
           </button>
         </div>
 
         <div className="formation-setup-row">
           <div className="field">
-            <label>Name</label>
+            <label>{t("common.name")}</label>
             <input
               type="text"
-              placeholder="e.g., vs Angkor FC — Round 5"
+              placeholder={t("startingXIManager.namePlaceholder")}
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
           <div className="field">
-            <label>Opponent</label>
+            <label>{t("startingXIManager.opponentLabel")}</label>
             <input
               type="text"
-              placeholder="e.g., Angkor FC"
+              placeholder={t("startingXIManager.opponentPlaceholder")}
               value={opponent}
               onChange={(e) => setOpponent(e.target.value)}
             />
           </div>
           <div className="field">
-            <label>Competition (optional)</label>
+            <label>{t("startingXIManager.competitionLabel")}</label>
             <input
               type="text"
-              placeholder="e.g., Cambodian League 2A"
+              placeholder={t("startingXIManager.competitionPlaceholder")}
               value={competition}
               onChange={(e) => setCompetition(e.target.value)}
             />
           </div>
           <div className="field">
-            <label>Squad list</label>
+            <label>{t("startingXIManager.squadListLabel")}</label>
             <select value={selectedLineupId} onChange={(e) => changeLineup(e.target.value)}>
               {lineups.map((l) => (
                 <option key={l._id} value={l._id}>
@@ -299,11 +304,11 @@ export default function StartingXIManager({ team }) {
             </select>
           </div>
           <div className="field">
-            <label>Match format</label>
+            <label>{t("startingXIManager.matchFormat")}</label>
             <select value={squadSize} onChange={(e) => setSquadSize(Number(e.target.value))}>
               {SQUAD_SIZES.map((n) => (
                 <option key={n} value={n}>
-                  {n}-a-side
+                  {n}{t("startingXIManager.asideSuffix")}
                 </option>
               ))}
             </select>
@@ -312,7 +317,7 @@ export default function StartingXIManager({ team }) {
 
         <div className="form-actions" style={{ marginBottom: 14 }}>
           <button className="btn btn-primary" onClick={saveItem} disabled={saving}>
-            {saving ? "Saving…" : "Save Starting XI"}
+            {saving ? t("common.saving") : t("startingXIManager.saveButton")}
           </button>
           <button
             className="btn btn-outline"
@@ -320,7 +325,7 @@ export default function StartingXIManager({ team }) {
             onClick={() => exportImage("jpg")}
             disabled={!!exporting}
           >
-            {exporting === "jpg" ? "Exporting…" : "Save as JPG"}
+            {exporting === "jpg" ? t("startingXIManager.exporting") : t("startingXIManager.saveAsJpg")}
           </button>
           <button
             className="btn btn-outline"
@@ -328,13 +333,15 @@ export default function StartingXIManager({ team }) {
             onClick={() => exportImage("png")}
             disabled={!!exporting}
           >
-            {exporting === "png" ? "Exporting…" : "Save as PNG"}
+            {exporting === "png" ? t("startingXIManager.exporting") : t("startingXIManager.saveAsPng")}
           </button>
         </div>
 
         <p className={`squad-count-note ${starterIds.length === squadSize ? "ok" : "warn"}`}>
-          {starterIds.length === squadSize ? "✓" : "⚠"} {starterIds.length} starter
-          {starterIds.length !== 1 ? "s" : ""} selected — a {squadSize}-a-side Starting XI is usually {squadSize}.
+          {starterIds.length === squadSize ? "✓" : "⚠"} {starterIds.length}{" "}
+          {starterIds.length !== 1 ? t("startingXIManager.starterPlural") : t("startingXIManager.starterSingular")} —{" "}
+          {t("startingXIManager.usualPrefix")} {squadSize}{t("startingXIManager.asideSuffix")}{" "}
+          {t("startingXIManager.usualSuffix")} {squadSize}.
         </p>
 
         <div className="athletes-select" style={{ marginBottom: 16 }}>
@@ -352,12 +359,12 @@ export default function StartingXIManager({ team }) {
               </span>
             </label>
           ))}
-          {pool.length === 0 && <p className="help-text">This squad list has no players (role "PLAYER").</p>}
+          {pool.length === 0 && <p className="help-text">{t("startingXIManager.noPlayersInList")}</p>}
         </div>
 
         <p className="help-text" style={{ marginBottom: 10 }}>
-          Everyone checked above becomes a starter card; everyone else in "{selectedLineup?.name || "—"}" is
-          listed as a substitute automatically.
+          {t("startingXIManager.everyoneCheckedPrefix")} "{selectedLineup?.name || "—"}"{" "}
+          {t("startingXIManager.everyoneCheckedSuffix")}
         </p>
 
         <StartingXIPoster
@@ -376,21 +383,20 @@ export default function StartingXIManager({ team }) {
   return (
     <div>
       <div className="lineup-header">
-        <h3>Starting XI — {team}</h3>
+        <h3>{t("startingXIManager.startingXI")} — {team}</h3>
         <button className="btn btn-primary" onClick={startNew} disabled={lineups.length === 0}>
-          + New Starting XI
+          {t("startingXIManager.newButton")}
         </button>
       </div>
 
       {lineups.length === 0 && (
         <p className="help-text">
-          Create a squad list first (Squad list tab) — a Starting XI can only place players who are already in
-          one.
+          {t("startingXIManager.needSquadListNote")}
         </p>
       )}
 
       {list.length === 0 ? (
-        <p>No Starting XI graphics yet. Create one to announce your lineup.</p>
+        <p>{t("startingXIManager.noneYet")}</p>
       ) : (
         <div className="lineups-list">
           {list.map((item) => (
@@ -399,17 +405,19 @@ export default function StartingXIManager({ team }) {
                 <h4>{item.name}</h4>
                 <div className="dash-actions">
                   <button className="link-btn" onClick={() => openItem(item)}>
-                    Open
+                    {t("startingXIManager.open")}
                   </button>
                   <button className="btn btn-danger" onClick={() => deleteItem(item._id)}>
-                    Delete
+                    {t("common.delete")}
                   </button>
                 </div>
               </div>
               <p className="lineup-count">
-                vs {item.opponent || "—"} · {item.squadSize || 11}-a-side · {item.starters.length} starter
-                {item.starters.length !== 1 ? "s" : ""} · {item.substitutes.length} sub
-                {item.substitutes.length !== 1 ? "s" : ""}
+                {t("startingXIManager.vs")} {item.opponent || "—"} · {item.squadSize || 11}
+                {t("startingXIManager.asideSuffix")} · {item.starters.length}{" "}
+                {item.starters.length !== 1 ? t("startingXIManager.startersWord") : t("startingXIManager.starterWord")} ·{" "}
+                {item.substitutes.length}{" "}
+                {item.substitutes.length !== 1 ? t("startingXIManager.subsWord") : t("startingXIManager.subWord")}
               </p>
             </div>
           ))}

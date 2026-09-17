@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { requireAuth, requireRole } = require("../middleware/auth");
+const { requireActiveSubscription } = require("../middleware/subscription");
 const upload = require("../middleware/upload");
 const {
   createAthlete,
@@ -50,13 +51,19 @@ router.get("/check-duplicate", requireRole("ADMIN", "HEAD_COACH"), checkDuplicat
 router.get("/stats", requireRole("ADMIN", "HEAD_COACH"), getStats);
 router.get("/export.csv", requireRole("ADMIN", "HEAD_COACH"), exportRosterCsv);
 router.put("/bulk-approve", requireRole("ADMIN"), bulkApproveAssignments);
-router.put("/bulk-renew", requireRole("ADMIN", "HEAD_COACH"), bulkRenewVerification);
+router.put("/bulk-renew", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, bulkRenewVerification);
 router.get("/:id", requireRole("ADMIN", "HEAD_COACH", "PLAYER"), getAthleteById);
 router.get("/:id/scan-logs", requireRole("ADMIN", "HEAD_COACH"), getScanLogs);
 
+// createAthlete/updateAthlete/renewVerification and everything below them
+// are athlete-roster MANAGEMENT actions — a Head Coach needs their team's
+// $15/year subscription active to reach them (requireActiveSubscription is
+// always a no-op for Admin). Viewing the roster (the GET routes above)
+// stays open regardless, so an unpaid team can still see who's on it.
 router.post(
   "/",
   requireRole("ADMIN", "HEAD_COACH"),
+  requireActiveSubscription,
   upload.fields([
     { name: "photo", maxCount: 1 },
     { name: "documents", maxCount: 10 },
@@ -66,21 +73,22 @@ router.post(
 router.put(
   "/:id",
   requireRole("ADMIN", "HEAD_COACH"),
+  requireActiveSubscription,
   upload.fields([
     { name: "photo", maxCount: 1 },
     { name: "documents", maxCount: 10 },
   ]),
   updateAthlete
 );
-router.put("/:id/renew", requireRole("ADMIN", "HEAD_COACH"), renewVerification);
+router.put("/:id/renew", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, renewVerification);
 
 // Team/role assignments — a person can have several, one per team (or even
 // several on the same team, e.g. Player + Assistant Coach). Add/edit/remove
 // act on ONE assignment at a time; approve/reject (admin-only) are how an
 // Admin signs off on a Head Coach's pending add or pending removal request.
-router.post("/:id/assignments", requireRole("ADMIN", "HEAD_COACH"), addAssignment);
-router.put("/:id/assignments/:assignmentId", requireRole("ADMIN", "HEAD_COACH"), updateAssignment);
-router.delete("/:id/assignments/:assignmentId", requireRole("ADMIN", "HEAD_COACH"), removeAssignment);
+router.post("/:id/assignments", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, addAssignment);
+router.put("/:id/assignments/:assignmentId", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, updateAssignment);
+router.delete("/:id/assignments/:assignmentId", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, removeAssignment);
 router.put("/:id/assignments/:assignmentId/approve", requireRole("ADMIN"), approveAssignment);
 router.put("/:id/assignments/:assignmentId/reject", requireRole("ADMIN"), rejectAssignment);
 
@@ -89,9 +97,9 @@ router.put("/:id/assignments/:assignmentId/reject", requireRole("ADMIN"), reject
 // removed independently. Same Admin/Head Coach (own team) access as the
 // assignment routes above; a Player account only ever GETs this data via
 // the flattened total + breakdown, never through these.
-router.post("/:id/assignments/:assignmentId/fees", requireRole("ADMIN", "HEAD_COACH"), addFee);
-router.put("/:id/assignments/:assignmentId/fees/:feeId", requireRole("ADMIN", "HEAD_COACH"), updateFee);
-router.delete("/:id/assignments/:assignmentId/fees/:feeId", requireRole("ADMIN", "HEAD_COACH"), removeFee);
+router.post("/:id/assignments/:assignmentId/fees", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, addFee);
+router.put("/:id/assignments/:assignmentId/fees/:feeId", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, updateFee);
+router.delete("/:id/assignments/:assignmentId/fees/:feeId", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, removeFee);
 
 // Admin-only — a Head Coach removes someone through the assignment routes
 // above instead (which always requires Admin confirmation, per team).

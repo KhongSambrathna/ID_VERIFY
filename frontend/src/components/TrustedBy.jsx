@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import api from "../api/axios";
+import { useLanguage } from "../i18n/LanguageContext";
 
 const AUTO_SCROLL_STEP = 1; // px per tick
 const AUTO_SCROLL_INTERVAL = 30; // ms per tick
@@ -11,6 +12,7 @@ const AUTO_SCROLL_RESUME_DELAY = 2500; // ms after manual interaction before aut
 // auto-scrolls sideways (pausing while the visitor hovers/touches/scrolls it),
 // and the arrow buttons let anyone scroll it manually at any time.
 export default function TrustedBy() {
+  const { t } = useLanguage();
   const [sponsors, setSponsors] = useState([]);
   const trackRef = useRef(null);
   const timerRef = useRef(null);
@@ -78,13 +80,13 @@ export default function TrustedBy() {
   return (
     <section className="trusted-by">
       <div className="container">
-        <p className="trusted-by-label">Trusted by</p>
+        <p className="trusted-by-label">{t("trustedBy.label")}</p>
         <div className="trusted-by-wrap">
           <button
             type="button"
             className="trusted-by-arrow trusted-by-arrow-left"
             onClick={() => scrollByArrow(-1)}
-            aria-label="Scroll left"
+            aria-label={t("trustedBy.scrollLeft")}
           >
             ‹
           </button>
@@ -97,7 +99,7 @@ export default function TrustedBy() {
             type="button"
             className="trusted-by-arrow trusted-by-arrow-right"
             onClick={() => scrollByArrow(1)}
-            aria-label="Scroll right"
+            aria-label={t("trustedBy.scrollRight")}
           >
             ›
           </button>

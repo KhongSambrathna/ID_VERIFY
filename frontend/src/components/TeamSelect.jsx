@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
+import { useLanguage } from "../i18n/LanguageContext";
 
 const ADD_NEW = "__add_new_team__";
 
@@ -7,7 +8,9 @@ const ADD_NEW = "__add_new_team__";
 // flow — so team names are always picked consistently instead of typed
 // freehand (which is how records end up split across "U18", "u18 boys",
 // "U-18 Boys", etc.).
-export default function TeamSelect({ value, onChange, required, label = "Team" }) {
+export default function TeamSelect({ value, onChange, required, label }) {
+  const { t } = useLanguage();
+  const displayLabel = label ?? t("common.team");
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -21,7 +24,7 @@ export default function TeamSelect({ value, onChange, required, label = "Team" }
       const { data } = await api.get("/teams");
       setTeams(data);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load teams");
+      setError(err.response?.data?.message || t("teamSelect.failedToLoadTeams"));
     } finally {
       setLoading(false);
     }
@@ -52,7 +55,7 @@ export default function TeamSelect({ value, onChange, required, label = "Team" }
       setShowAddForm(false);
       setNewTeamName("");
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to add team");
+      setError(err.response?.data?.message || t("teamSelect.failedToAddTeam"));
     } finally {
       setAdding(false);
     }
@@ -60,24 +63,24 @@ export default function TeamSelect({ value, onChange, required, label = "Team" }
 
   return (
     <div className="field">
-      <label>{label}</label>
+      <label>{displayLabel}</label>
       {!showAddForm ? (
         <select value={value || ""} onChange={handleSelectChange} required={required} disabled={loading}>
           <option value="" disabled>
-            {loading ? "Loading teams…" : "Select a team…"}
+            {loading ? t("teamSelect.loadingTeams") : t("teamSelect.selectTeam")}
           </option>
-          {teams.map((t) => (
-            <option key={t._id} value={t.name}>
-              {t.name}
+          {teams.map((team) => (
+            <option key={team._id} value={team.name}>
+              {team.name}
             </option>
           ))}
-          <option value={ADD_NEW}>+ Add new team…</option>
+          <option value={ADD_NEW}>{t("teamSelect.addNewTeamOption")}</option>
         </select>
       ) : (
         <div className="inline-add-row">
           <input
             autoFocus
-            placeholder="New team name"
+            placeholder={t("teamSelect.newTeamNamePlaceholder")}
             value={newTeamName}
             onChange={(e) => setNewTeamName(e.target.value)}
             onKeyDown={(e) => {
@@ -88,7 +91,7 @@ export default function TeamSelect({ value, onChange, required, label = "Team" }
             }}
           />
           <button type="button" className="btn btn-primary" onClick={handleAddTeam} disabled={adding}>
-            {adding ? "Adding…" : "Add"}
+            {adding ? t("teamSelect.adding") : t("common.add")}
           </button>
           <button
             type="button"
@@ -96,7 +99,7 @@ export default function TeamSelect({ value, onChange, required, label = "Team" }
             style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
             onClick={() => setShowAddForm(false)}
           >
-            Cancel
+            {t("common.cancel")}
           </button>
         </div>
       )}

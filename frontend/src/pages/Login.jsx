@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../i18n/LanguageContext";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -10,6 +11,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -26,7 +28,7 @@ export default function Login() {
         data.admin?.role === "HEAD_COACH" ? "/coach" : data.admin?.role === "PLAYER" ? "/player" : "/admin"
       );
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed");
+      setError(err.response?.data?.message || t("login.loginFailed"));
     } finally {
       setLoading(false);
     }
@@ -35,13 +37,13 @@ export default function Login() {
   return (
     <div className="auth-wrap">
       <form className="card" onSubmit={handleSubmit}>
-        <h2>Sign in</h2>
+        <h2>{t("login.signIn")}</h2>
         <div className="field">
-          <label>Username</label>
+          <label>{t("common.username")}</label>
           <input value={username} onChange={(e) => setUsername(e.target.value)} required />
         </div>
         <div className="field">
-          <label>Password</label>
+          <label>{t("common.password")}</label>
           <input
             type="password"
             value={password}
@@ -51,15 +53,12 @@ export default function Login() {
         </div>
         {error && <div className="error-text">{error}</div>}
         <button className="btn btn-primary" style={{ width: "100%" }} disabled={loading}>
-          {loading ? "Signing in…" : "Sign in"}
+          {loading ? t("login.signingIn") : t("login.signIn")}
         </button>
         <Link className="link-btn" style={{ marginTop: 10, display: "inline-block" }} to="/forgot-password">
-          Forgot password?
+          {t("login.forgotPassword")}
         </Link>
-        <p className="help-text">
-          Head coaches and players sign in here too — use the username and
-          password your admin created for you.
-        </p>
+        <p className="help-text">{t("login.helpText")}</p>
       </form>
     </div>
   );

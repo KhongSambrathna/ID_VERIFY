@@ -3,6 +3,7 @@ import api from "../api/axios";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { exportPosterAsImage } from "../utils/exportPoster";
 import { isPlayerOnTeam } from "../utils/rolesForTeam";
+import { useLanguage } from "../i18n/LanguageContext";
 
 // Four fixed lines, top (attack) to bottom (goalkeeper) — matches how a
 // "combined XI" graphic is normally read. Only 4-line shapes are offered
@@ -12,6 +13,8 @@ import { isPlayerOnTeam } from "../utils/rolesForTeam";
 // 11-a-side, not 5/7-a-side, so those are the four groups offered.
 const ROWS_ORDER = ["FWD", "MID", "DEF", "GK"];
 const ROW_LABELS = { FWD: "Forwards", MID: "Midfielders", DEF: "Defenders", GK: "Goalkeeper" };
+// Maps each row code to its dict key suffix (see i18n/dict/formationManager.js).
+const ROW_LABEL_KEY = { FWD: "rowForwards", MID: "rowMidfielders", DEF: "rowDefenders", GK: "rowGoalkeeper" };
 const ROW_Y = { FWD: 16, MID: 40, DEF: 64, GK: 90 };
 const SHAPES = {
   // 11-a-side
@@ -42,6 +45,8 @@ const SHAPE_GROUPS = [
   { label: "9-a-side", keys: ["3-3-2", "3-2-3", "2-3-3"] },
   { label: "8-a-side", keys: ["3-3-1", "3-2-2", "2-3-2", "2-2-3"] },
 ];
+// Maps each group's label to its dict key suffix (see i18n/dict/formationManager.js).
+const ASIDE_LABEL_KEY = { "11-a-side": "aside11", "10-a-side": "aside10", "9-a-side": "aside9", "8-a-side": "aside8" };
 // Position abbreviation shown under each player's name — e.g. LW/ST/RW for
 // a 3-forward line, CB/LB/RB for a 4-back line. Purely cosmetic labeling;
 // the coach still just picks who fills which slot.
@@ -112,6 +117,7 @@ function PlayerToken({ athlete, label }) {
 // so "Save as JPG/PNG" produces something postable, not just a bare green
 // rectangle.
 function PitchBoard({ posterRef, team, formationName, rowsData, subAthletes }) {
+  const { t } = useLanguage();
   return (
     <div className="formation-poster" ref={posterRef}>
       <div className="formation-poster-header">
@@ -151,7 +157,7 @@ function PitchBoard({ posterRef, team, formationName, rowsData, subAthletes }) {
 
       {subAthletes.length > 0 && (
         <div className="formation-subs">
-          <p className="formation-subs-title">Substitutes</p>
+          <p className="formation-subs-title">{t("formationManager.substitutes")}</p>
           <ul className="formation-subs-list">
             {subAthletes.map((a) => (
               <li key={a._id}>{a.fullName}</li>
@@ -166,6 +172,7 @@ function PitchBoard({ posterRef, team, formationName, rowsData, subAthletes }) {
 }
 
 export default function FormationManager({ team }) {
+  const { t } = useLanguage();
   const [formations, setFormations] = useState([]);
   const [lineups, setLineups] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -202,7 +209,7 @@ export default function FormationManager({ team }) {
       setLineups(lineupsRes.data);
       setError("");
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load data");
+      setError(err.response?.data?.message || t("common.failedToLoad"));
     } finally {
       setLoading(false);
     }
@@ -220,7 +227,7 @@ export default function FormationManager({ team }) {
 
   const startNew = () => {
     if (lineups.length === 0) {
-      alert("Create a squad list first — a formation can only use players who are already in one.");
+      alert(t("formationManager.needSquadFirst"));
       return;
     }
     setEditingId(null);
@@ -262,7 +269,7 @@ export default function FormationManager({ team }) {
 
   const changeShape = (newShape) => {
     if (Object.keys(slotAssignments).length > 0) {
-      if (!confirm("Changing the formation shape clears the players already assigned to slots. Continue?")) return;
+      if (!confirm(t("formationManager.confirmChangeShape"))) return;
     }
     setShape(newShape);
     setSlotAssignments({});
@@ -270,7 +277,7 @@ export default function FormationManager({ team }) {
 
   const changeLineup = (id) => {
     if (Object.keys(slotAssignments).length > 0) {
-      if (!confirm("Switching squad lists clears the players already assigned to slots. Continue?")) return;
+      if (!confirm(t("formationManager.confirmChangeLineup"))) return;
     }
     setSelectedLineupId(id);
     setSlotAssignments({});
@@ -293,11 +300,11 @@ export default function FormationManager({ team }) {
 
   const saveFormation = async () => {
     if (!formationName.trim()) {
-      alert("Please enter a name for this formation");
+      alert(t("formationManager.nameRequired"));
       return;
     }
     if (!selectedLineupId) {
-      alert("Please choose a squad list first");
+      alert(t("formationManager.lineupRequired"));
       return;
     }
     const builtPositions = [];
@@ -309,7 +316,7 @@ export default function FormationManager({ team }) {
       });
     });
     if (builtPositions.length === 0) {
-      alert("Assign at least one player to a slot first");
+      alert(t("formationManager.assignAtLeastOne"));
       return;
     }
     setSaving(true);
@@ -329,19 +336,19 @@ export default function FormationManager({ team }) {
       await load();
       backToList();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to save formation");
+      alert(err.response?.data?.message || t("formationManager.failedToSave"));
     } finally {
       setSaving(false);
     }
   };
 
   const deleteFormation = async (id) => {
-    if (!confirm("Delete this formation?")) return;
+    if (!confirm(t("formationManager.confirmDelete"))) return;
     try {
       await api.delete(`/coach/formation/${id}`);
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to delete formation");
+      alert(err.response?.data?.message || t("formationManager.failedToDelete"));
     }
   };
 
@@ -360,38 +367,40 @@ export default function FormationManager({ team }) {
       });
     } catch (err) {
       console.error(err);
-      alert(`Couldn't export the formation as a ${format.toUpperCase()}. Please try again.`);
+      alert(
+        `${t("formationManager.exportFailedPrefix")} ${format.toUpperCase()}. ${t("formationManager.exportFailedSuffix")}`
+      );
     } finally {
       setExporting(null);
     }
   };
 
-  if (!team) return <p className="help-text">Choose a team first.</p>;
-  if (loading) return <p>Loading…</p>;
+  if (!team) return <p className="help-text">{t("formationManager.chooseTeamFirst")}</p>;
+  if (loading) return <p>{t("common.loading")}</p>;
   if (error) return <p className="error-text">{error}</p>;
 
   if (mode === "board") {
     return (
       <div>
         <div className="lineup-header">
-          <h3>{editingId ? "Edit formation" : "New formation"} — {team}</h3>
+          <h3>{editingId ? t("formationManager.editFormation") : t("formationManager.newFormation")} — {team}</h3>
           <button className="link-btn" onClick={backToList}>
-            ← Back to formations
+            {t("formationManager.backToFormations")}
           </button>
         </div>
 
         <div className="formation-setup-row">
           <div className="field">
-            <label>Formation name</label>
+            <label>{t("formationManager.formationName")}</label>
             <input
               type="text"
-              placeholder="e.g., vs Angkor FC — Starting XI"
+              placeholder={t("formationManager.namePlaceholder")}
               value={formationName}
               onChange={(e) => setFormationName(e.target.value)}
             />
           </div>
           <div className="field">
-            <label>Squad list</label>
+            <label>{t("formationManager.squadList")}</label>
             <select value={selectedLineupId} onChange={(e) => changeLineup(e.target.value)}>
               {lineups.map((l) => (
                 <option key={l._id} value={l._id}>
@@ -401,10 +410,10 @@ export default function FormationManager({ team }) {
             </select>
           </div>
           <div className="field">
-            <label>Formation shape</label>
+            <label>{t("formationManager.formationShape")}</label>
             <select value={shape} onChange={(e) => changeShape(e.target.value)}>
               {SHAPE_GROUPS.map((group) => (
-                <optgroup key={group.label} label={group.label}>
+                <optgroup key={group.label} label={t(`formationManager.${ASIDE_LABEL_KEY[group.label]}`)}>
                   {group.keys.map((key) => (
                     <option key={key} value={key}>
                       {key}
@@ -418,7 +427,7 @@ export default function FormationManager({ team }) {
 
         <div className="form-actions" style={{ marginBottom: 14 }}>
           <button className="btn btn-primary" onClick={saveFormation} disabled={saving}>
-            {saving ? "Saving…" : "Save formation"}
+            {saving ? t("common.saving") : t("formationManager.saveFormation")}
           </button>
           <button
             className="btn btn-outline"
@@ -426,7 +435,7 @@ export default function FormationManager({ team }) {
             onClick={() => exportImage("jpg")}
             disabled={!!exporting}
           >
-            {exporting === "jpg" ? "Exporting…" : "Save as JPG"}
+            {exporting === "jpg" ? t("formationManager.exporting") : t("formationManager.saveAsJpg")}
           </button>
           <button
             className="btn btn-outline"
@@ -434,12 +443,12 @@ export default function FormationManager({ team }) {
             onClick={() => exportImage("png")}
             disabled={!!exporting}
           >
-            {exporting === "png" ? "Exporting…" : "Save as PNG"}
+            {exporting === "png" ? t("formationManager.exporting") : t("formationManager.saveAsPng")}
           </button>
         </div>
 
         <p className="help-text" style={{ marginBottom: 10 }}>
-          Assign a player from "{selectedLineup?.name || "—"}" to each slot below ({filledCount} placed).
+          {t("formationManager.assignFromPrefix")} "{selectedLineup?.name || "—"}" {t("formationManager.assignFromSuffix")} ({filledCount} {t("formationManager.placed")}).
         </p>
 
         <div className="formation-slot-groups">
@@ -448,7 +457,7 @@ export default function FormationManager({ team }) {
             const labels = POSITION_LABELS[shape]?.[row] || [];
             return (
               <div key={row} className="formation-slot-group">
-                <p className="formation-slot-group-title">{ROW_LABELS[row]}</p>
+                <p className="formation-slot-group-title">{t(`formationManager.${ROW_LABEL_KEY[row]}`)}</p>
                 <div className="formation-slot-row">
                   {Array.from({ length: count }, (_, i) => {
                     const current = slotAssignments[`${row}-${i}`] || "";
@@ -460,7 +469,7 @@ export default function FormationManager({ team }) {
                           value={current}
                           onChange={(e) => assignSlot(row, i, e.target.value)}
                         >
-                          <option value="">— empty —</option>
+                          <option value="">{t("formationManager.emptySlot")}</option>
                           {pool
                             .filter((a) => a._id === current || !assignedIds.has(a._id))
                             .map((a) => (
@@ -478,7 +487,7 @@ export default function FormationManager({ team }) {
           })}
         </div>
         {pool.length === 0 && (
-          <p className="help-text">This squad list has no players (role "PLAYER") to place.</p>
+          <p className="help-text">{t("formationManager.noPlayersToPlace")}</p>
         )}
 
         <PitchBoard
@@ -495,20 +504,20 @@ export default function FormationManager({ team }) {
   return (
     <div>
       <div className="lineup-header">
-        <h3>Formations — {team}</h3>
+        <h3>{t("formationManager.formationsHeading")} — {team}</h3>
         <button className="btn btn-primary" onClick={startNew} disabled={lineups.length === 0}>
-          + New formation
+          {t("formationManager.newFormationButton")}
         </button>
       </div>
 
       {lineups.length === 0 && (
         <p className="help-text">
-          Create a squad list first (Squad list tab) — a formation can only place players who are already in one.
+          {t("formationManager.needSquadListFirstNote")}
         </p>
       )}
 
       {formations.length === 0 ? (
-        <p>No formations yet. Create one to lay out your starting XI on the pitch.</p>
+        <p>{t("formationManager.noFormationsYet")}</p>
       ) : (
         <div className="lineups-list">
           {formations.map((f) => (
@@ -517,15 +526,17 @@ export default function FormationManager({ team }) {
                 <h4>{f.name}</h4>
                 <div className="dash-actions">
                   <button className="link-btn" onClick={() => openFormation(f)}>
-                    Open
+                    {t("formationManager.open")}
                   </button>
                   <button className="btn btn-danger" onClick={() => deleteFormation(f._id)}>
-                    Delete
+                    {t("common.delete")}
                   </button>
                 </div>
               </div>
               <p className="lineup-count">
-                {f.shape || "4-3-3"} · {f.positions.length} player{f.positions.length !== 1 ? "s" : ""} placed
+                {f.shape || "4-3-3"} · {f.positions.length}{" "}
+                {f.positions.length !== 1 ? t("formationManager.players") : t("formationManager.player")}{" "}
+                {t("formationManager.placedWord")}
               </p>
             </div>
           ))}

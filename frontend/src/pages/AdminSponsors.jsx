@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
+import { useLanguage } from "../i18n/LanguageContext";
 
 // Admin page for managing the logos shown in the public "Trusted by" strip
 // (Landing + About pages) — add, rename/replace, delete. No code changes
 // needed to add a new club logo anymore.
 export default function AdminSponsors() {
+  const { t } = useLanguage();
   const [sponsors, setSponsors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -25,7 +27,7 @@ export default function AdminSponsors() {
       const { data } = await api.get("/sponsors");
       setSponsors(data);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load sponsors");
+      setError(err.response?.data?.message || t("adminSponsors.failedToLoadSponsors"));
     } finally {
       setLoading(false);
     }
@@ -39,7 +41,7 @@ export default function AdminSponsors() {
     e.preventDefault();
     setFormError("");
     if (!logo) {
-      setFormError("Please choose a logo image");
+      setFormError(t("adminSponsors.pleaseChooseLogo"));
       return;
     }
     setSaving(true);
@@ -55,7 +57,7 @@ export default function AdminSponsors() {
       document.getElementById("sponsor-logo-input") && (document.getElementById("sponsor-logo-input").value = "");
       load();
     } catch (err) {
-      setFormError(err.response?.data?.message || "Failed to add sponsor");
+      setFormError(err.response?.data?.message || t("adminSponsors.failedToAddSponsor"));
     } finally {
       setSaving(false);
     }
@@ -85,19 +87,19 @@ export default function AdminSponsors() {
       cancelEdit();
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to save changes");
+      alert(err.response?.data?.message || t("adminSponsors.failedToSaveChanges"));
     } finally {
       setSavingEdit(false);
     }
   };
 
   const remove = async (id) => {
-    if (!confirm("Remove this logo from the Trusted by strip?")) return;
+    if (!confirm(t("adminSponsors.confirmRemove"))) return;
     try {
       await api.delete(`/sponsors/${id}`);
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to delete sponsor");
+      alert(err.response?.data?.message || t("adminSponsors.failedToDeleteSponsor"));
     }
   };
 
@@ -112,29 +114,25 @@ export default function AdminSponsors() {
       ]);
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to reorder");
+      alert(err.response?.data?.message || t("adminSponsors.failedToReorder"));
     }
   };
 
   return (
     <div className="container dash-body">
       <div className="dash-header">
-        <h2>Trusted by — logos</h2>
-        <p>
-          These logos show on the public Landing and About pages. Add as many as you want; the strip
-          scrolls automatically (and visitors can also scroll it with the arrows) once there are more
-          than fit on screen.
-        </p>
+        <h2>{t("adminSponsors.title")}</h2>
+        <p>{t("adminSponsors.intro")}</p>
       </div>
 
       <form className="card" style={{ maxWidth: 480, marginBottom: 24 }} onSubmit={handleCreate}>
-        <h3 style={{ marginTop: 0 }}>Add a logo</h3>
+        <h3 style={{ marginTop: 0 }}>{t("adminSponsors.addLogo")}</h3>
         <div className="field">
-          <label>Club / team name</label>
+          <label>{t("adminSponsors.clubTeamName")}</label>
           <input value={name} onChange={(e) => setName(e.target.value)} required />
         </div>
         <div className="field">
-          <label>Logo image</label>
+          <label>{t("adminSponsors.logoImage")}</label>
           <input
             id="sponsor-logo-input"
             type="file"
@@ -145,11 +143,11 @@ export default function AdminSponsors() {
         </div>
         {formError && <div className="error-text">{formError}</div>}
         <button className="btn btn-primary" disabled={saving}>
-          {saving ? "Adding…" : "Add logo"}
+          {saving ? t("adminSponsors.adding") : t("adminSponsors.addLogoButton")}
         </button>
       </form>
 
-      {loading && <p>Loading…</p>}
+      {loading && <p>{t("common.loading")}</p>}
       {error && <p className="error-text">{error}</p>}
 
       {!loading && !error && (
@@ -169,7 +167,7 @@ export default function AdminSponsors() {
                       onClick={() => saveEdit(s._id)}
                       disabled={savingEdit}
                     >
-                      {savingEdit ? "Saving…" : "Save"}
+                      {savingEdit ? t("common.saving") : t("common.save")}
                     </button>
                     <button
                       type="button"
@@ -177,7 +175,7 @@ export default function AdminSponsors() {
                       style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
                       onClick={cancelEdit}
                     >
-                      Cancel
+                      {t("common.cancel")}
                     </button>
                   </div>
                 </div>
@@ -196,17 +194,17 @@ export default function AdminSponsors() {
                       ↓
                     </button>
                     <button className="link-btn" onClick={() => startEdit(s)}>
-                      Edit
+                      {t("common.edit")}
                     </button>
                     <button className="link-btn" onClick={() => remove(s._id)}>
-                      Delete
+                      {t("common.delete")}
                     </button>
                   </div>
                 </>
               )}
             </div>
           ))}
-          {sponsors.length === 0 && <p style={{ color: "#777" }}>No logos yet — add the first one above.</p>}
+          {sponsors.length === 0 && <p style={{ color: "#777" }}>{t("adminSponsors.noLogos")}</p>}
         </div>
       )}
     </div>

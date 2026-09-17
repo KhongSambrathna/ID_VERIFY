@@ -1,11 +1,19 @@
 const express = require("express");
 const router = express.Router();
 const { requireAuth, requireRole } = require("../middleware/auth");
+const { requireActiveSubscription } = require("../middleware/subscription");
 const Athlete = require("../models/Athlete");
 const Lineup = require("../models/Lineup");
 const Formation = require("../models/Formation");
 const StartingXI = require("../models/StartingXI");
 const flattenAssignments = require("../utils/flattenAssignments");
+
+// Every route below is squad-list/formation/starting-XI/roster management —
+// exactly the set of features gated behind a team's $15/year subscription.
+// requireActiveSubscription is a no-op for Admin (and Player, on the
+// read-only routes it's allowed on) and only blocks a Head Coach whose own
+// team's subscription has lapsed.
+router.use(requireAuth, requireActiveSubscription);
 
 // A formation's players must come from an already-created Squad List
 // (Lineup) belonging to the SAME team — this stops a Head Coach from
@@ -38,7 +46,7 @@ function canAccessTeam(req, team) {
 // Head Coach gets athletes in their team. (Admins use GET /api/athletes?team=X instead.)
 // Same one-row-per-assignment shape as GET /api/athletes — a person who is
 // e.g. both a Player and an Assistant Coach on this team shows up as 2 rows.
-router.get("/my-team", requireAuth, requireRole("HEAD_COACH"), async (req, res) => {
+router.get("/my-team", requireRole("HEAD_COACH"), async (req, res) => {
   try {
     const athletes = await Athlete.find({ "assignments.team": req.adminTeam });
     const rows = athletes.flatMap((a) => flattenAssignments(a, req.adminTeam));
@@ -53,7 +61,7 @@ router.get("/my-team", requireAuth, requireRole("HEAD_COACH"), async (req, res) 
 // assistant coach + medic, typically 15-22 people) — not the tactical pitch
 // formation, which is the separate Formation resource below.
 
-router.post("/lineup", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
+router.post("/lineup", requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
   try {
     const team = resolveTeam(req);
     if (!team) return res.status(400).json({ message: "Team is required" });
@@ -78,7 +86,7 @@ router.post("/lineup", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (r
 
 // PLAYER (shared or individual login) can view their own team's squad
 // lists read-only — create/update/delete stay Admin/Head Coach only below.
-router.get("/lineups", requireAuth, requireRole("HEAD_COACH", "ADMIN", "PLAYER"), async (req, res) => {
+router.get("/lineups", requireRole("HEAD_COACH", "ADMIN", "PLAYER"), async (req, res) => {
   try {
     const team = resolveTeam(req);
     if (!team) return res.status(400).json({ message: "Team is required" });
@@ -91,7 +99,7 @@ router.get("/lineups", requireAuth, requireRole("HEAD_COACH", "ADMIN", "PLAYER")
   }
 });
 
-router.get("/lineup/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN", "PLAYER"), async (req, res) => {
+router.get("/lineup/:id", requireRole("HEAD_COACH", "ADMIN", "PLAYER"), async (req, res) => {
   try {
     const lineup = await Lineup.findById(req.params.id).populate("athletes.athleteId");
     if (!lineup) return res.status(404).json({ message: "Lineup not found" });
@@ -103,7 +111,7 @@ router.get("/lineup/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN", "PLAYE
   }
 });
 
-router.put("/lineup/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
+router.put("/lineup/:id", requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
   try {
     const lineup = await Lineup.findById(req.params.id);
     if (!lineup) return res.status(404).json({ message: "Lineup not found" });
@@ -123,7 +131,7 @@ router.put("/lineup/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async
   }
 });
 
-router.delete("/lineup/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
+router.delete("/lineup/:id", requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
   try {
     const lineup = await Lineup.findById(req.params.id);
     if (!lineup) return res.status(404).json({ message: "Lineup not found" });
@@ -139,7 +147,7 @@ router.delete("/lineup/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"), as
 // ============ FORMATION (TACTICAL POSTER) MANAGEMENT ============
 // Players positioned on a pitch diagram for a specific match, saved as JPG.
 
-router.post("/formation", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
+router.post("/formation", requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
   try {
     const team = resolveTeam(req);
     if (!team) return res.status(400).json({ message: "Team is required" });
@@ -167,7 +175,7 @@ router.post("/formation", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async
   }
 });
 
-router.get("/formations", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
+router.get("/formations", requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
   try {
     const team = resolveTeam(req);
     if (!team) return res.status(400).json({ message: "Team is required" });
@@ -182,7 +190,7 @@ router.get("/formations", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async
   }
 });
 
-router.get("/formation/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
+router.get("/formation/:id", requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
   try {
     const formation = await Formation.findById(req.params.id).populate("positions.athleteId");
     if (!formation) return res.status(404).json({ message: "Formation not found" });
@@ -194,7 +202,7 @@ router.get("/formation/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"), as
   }
 });
 
-router.put("/formation/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
+router.put("/formation/:id", requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
   try {
     const formation = await Formation.findById(req.params.id);
     if (!formation) return res.status(404).json({ message: "Formation not found" });
@@ -219,7 +227,7 @@ router.put("/formation/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"), as
   }
 });
 
-router.delete("/formation/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
+router.delete("/formation/:id", requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
   try {
     const formation = await Formation.findById(req.params.id);
     if (!formation) return res.status(404).json({ message: "Formation not found" });
@@ -237,7 +245,7 @@ router.delete("/formation/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"),
 // cards, substitutes list — kept separate from the tactical Formation
 // (pitch diagram) above. Same team-scoping rules apply.
 
-router.post("/startingxi", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
+router.post("/startingxi", requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
   try {
     const team = resolveTeam(req);
     if (!team) return res.status(400).json({ message: "Team is required" });
@@ -268,7 +276,7 @@ router.post("/startingxi", requireAuth, requireRole("HEAD_COACH", "ADMIN"), asyn
   }
 });
 
-router.get("/startingxis", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
+router.get("/startingxis", requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
   try {
     const team = resolveTeam(req);
     if (!team) return res.status(400).json({ message: "Team is required" });
@@ -283,7 +291,7 @@ router.get("/startingxis", requireAuth, requireRole("HEAD_COACH", "ADMIN"), asyn
   }
 });
 
-router.get("/startingxi/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
+router.get("/startingxi/:id", requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
   try {
     const startingXI = await StartingXI.findById(req.params.id).populate("starters substitutes");
     if (!startingXI) return res.status(404).json({ message: "Starting XI not found" });
@@ -295,7 +303,7 @@ router.get("/startingxi/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"), a
   }
 });
 
-router.put("/startingxi/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
+router.put("/startingxi/:id", requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
   try {
     const startingXI = await StartingXI.findById(req.params.id);
     if (!startingXI) return res.status(404).json({ message: "Starting XI not found" });
@@ -323,7 +331,7 @@ router.put("/startingxi/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"), a
   }
 });
 
-router.delete("/startingxi/:id", requireAuth, requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
+router.delete("/startingxi/:id", requireRole("HEAD_COACH", "ADMIN"), async (req, res) => {
   try {
     const startingXI = await StartingXI.findById(req.params.id);
     if (!startingXI) return res.status(404).json({ message: "Starting XI not found" });

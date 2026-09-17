@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/axios";
 import { resolveFileUrl } from "../utils/fileUrl";
+import { useLanguage } from "../i18n/LanguageContext";
 
 export default function SearchPage() {
+  const { t } = useLanguage();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -26,7 +28,7 @@ export default function SearchPage() {
         setResults(data);
         setError("");
       } catch (err) {
-        setError(err.response?.data?.message || "Search failed");
+        setError(err.response?.data?.message || t("searchPage.searchFailed"));
         setResults([]);
       } finally {
         setSearched(true);
@@ -40,25 +42,25 @@ export default function SearchPage() {
   return (
     <div className="verify-wrap search-page-wrap">
       <div className="card search-page-card">
-        <h2 style={{ marginBottom: 4 }}>Find a player</h2>
+        <h2 style={{ marginBottom: 4 }}>{t("searchPage.title")}</h2>
         <p className="help-text" style={{ marginBottom: 18 }}>
-          Type a player's name or ID number — no sign-in needed.
+          {t("searchPage.helpText")}
         </p>
 
         <div className="field" style={{ marginBottom: 4 }}>
           <input
             autoFocus
-            placeholder="e.g. Sok Dara or 001-100-2991"
+            placeholder={t("searchPage.placeholder")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
 
-        {loading && <p className="help-text">Searching…</p>}
+        {loading && <p className="help-text">{t("searchPage.searching")}</p>}
         {error && <p className="error-text">{error}</p>}
 
         {!loading && searched && !error && results.length === 0 && (
-          <p className="help-text">No matches for "{query.trim()}".</p>
+          <p className="help-text">{t("searchPage.noMatchesPrefix")} "{query.trim()}".</p>
         )}
 
         {results.length > 0 && (
@@ -79,11 +81,11 @@ export default function SearchPage() {
                     {a.memberships?.length
                       ? a.memberships.map((m) => `${m.team} · ${m.role}`).join(", ")
                       : "—"}{" "}
-                    · ID {a.verifyId}
+                    · {t("common.verifyId")} {a.verifyId}
                   </p>
                 </div>
                 <span className={`badge ${a.isAvailable ? "verified" : "rejected"}`}>
-                  {a.isAvailable ? "Available" : "Not available"}
+                  {a.isAvailable ? t("common.available") : t("common.notAvailable")}
                 </span>
               </Link>
             ))}

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../i18n/LanguageContext";
 
 function formatDate(d) {
   const date = new Date(d);
@@ -9,11 +10,14 @@ function formatDate(d) {
   return date.toISOString().slice(0, 10);
 }
 
-function ageRuleSummary(t) {
-  if (!t.ageLimitYear) return "";
-  let s = `Born ${t.ageLimitYear}+`;
-  if (t.overageSlots > 0) {
-    s += ` (or ${t.overageLimitYear || "—"}+ for up to ${t.overageSlots} over-age spots, ${t.overageUsed || 0} used)`;
+function ageRuleSummary(tour, t) {
+  if (!tour.ageLimitYear) return "";
+  let s = t("tournamentsPage.bornYearPlus").replace("{year}", tour.ageLimitYear);
+  if (tour.overageSlots > 0) {
+    s += t("tournamentsPage.overageDetail")
+      .replace("{overageYear}", tour.overageLimitYear || "—")
+      .replace("{slots}", tour.overageSlots)
+      .replace("{used}", tour.overageUsed || 0);
   }
   return s;
 }
@@ -23,6 +27,7 @@ function ageRuleSummary(t) {
 // Also where you link your own Telegram chat id, needed for the
 // self-service "forgot password" flow on the sign-in page.
 export default function TournamentsPage() {
+  const { t } = useLanguage();
   const { user, team, athleteId, login } = useAuth();
   const navigate = useNavigate();
   const [tournaments, setTournaments] = useState([]);
@@ -40,7 +45,7 @@ export default function TournamentsPage() {
       const { data } = await api.get("/tournaments");
       setTournaments(data);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load tournaments");
+      setError(err.response?.data?.message || t("common.failedToLoad"));
     } finally {
       setLoading(false);
     }
@@ -50,26 +55,26 @@ export default function TournamentsPage() {
     load();
   }, []);
 
-  const register = async (t) => {
-    setRegisteringId(t._id);
+  const register = async (tour) => {
+    setRegisteringId(tour._id);
     try {
-      await api.post(`/tournaments/${t._id}/register`, { team });
-      navigate(`/tournaments/${t._id}/squad`);
+      await api.post(`/tournaments/${tour._id}/register`, { team });
+      navigate(`/tournaments/${tour._id}/squad`);
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to register");
+      alert(err.response?.data?.message || t("tournamentsPage.failedToRegister"));
     } finally {
       setRegisteringId(null);
     }
   };
 
-  const unregister = async (t) => {
-    if (!confirm(`Cancel your registration for "${t.name}"?`)) return;
-    setRegisteringId(t._id);
+  const unregister = async (tour) => {
+    if (!confirm(t("tournamentsPage.confirmCancel").replace("{name}", tour.name))) return;
+    setRegisteringId(tour._id);
     try {
-      await api.delete(`/tournaments/${t._id}/registrations/${t.myRegistrationId}`);
+      await api.delete(`/tournaments/${tour._id}/registrations/${tour.myRegistrationId}`);
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to cancel");
+      alert(err.response?.data?.message || t("tournamentsPage.failedToCancel"));
     } finally {
       setRegisteringId(null);
     }
@@ -83,7 +88,7 @@ export default function TournamentsPage() {
       login(localStorage.getItem("token"), data);
       setTelegramSaved(true);
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to save");
+      alert(err.response?.data?.message || t("common.failedToSave"));
     } finally {
       setSavingTelegram(false);
     }
@@ -92,7 +97,7 @@ export default function TournamentsPage() {
   if (!athleteId) {
     return (
       <div className="container dash-body">
-        <p className="error-text">This page is only for an individual player login.</p>
+        <p className="error-text">{t("tournamentsPage.onlyForPlayer")}</p>
       </div>
     );
   }
@@ -100,21 +105,19 @@ export default function TournamentsPage() {
   return (
     <div className="container dash-body">
       <div className="dash-header">
-        <h2>Tournaments</h2>
-        <p>Register yourself for an upcoming tournament. Owing a fee on your team blocks registration until it's paid.</p>
+        <h2>{t("tournamentsPage.title")}</h2>
+        <p>{t("tournamentsPage.subtitle")}</p>
       </div>
 
       <div className="card" style={{ maxWidth: 420, marginBottom: 24 }}>
-        <h4 style={{ marginTop: 0 }}>Link Telegram (for password recovery)</h4>
+        <h4 style={{ marginTop: 0 }}>{t("tournamentsPage.telegramCardTitle")}</h4>
         <p className="help-text" style={{ marginTop: -6 }}>
-          Message the club's Telegram bot once, then get your numeric chat ID from @userinfobot and paste it
-          below. If you ever forget your password, use "Forgot password?" on the sign-in page to get a new
-          temporary one sent here.
+          {t("tournamentsPage.telegramHelp")}
         </p>
         <div className="field">
-          <label>Telegram chat ID</label>
+          <label>{t("tournamentsPage.telegramLabel")}</label>
           <input
-            placeholder="e.g. 123456789"
+            placeholder={t("tournamentsPage.telegramPlaceholder")}
             value={telegramDraft}
             onChange={(e) => {
               setTelegramDraft(e.target.value);
@@ -123,11 +126,11 @@ export default function TournamentsPage() {
           />
         </div>
         <button className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }} onClick={saveTelegram} disabled={savingTelegram}>
-          {savingTelegram ? "Saving…" : telegramSaved ? "Saved ✓" : "Save"}
+          {savingTelegram ? t("tournamentsPage.saving") : telegramSaved ? t("tournamentsPage.saved") : t("common.save")}
         </button>
       </div>
 
-      {loading && <p>Loading…</p>}
+      {loading && <p>{t("common.loading")}</p>}
       {error && <p className="error-text">{error}</p>}
 
       {!loading && !error && (
@@ -135,40 +138,42 @@ export default function TournamentsPage() {
           <table className="athletes">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Entry fee</th>
-                <th>Dates</th>
-                <th>Rules</th>
-                <th>Spots</th>
-                <th>Actions</th>
+                <th>{t("common.name")}</th>
+                <th>{t("tournamentsPage.entryFeeHeader")}</th>
+                <th>{t("tournamentsPage.datesHeader")}</th>
+                <th>{t("tournamentsPage.rulesHeader")}</th>
+                <th>{t("tournamentsPage.spotsHeader")}</th>
+                <th>{t("common.actions")}</th>
               </tr>
             </thead>
             <tbody>
-              {tournaments.map((t) => (
-                <tr key={t._id}>
-                  <td data-label="Name">{t.name}</td>
-                  <td data-label="Entry fee">${t.entryFee || 0}</td>
-                  <td data-label="Dates">{t.matchDates?.length ? t.matchDates.map(formatDate).join(", ") : "—"}</td>
-                  <td data-label="Rules">{ageRuleSummary(t) || "No age limit"}</td>
-                  <td data-label="Spots">
-                    {t.maxParticipants ? `${t.registrationCount}/${t.maxParticipants}` : t.registrationCount}
+              {tournaments.map((tour) => (
+                <tr key={tour._id}>
+                  <td data-label={t("common.name")}>{tour.name}</td>
+                  <td data-label={t("tournamentsPage.entryFeeHeader")}>${tour.entryFee || 0}</td>
+                  <td data-label={t("tournamentsPage.datesHeader")}>
+                    {tour.matchDates?.length ? tour.matchDates.map(formatDate).join(", ") : "—"}
                   </td>
-                  <td data-label="Actions" className="actions-cell">
-                    {t.myRegistrationId ? (
+                  <td data-label={t("tournamentsPage.rulesHeader")}>{ageRuleSummary(tour, t) || t("tournamentsPage.noAgeLimit")}</td>
+                  <td data-label={t("tournamentsPage.spotsHeader")}>
+                    {tour.maxParticipants ? `${tour.registrationCount}/${tour.maxParticipants}` : tour.registrationCount}
+                  </td>
+                  <td data-label={t("common.actions")} className="actions-cell">
+                    {tour.myRegistrationId ? (
                       <>
                         <span className="badge verified" style={{ marginRight: 6 }}>
-                          Registered
+                          {t("tournamentsPage.registeredBadge")}
                         </span>
-                        <button className="link-btn" onClick={() => navigate(`/tournaments/${t._id}/squad`)}>
-                          View squad
+                        <button className="link-btn" onClick={() => navigate(`/tournaments/${tour._id}/squad`)}>
+                          {t("tournamentsPage.viewSquad")}
                         </button>
-                        <button className="action-btn danger" disabled={registeringId === t._id} onClick={() => unregister(t)}>
-                          Cancel
+                        <button className="action-btn danger" disabled={registeringId === tour._id} onClick={() => unregister(tour)}>
+                          {t("common.cancel")}
                         </button>
                       </>
                     ) : (
-                      <button className="action-btn positive" disabled={registeringId === t._id} onClick={() => register(t)}>
-                        {registeringId === t._id ? "Registering…" : "Register"}
+                      <button className="action-btn positive" disabled={registeringId === tour._id} onClick={() => register(tour)}>
+                        {registeringId === tour._id ? t("tournamentsPage.registering") : t("tournamentsPage.registerButton")}
                       </button>
                     )}
                   </td>
@@ -177,7 +182,7 @@ export default function TournamentsPage() {
               {tournaments.length === 0 && (
                 <tr>
                   <td colSpan={6} style={{ textAlign: "center", color: "#777" }}>
-                    No tournaments open right now.
+                    {t("tournamentsPage.noneOpen")}
                   </td>
                 </tr>
               )}

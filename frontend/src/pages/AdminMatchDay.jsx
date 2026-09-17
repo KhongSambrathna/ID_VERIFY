@@ -5,8 +5,10 @@ import TeamSelect from "../components/TeamSelect";
 import SquadListManager from "../components/SquadListManager";
 import FormationManager from "../components/FormationManager";
 import StartingXIManager from "../components/StartingXIManager";
+import { useLanguage } from "../i18n/LanguageContext";
 
 export default function AdminMatchDay() {
+  const { t } = useLanguage();
   const [searchParams] = useSearchParams();
   // Lets a link from elsewhere (e.g. a tournament's squad page) land
   // directly on a team + tab, e.g. /admin/matchday?team=X&tab=lineups.
@@ -30,22 +32,22 @@ export default function AdminMatchDay() {
         setAthletes(data);
         setError("");
       })
-      .catch((err) => setError(err.response?.data?.message || "Failed to load team roster"))
+      .catch((err) => setError(err.response?.data?.message || t("adminMatchDay.failedToLoadRoster")))
       .finally(() => setLoading(false));
   }, [team]);
 
   return (
     <div className="container dash-body">
       <div className="dash-header">
-        <h2>Match day</h2>
-        <p>Build a match squad list (15–22 people, exportable as PDF/JPG), lay out a pitch formation, or announce a Starting XI — for any team.</p>
+        <h2>{t("adminMatchDay.title")}</h2>
+        <p>{t("adminMatchDay.description")}</p>
       </div>
 
       <div style={{ maxWidth: 360, marginBottom: 20 }}>
-        <TeamSelect value={team} onChange={setTeam} label="Team" />
+        <TeamSelect value={team} onChange={setTeam} label={t("common.team")} />
       </div>
 
-      {!team && <p className="help-text">Choose a team above to get started.</p>}
+      {!team && <p className="help-text">{t("adminMatchDay.chooseTeamPrompt")}</p>}
 
       {team && (
         <>
@@ -54,23 +56,23 @@ export default function AdminMatchDay() {
               className={`tab-btn ${activeTab === "lineups" ? "active" : ""}`}
               onClick={() => setActiveTab("lineups")}
             >
-              Squad list
+              {t("adminMatchDay.tabSquadList")}
             </button>
             <button
               className={`tab-btn ${activeTab === "formations" ? "active" : ""}`}
               onClick={() => setActiveTab("formations")}
             >
-              Formation
+              {t("adminMatchDay.tabFormation")}
             </button>
             <button
               className={`tab-btn ${activeTab === "startingxi" ? "active" : ""}`}
               onClick={() => setActiveTab("startingxi")}
             >
-              Starting XI
+              {t("adminMatchDay.tabStartingXI")}
             </button>
           </div>
 
-          {loading && <p>Loading roster…</p>}
+          {loading && <p>{t("adminMatchDay.loadingRoster")}</p>}
           {error && <p className="error-text">{error}</p>}
 
           {!loading && !error && (

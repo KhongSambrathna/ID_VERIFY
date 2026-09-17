@@ -4,6 +4,7 @@ import html2canvas from "html2canvas";
 import JSZip from "jszip";
 import api from "../api/axios";
 import IDCard from "../components/IDCard";
+import { useLanguage } from "../i18n/LanguageContext";
 
 const ROLE_OPTIONS = ["PLAYER", "ASSISTAN COACH", "HEAD COACH", "TECHNICAL", "MEDIC"];
 
@@ -16,6 +17,7 @@ function sanitizeFilename(s) {
 }
 
 export default function AllCardsPage() {
+  const { t } = useLanguage();
   const [athletes, setAthletes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -28,7 +30,7 @@ export default function AllCardsPage() {
     api
       .get("/athletes")
       .then(({ data }) => setAthletes(data))
-      .catch((err) => setError(err.response?.data?.message || "Failed to load athletes"))
+      .catch((err) => setError(err.response?.data?.message || t("allCardsPage.failedToLoad")))
       .finally(() => setLoading(false));
   }, []);
 
@@ -85,7 +87,7 @@ export default function AllCardsPage() {
       }
 
       if (files.length === 0) {
-        alert("Nothing to export.");
+        alert(t("allCardsPage.nothingToExport"));
         return;
       }
 
@@ -115,7 +117,7 @@ export default function AllCardsPage() {
       }
     } catch (err) {
       console.error(err);
-      alert("Couldn't export cards as PNG. Please try again.");
+      alert(t("allCardsPage.exportPngFailed"));
     } finally {
       setExportingPng(false);
     }
@@ -124,13 +126,13 @@ export default function AllCardsPage() {
   return (
     <div className="container" style={{ paddingBottom: 60 }}>
       <div className="dash-header no-print">
-        <h2>All ID cards ({filtered.length})</h2>
+        <h2>{t("allCardsPage.title").replace("{count}", filtered.length)}</h2>
         <div className="dash-actions">
           <Link to="/admin" className="link-btn">
-            ← Back to dashboard
+            {t("allCardsPage.backToDashboard")}
           </Link>
           <button className="btn btn-primary" onClick={() => window.print()}>
-            Export / Print selected
+            {t("allCardsPage.exportPrintSelected")}
           </button>
           <button
             className="btn btn-outline"
@@ -138,27 +140,27 @@ export default function AllCardsPage() {
             onClick={exportPng}
             disabled={exportingPng || filtered.length === 0}
           >
-            {exportingPng ? "Exporting…" : "Export PNG"}
+            {exportingPng ? t("allCardsPage.exporting") : t("allCardsPage.exportPng")}
           </button>
         </div>
       </div>
 
       <div className="no-print filter-row">
         <div className="field" style={{ marginBottom: 0, minWidth: 180 }}>
-          <label>Filter by team</label>
+          <label>{t("allCardsPage.filterByTeam")}</label>
           <select value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)}>
-            <option value="all">All teams</option>
-            {teams.map((t) => (
-              <option key={t} value={t}>
-                {t}
+            <option value="all">{t("allCardsPage.allTeams")}</option>
+            {teams.map((team) => (
+              <option key={team} value={team}>
+                {team}
               </option>
             ))}
           </select>
         </div>
         <div className="field" style={{ marginBottom: 0, minWidth: 180 }}>
-          <label>Filter by role</label>
+          <label>{t("allCardsPage.filterByRole")}</label>
           <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
-            <option value="all">All roles</option>
+            <option value="all">{t("allCardsPage.allRoles")}</option>
             {ROLE_OPTIONS.map((r) => (
               <option key={r} value={r}>
                 {r}
@@ -168,10 +170,10 @@ export default function AllCardsPage() {
         </div>
       </div>
 
-      {loading && <p>Loading…</p>}
+      {loading && <p>{t("common.loading")}</p>}
       {error && <p className="error-text">{error}</p>}
       {!loading && !error && filtered.length === 0 && (
-        <p>No athletes match this filter.</p>
+        <p>{t("allCardsPage.noMatch")}</p>
       )}
 
       <div className="cards-grid" ref={gridRef}>

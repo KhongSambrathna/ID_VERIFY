@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import jsQR from "jsqr";
 import { useNavigate } from "react-router-dom";
+import { useLanguage } from "../i18n/LanguageContext";
 
 export default function QrScanner() {
+  const { t } = useLanguage();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [scannedId, setScannedId] = useState(null);
@@ -29,7 +31,7 @@ export default function QrScanner() {
         startScanning();
       })
       .catch((err) => {
-        setError("Cannot access camera: " + err.message);
+        setError(t("qrScanner.cameraError").replace("{message}", err.message));
       });
 
     const startScanning = () => {
@@ -88,13 +90,13 @@ export default function QrScanner() {
   return (
     <div className="qr-scanner-container">
       <div className="qr-scanner">
-        <h2>Scan Athlete QR Code</h2>
+        <h2>{t("qrScanner.title")}</h2>
 
         {error && (
           <div className="error-box">
             <p className="error-text">{error}</p>
             <button className="btn btn-primary" onClick={handleReset}>
-              Try Again
+              {t("qrScanner.tryAgain")}
             </button>
           </div>
         )}
@@ -114,12 +116,12 @@ export default function QrScanner() {
             />
             <canvas ref={canvasRef} style={{ display: "none" }} />
 
-            <p className="scanner-hint">Point your camera at the QR code</p>
+            <p className="scanner-hint">{t("qrScanner.hint")}</p>
 
             {scannedId && (
               <div className="success-box">
-                <p>✅ Scanned: {scannedId}</p>
-                <p>Redirecting...</p>
+                <p>{t("qrScanner.scanned").replace("{id}", scannedId)}</p>
+                <p>{t("qrScanner.redirecting")}</p>
               </div>
             )}
           </div>

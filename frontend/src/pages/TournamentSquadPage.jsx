@@ -5,6 +5,7 @@ import jsPDF from "jspdf";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { resolveFileUrl } from "../utils/fileUrl";
+import { useLanguage } from "../i18n/LanguageContext";
 
 function formatDate(d) {
   const date = new Date(d);
@@ -62,6 +63,7 @@ function TournamentExportSheet({ innerRef, tournament }) {
 // buttons to export the list as a JPG image or a PDF, same pattern as the
 // coach's squad-list export.
 export default function TournamentSquadPage() {
+  const { t } = useLanguage();
   const { id } = useParams();
   const navigate = useNavigate();
   const { isPlayer, isAdmin, athleteId } = useAuth();
@@ -85,7 +87,7 @@ export default function TournamentSquadPage() {
       setTournament(data);
       setError("");
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load tournament");
+      setError(err.response?.data?.message || t("tournamentSquadPage.failedToLoad"));
     } finally {
       setLoading(false);
     }
@@ -128,20 +130,20 @@ export default function TournamentSquadPage() {
       setAthleteResults([]);
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to register");
+      alert(err.response?.data?.message || t("tournamentSquadPage.failedToRegister"));
     } finally {
       setActingId(null);
     }
   };
 
   const removeRegistration = async (r) => {
-    if (!confirm(`Remove ${r.fullName} from this tournament?`)) return;
+    if (!confirm(t("tournamentSquadPage.confirmRemove").replace("{name}", r.fullName))) return;
     setActingId(r._id);
     try {
       await api.delete(`/tournaments/${id}/registrations/${r._id}`);
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to remove");
+      alert(err.response?.data?.message || t("tournamentSquadPage.failedToRemove"));
     } finally {
       setActingId(null);
     }
@@ -170,7 +172,7 @@ export default function TournamentSquadPage() {
       });
     } catch (err) {
       console.error(err);
-      alert("Couldn't export the squad list as a JPG. Please try again.");
+      alert(t("tournamentSquadPage.exportJpgFailed"));
     } finally {
       setExporting(null);
     }
@@ -202,7 +204,7 @@ export default function TournamentSquadPage() {
       });
     } catch (err) {
       console.error(err);
-      alert("Couldn't export the squad list as a PDF. Please try again.");
+      alert(t("tournamentSquadPage.exportPdfFailed"));
     } finally {
       setExporting(null);
     }
@@ -210,35 +212,35 @@ export default function TournamentSquadPage() {
 
   const backTo = isPlayer && athleteId ? "/tournaments" : "/admin/tournaments";
 
-  if (loading) return <div className="container dash-body"><p>Loading…</p></div>;
+  if (loading) return <div className="container dash-body"><p>{t("common.loading")}</p></div>;
   if (error) return <div className="container dash-body"><p className="error-text">{error}</p></div>;
   if (!tournament) return null;
 
   return (
     <div className="container dash-body">
       <div className="dash-header">
-        <h2>{tournament.name} — Squad list</h2>
+        <h2>{tournament.name} {t("tournamentSquadPage.squadListSuffix")}</h2>
         <p>
-          {tournament.registrations.length} registered
+          {t("tournamentSquadPage.registeredCount").replace("{count}", tournament.registrations.length)}
           {tournament.matchDates?.length ? ` · ${tournament.matchDates.map(formatDate).join(", ")}` : ""}
         </p>
       </div>
 
       <div className="dash-actions" style={{ marginBottom: 16 }}>
         <button className="btn btn-outline" onClick={exportJpg} disabled={exporting !== null}>
-          {exporting === "jpg" ? "Exporting…" : "Export as image"}
+          {exporting === "jpg" ? t("tournamentSquadPage.exporting") : t("tournamentSquadPage.exportImage")}
         </button>
         <button className="btn btn-outline" onClick={exportPdf} disabled={exporting !== null}>
-          {exporting === "pdf" ? "Exporting…" : "Export as PDF"}
+          {exporting === "pdf" ? t("tournamentSquadPage.exporting") : t("tournamentSquadPage.exportPdf")}
         </button>
         <Link className="link-btn" to={backTo} onClick={(e) => { e.preventDefault(); navigate(backTo); }}>
-          Back to tournaments
+          {t("tournamentSquadPage.backToTournaments")}
         </Link>
       </div>
 
       {!isPlayer && tournament.teamLineups?.length > 0 && (
         <p className="help-text" style={{ marginTop: -8, marginBottom: 16 }}>
-          Registered players are kept in sync with each team's Squad list, ready for Formation/Starting XI —{" "}
+          {t("tournamentSquadPage.syncHelpPrefix")}{" "}
           {tournament.teamLineups.map((tl, i) => (
             <span key={tl.team}>
               {i > 0 && " · "}
@@ -246,7 +248,7 @@ export default function TournamentSquadPage() {
                 className="link-btn"
                 to={isAdmin ? `/admin/matchday?team=${encodeURIComponent(tl.team)}&tab=lineups` : `/coach?tab=lineups`}
               >
-                Open {tl.team}'s Squad list
+                {t("tournamentSquadPage.openSquadList").replace("{team}", tl.team)}
               </Link>
             </span>
           ))}
@@ -255,9 +257,9 @@ export default function TournamentSquadPage() {
 
       {!isPlayer && (
         <div className="field search-field" style={{ maxWidth: 340, marginBottom: 16 }}>
-          <label>Register a player (no phone / on their behalf)</label>
+          <label>{t("tournamentSquadPage.registerLabel")}</label>
           <input
-            placeholder="Search by name or ID…"
+            placeholder={t("tournamentSquadPage.searchPlaceholder")}
             value={athleteSearch}
             onChange={(e) => searchAthletes(e.target.value)}
           />
@@ -267,10 +269,10 @@ export default function TournamentSquadPage() {
                 <li key={a.assignmentId || a._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span>
                     {a.fullName} — {a.team}
-                    {a.feeOwed > 0 ? ` (owes $${a.feeOwed})` : ""}
+                    {a.feeOwed > 0 ? ` ${t("tournamentSquadPage.owesAmount").replace("{amount}", a.feeOwed)}` : ""}
                   </span>
                   <button className="action-btn positive" disabled={actingId === a._id} onClick={() => registerOnBehalf(a)}>
-                    {actingId === a._id ? "Registering…" : "Register"}
+                    {actingId === a._id ? t("tournamentSquadPage.registering") : t("tournamentSquadPage.registerBtn")}
                   </button>
                 </li>
               ))}
@@ -280,7 +282,7 @@ export default function TournamentSquadPage() {
       )}
 
       {tournament.registrations.length === 0 ? (
-        <p>No one has registered yet.</p>
+        <p>{t("tournamentSquadPage.noOneRegistered")}</p>
       ) : (
         <div className="lineup-athletes">
           {tournament.registrations.map((r, idx) => {
@@ -296,17 +298,17 @@ export default function TournamentSquadPage() {
                 <div className="athlete-info">
                   <p className="name">
                     {r.fullName}
-                    {r.isOverage && <span className="badge pending" style={{ marginLeft: 6 }}>Over-age</span>}
+                    {r.isOverage && <span className="badge pending" style={{ marginLeft: 6 }}>{t("tournamentSquadPage.overAge")}</span>}
                   </p>
                   <p className="role">
                     {r.khmerName ? `${r.khmerName} · ` : ""}
-                    DOB {formatDob(r.dateOfBirth) || "—"} · {r.team}
-                    {r.registeredBy ? " · registered by staff" : ""}
+                    {t("tournamentSquadPage.dobLabel")} {formatDob(r.dateOfBirth) || "—"} · {r.team}
+                    {r.registeredBy ? t("tournamentSquadPage.registeredByStaff") : ""}
                   </p>
                 </div>
                 {(!isPlayer || isMine) && (
                   <button className="link-btn" disabled={actingId === r._id} onClick={() => removeRegistration(r)}>
-                    {isMine ? "Cancel" : "Remove"}
+                    {isMine ? t("common.cancel") : t("common.remove")}
                   </button>
                 )}
               </div>

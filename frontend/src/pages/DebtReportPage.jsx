@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { resolveFileUrl } from "../utils/fileUrl";
+import { useLanguage } from "../i18n/LanguageContext";
 
 // Debt/fee report — Admin sees every team; a Head Coach only ever sees their
 // own team's people (the backend already scopes GET /athletes that way for
@@ -11,6 +12,7 @@ import { resolveFileUrl } from "../utils/fileUrl";
 // tables, and the Edit page are the only places it's ever shown, and only
 // to these two roles.
 export default function DebtReportPage() {
+  const { t } = useLanguage();
   const { isAdmin } = useAuth();
   const [athletes, setAthletes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +27,7 @@ export default function DebtReportPage() {
         setAthletes(data);
         setError("");
       })
-      .catch((err) => setError(err.response?.data?.message || "Failed to load athletes"))
+      .catch((err) => setError(err.response?.data?.message || t("debtReport.failedToLoadAthletes")))
       .finally(() => setLoading(false));
   }, []);
 
@@ -46,32 +48,36 @@ export default function DebtReportPage() {
   return (
     <div className="container dash-body">
       <div className="dash-header">
-        <h2>Debt report</h2>
-        <p>Everyone who currently owes a playing fee. Visible only to Admin and Head Coach — never shown on a card, export, or public page.</p>
+        <h2>{t("debtReport.title")}</h2>
+        <p>{t("debtReport.intro")}</p>
       </div>
 
       {isAdmin && teams.length > 1 && (
         <div className="field search-field" style={{ maxWidth: 260 }}>
           <select value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)}>
-            <option value="">All teams</option>
-            {teams.map((t) => (
-              <option key={t} value={t}>
-                {t}
+            <option value="">{t("debtReport.allTeams")}</option>
+            {teams.map((team) => (
+              <option key={team} value={team}>
+                {team}
               </option>
             ))}
           </select>
         </div>
       )}
 
-      {loading && <p>Loading…</p>}
+      {loading && <p>{t("common.loading")}</p>}
       {error && <p className="error-text">{error}</p>}
 
       {!loading && !error && (
         <>
           <p className="help-text" style={{ fontWeight: 600 }}>
             {owing.length === 0
-              ? "No one currently owes a fee."
-              : `${owing.length} ${owing.length === 1 ? "person" : "people"} owing — $${total} total`}
+              ? t("debtReport.noOneOwes")
+              : `${owing.length} ${
+                  owing.length === 1
+                    ? t("debtReport.owingCountLabelSingular")
+                    : t("debtReport.owingCountLabelPlural")
+                } — $${total} ${t("debtReport.totalLabel")}`}
           </p>
 
           {owing.length > 0 && (
@@ -79,41 +85,41 @@ export default function DebtReportPage() {
               <table className="athletes">
                 <thead>
                   <tr>
-                    <th>Photo</th>
-                    <th>ID</th>
-                    <th>Name</th>
-                    <th>Team</th>
-                    <th>Role</th>
-                    <th>Owes</th>
-                    <th>Note</th>
-                    <th>Actions</th>
+                    <th>{t("common.photo")}</th>
+                    <th>{t("debtReport.id")}</th>
+                    <th>{t("common.name")}</th>
+                    <th>{t("common.team")}</th>
+                    <th>{t("common.role")}</th>
+                    <th>{t("debtReport.owes")}</th>
+                    <th>{t("debtReport.note")}</th>
+                    <th>{t("common.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {owing.map((a) => (
                     <tr key={a.assignmentId}>
-                      <td data-label="Photo">
+                      <td data-label={t("common.photo")}>
                         <img
                           className="small-photo"
                           src={a.photoUrl ? resolveFileUrl(a.photoUrl) : "https://placehold.co/50x50?text=Photo"}
                           alt={a.fullName}
                         />
                       </td>
-                      <td data-label="ID">{a.verifyId}</td>
-                      <td data-label="Name">{a.fullName}</td>
-                      <td data-label="Team">{a.team || "—"}</td>
-                      <td data-label="Role">{a.role || "—"}</td>
-                      <td data-label="Owes">
+                      <td data-label={t("debtReport.id")}>{a.verifyId}</td>
+                      <td data-label={t("common.name")}>{a.fullName}</td>
+                      <td data-label={t("common.team")}>{a.team || "—"}</td>
+                      <td data-label={t("common.role")}>{a.role || "—"}</td>
+                      <td data-label={t("debtReport.owes")}>
                         <span className="badge rejected">${a.feeOwed}</span>
                       </td>
-                      <td data-label="Note">
+                      <td data-label={t("debtReport.note")}>
                         {(a.fees || []).length
                           ? a.fees.map((f) => `$${f.amount}${f.note ? ` — ${f.note}` : ""}`).join(", ")
                           : "—"}
                       </td>
-                      <td data-label="Actions" className="actions-cell">
+                      <td data-label={t("common.actions")} className="actions-cell">
                         <Link className="action-btn" to={`/admin/athlete/${a._id}/edit`}>
-                          Edit
+                          {t("common.edit")}
                         </Link>
                       </td>
                     </tr>

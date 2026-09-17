@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
+import { useLanguage } from "../i18n/LanguageContext";
 
-function stockBadge(stock) {
-  if (stock <= 0) return { cls: "rejected", text: "Out of stock" };
-  if (stock <= 5) return { cls: "pending", text: "Low stock" };
-  return { cls: "verified", text: "In stock" };
+function stockBadge(stock, t) {
+  if (stock <= 0) return { cls: "rejected", text: t("adminShop.outOfStock") };
+  if (stock <= 5) return { cls: "pending", text: t("adminShop.lowStock") };
+  return { cls: "verified", text: t("adminShop.inStock") };
 }
 
 function money(n) {
@@ -17,6 +18,7 @@ function money(n) {
 // quick sales/restocks, or full edit for name/price/photo/an exact count)
 // any time. Products with a photo also show up on the public /shop page.
 export default function AdminShop() {
+  const { t } = useLanguage();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -46,7 +48,7 @@ export default function AdminShop() {
       setProducts(data);
       setError("");
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load products");
+      setError(err.response?.data?.message || t("adminShop.failedToLoadProducts"));
     } finally {
       setLoading(false);
     }
@@ -70,19 +72,19 @@ export default function AdminShop() {
     e.preventDefault();
     setFormError("");
     if (!name.trim()) {
-      setFormError("Please enter a product name");
+      setFormError(t("adminShop.pleaseEnterProductName"));
       return;
     }
     if (price === "" || Number(price) < 0) {
-      setFormError("Please enter a valid price");
+      setFormError(t("adminShop.pleaseEnterValidPrice"));
       return;
     }
     if (stock !== "" && Number(stock) < 0) {
-      setFormError("Stock quantity can't be negative");
+      setFormError(t("adminShop.stockCannotBeNegative"));
       return;
     }
     if (!image) {
-      setFormError("Please choose a product photo");
+      setFormError(t("adminShop.pleaseChoosePhoto"));
       return;
     }
     setSaving(true);
@@ -99,7 +101,7 @@ export default function AdminShop() {
       resetCreateForm();
       load();
     } catch (err) {
-      setFormError(err.response?.data?.message || "Failed to add product");
+      setFormError(err.response?.data?.message || t("adminShop.failedToAddProduct"));
     } finally {
       setSaving(false);
     }
@@ -125,15 +127,15 @@ export default function AdminShop() {
 
   const saveEdit = async (id) => {
     if (!editName.trim()) {
-      alert("Please enter a product name");
+      alert(t("adminShop.pleaseEnterProductName"));
       return;
     }
     if (editPrice === "" || Number(editPrice) < 0) {
-      alert("Please enter a valid price");
+      alert(t("adminShop.pleaseEnterValidPrice"));
       return;
     }
     if (editStock === "" || Number(editStock) < 0) {
-      alert("Please enter a valid stock quantity");
+      alert(t("adminShop.pleaseEnterValidStock"));
       return;
     }
     setSavingEdit(true);
@@ -150,19 +152,19 @@ export default function AdminShop() {
       cancelEdit();
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to save changes");
+      alert(err.response?.data?.message || t("adminShop.failedToSaveChanges"));
     } finally {
       setSavingEdit(false);
     }
   };
 
   const remove = async (id) => {
-    if (!confirm("Delete this product from the shop?")) return;
+    if (!confirm(t("adminShop.confirmDeleteProduct"))) return;
     try {
       await api.delete(`/products/${id}`);
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to delete product");
+      alert(err.response?.data?.message || t("adminShop.failedToDeleteProduct"));
     }
   };
 
@@ -177,7 +179,7 @@ export default function AdminShop() {
       await api.put(`/products/${p._id}`, { stock: next });
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to update stock");
+      alert(err.response?.data?.message || t("adminShop.failedToUpdateStock"));
     } finally {
       setAdjustingId(null);
     }
@@ -186,21 +188,18 @@ export default function AdminShop() {
   return (
     <div className="container dash-body">
       <div className="dash-header">
-        <h2>Shop — sports equipment</h2>
-        <p>
-          Manage products, prices, and stock levels. Everything here (with its photo) also shows up
-          on the public shop page — no login needed for buyers to browse and order.
-        </p>
+        <h2>{t("adminShop.title")}</h2>
+        <p>{t("adminShop.intro")}</p>
       </div>
 
       <form className="card" style={{ maxWidth: 560, marginBottom: 24 }} onSubmit={handleCreate}>
-        <h3 style={{ marginTop: 0 }}>Add a product</h3>
+        <h3 style={{ marginTop: 0 }}>{t("adminShop.addProduct")}</h3>
         <div className="field">
-          <label>Product name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Match ball, size 5" required />
+          <label>{t("adminShop.productName")}</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("adminShop.productNamePlaceholder")} required />
         </div>
         <div className="field">
-          <label>Photo</label>
+          <label>{t("adminShop.photo")}</label>
           <input
             id="product-image-input"
             type="file"
@@ -211,7 +210,7 @@ export default function AdminShop() {
         </div>
         <div className="filter-row" style={{ marginBottom: 0 }}>
           <div className="field" style={{ flex: 1, minWidth: 120 }}>
-            <label>Price ($)</label>
+            <label>{t("adminShop.price")}</label>
             <input
               type="number"
               min="0"
@@ -222,7 +221,7 @@ export default function AdminShop() {
             />
           </div>
           <div className="field" style={{ flex: 1, minWidth: 120 }}>
-            <label>Starting stock</label>
+            <label>{t("adminShop.startingStock")}</label>
             <input
               type="number"
               min="0"
@@ -233,17 +232,17 @@ export default function AdminShop() {
             />
           </div>
           <div className="field" style={{ flex: 1, minWidth: 100 }}>
-            <label>Unit</label>
+            <label>{t("adminShop.unit")}</label>
             <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="pcs" />
           </div>
         </div>
         {formError && <div className="error-text">{formError}</div>}
         <button className="btn btn-primary" disabled={saving} style={{ marginTop: 14 }}>
-          {saving ? "Adding…" : "Add product"}
+          {saving ? t("adminShop.adding") : t("adminShop.addProductButton")}
         </button>
       </form>
 
-      {loading && <p>Loading…</p>}
+      {loading && <p>{t("common.loading")}</p>}
       {error && <p className="error-text">{error}</p>}
 
       {!loading && !error && (
@@ -251,21 +250,21 @@ export default function AdminShop() {
           <table className="athletes">
             <thead>
               <tr>
-                <th>Photo</th>
-                <th>Product</th>
-                <th>Price</th>
-                <th>Stock</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th>{t("adminShop.photo")}</th>
+                <th>{t("adminShop.product")}</th>
+                <th>{t("adminShop.priceHeader")}</th>
+                <th>{t("adminShop.stock")}</th>
+                <th>{t("common.status")}</th>
+                <th>{t("common.actions")}</th>
               </tr>
             </thead>
             <tbody>
               {products.map((p) => {
-                const badge = stockBadge(p.stock);
+                const badge = stockBadge(p.stock, t);
                 const isEditing = editingId === p._id;
                 return (
                   <tr key={p._id}>
-                    <td data-label="Photo">
+                    <td data-label={t("adminShop.photo")}>
                       <img
                         src={p.imageUrl || "https://placehold.co/50x50?text=No+Photo"}
                         alt={p.name}
@@ -280,14 +279,14 @@ export default function AdminShop() {
                         />
                       )}
                     </td>
-                    <td data-label="Product">
+                    <td data-label={t("adminShop.product")}>
                       {isEditing ? (
                         <input value={editName} onChange={(e) => setEditName(e.target.value)} style={{ maxWidth: 180 }} />
                       ) : (
                         p.name
                       )}
                     </td>
-                    <td data-label="Price">
+                    <td data-label={t("adminShop.priceHeader")}>
                       {isEditing ? (
                         <input
                           type="number"
@@ -301,7 +300,7 @@ export default function AdminShop() {
                         money(p.price)
                       )}
                     </td>
-                    <td data-label="Stock">
+                    <td data-label={t("adminShop.stock")}>
                       {isEditing ? (
                         <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
                           <input
@@ -343,26 +342,26 @@ export default function AdminShop() {
                         </span>
                       )}
                     </td>
-                    <td data-label="Status">
+                    <td data-label={t("common.status")}>
                       <span className={`badge ${badge.cls}`}>{badge.text}</span>
                     </td>
-                    <td data-label="Actions" className="actions-cell">
+                    <td data-label={t("common.actions")} className="actions-cell">
                       {isEditing ? (
                         <>
                           <button className="link-btn" onClick={() => saveEdit(p._id)} disabled={savingEdit}>
-                            {savingEdit ? "Saving…" : "Save"}
+                            {savingEdit ? t("common.saving") : t("common.save")}
                           </button>
                           <button className="link-btn" onClick={cancelEdit}>
-                            Cancel
+                            {t("common.cancel")}
                           </button>
                         </>
                       ) : (
                         <>
                           <button className="link-btn" onClick={() => startEdit(p)}>
-                            Edit
+                            {t("common.edit")}
                           </button>
                           <button className="link-btn" onClick={() => remove(p._id)}>
-                            Delete
+                            {t("common.delete")}
                           </button>
                         </>
                       )}
@@ -373,7 +372,7 @@ export default function AdminShop() {
               {products.length === 0 && (
                 <tr>
                   <td colSpan={6} style={{ textAlign: "center", color: "#777" }}>
-                    No products yet — add your first one above.
+                    {t("adminShop.noProducts")}
                   </td>
                 </tr>
               )}

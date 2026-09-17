@@ -1,26 +1,24 @@
 import TrustedBy from "../components/TrustedBy";
+import { useLanguage } from "../i18n/LanguageContext";
 
 export default function Landing() {
+  const { t } = useLanguage();
+
   return (
     <>
       <section className="hero">
         <div className="container">
-          <h1>Verified footballer identity, backed by a scan.</h1>
-          <p>
-            Countryside Football ID Verify records, verifies, and cards every
-            player and staff member in your program — each ID carries a QR code
-            that opens straight to a live verification record, so officials and
-            organizers can confirm identity in seconds.
-          </p>
+          <h1>{t("landing.heroTitle")}</h1>
+          <p>{t("landing.heroDescription")}</p>
           <div className="cta-row">
             <a href="/search" className="btn btn-primary">
-              Find a player
+              {t("landing.findPlayerCta")}
             </a>
             <a href="/login" className="btn btn-outline">
-              Admin sign in
+              {t("landing.adminSignIn")}
             </a>
             <a href="#how" className="btn btn-outline">
-              How it works
+              {t("landing.howItWorksLink")}
             </a>
           </div>
         </div>
@@ -30,31 +28,22 @@ export default function Landing() {
 
       <section className="features" id="how">
         <div className="container">
-          <h2>How verification works</h2>
+          <h2>{t("landing.howVerificationWorksTitle")}</h2>
           <div className="grid">
             <div className="feature-card">
               <div className="num">01</div>
-              <h3>Register the athlete</h3>
-              <p>
-                An admin enters personal details, uploads a photo, and attaches
-                supporting documents used to confirm identity.
-              </p>
+              <h3>{t("landing.step1Title")}</h3>
+              <p>{t("landing.step1Desc")}</p>
             </div>
             <div className="feature-card">
               <div className="num">02</div>
-              <h3>Card and QR are generated</h3>
-              <p>
-                The system creates an ID card and a unique QR code tied to that
-                athlete's verification record.
-              </p>
+              <h3>{t("landing.step2Title")}</h3>
+              <p>{t("landing.step2Desc")}</p>
             </div>
             <div className="feature-card">
               <div className="num">03</div>
-              <h3>Scan to verify</h3>
-              <p>
-                Scanning the QR code opens a public page showing the athlete's
-                name, photo, and current verification status.
-              </p>
+              <h3>{t("landing.step3Title")}</h3>
+              <p>{t("landing.step3Desc")}</p>
             </div>
           </div>
         </div>

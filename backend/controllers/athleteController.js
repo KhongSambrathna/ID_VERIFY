@@ -1,4 +1,5 @@
 const Athlete = require("../models/Athlete");
+const Team = require("../models/Team");
 const ScanLog = require("../models/ScanLog");
 const generateAthleteQR = require("../utils/generateQR");
 const generateShortId = require("../utils/generateShortId");
@@ -6,6 +7,28 @@ const uploadBufferToCloudinary = require("../utils/uploadToCloudinary");
 const cloudinary = require("../config/cloudinary");
 const flattenAssignments = require("../utils/flattenAssignments");
 const { notifyAdmins, notifyTeamCoaches } = require("../utils/notify");
+const { planInfo, countTeamPlayers } = require("../utils/subscriptionPlans");
+
+// Enforces a team's subscription plan player cap (see
+// utils/subscriptionPlans.js) for any assignment being added/changed to
+// role "PLAYER" — a team that's never been assigned a plan defaults to
+// BASIC's 20-player cap rather than being treated as uncapped. Non-PLAYER
+// roles (coach/technical/medic) never count against this, and UNLIMITED
+// plans (maxPlayers: null) always pass. Returns null when it's fine to
+// proceed, or an error message string when the cap would be exceeded.
+async function checkPlayerCap(team, role) {
+  if (role !== "PLAYER") return null;
+  const teamDoc = await Team.findOne({ name: team });
+  const plan = teamDoc?.subscriptionPlan || "BASIC";
+  const { maxPlayers } = planInfo(plan);
+  if (maxPlayers == null) return null;
+
+  const current = await countTeamPlayers(Athlete, team);
+  if (current >= maxPlayers) {
+    return `${team} is at its ${plan.replace("_", " ")} plan's ${maxPlayers}-player limit. Ask an Admin to upgrade the plan to add more players.`;
+  }
+  return null;
+}
 
 function toBool(value) {
   if (typeof value === "boolean") return value;
@@ -50,6 +73,11 @@ exports.createAthlete = async (req, res) => {
     const team = isHeadCoach ? req.adminTeam : req.body.team;
     if (isHeadCoach && !team) {
       return res.status(400).json({ message: "Your account has no team set — contact an admin" });
+    }
+
+    if (team) {
+      const capError = await checkPlayerCap(team, role || "PLAYER");
+      if (capError) return res.status(400).json({ message: capError });
     }
 
     const verifyId = await generateShortId();
@@ -329,6 +357,9 @@ exports.addAssignment = async (req, res) => {
       return res.status(400).json({ message: "This person already has that exact team and role" });
     }
 
+    const capError = await checkPlayerCap(team, role);
+    if (capError) return res.status(400).json({ message: capError });
+
     athlete.assignments.push({
       team,
       role,
@@ -365,6 +396,10 @@ exports.updateAssignment = async (req, res) => {
     }
 
     if (req.body.role && req.body.role !== assignment.role) {
+      if (req.body.role === "PLAYER") {
+        const capError = await checkPlayerCap(assignment.team, "PLAYER");
+        if (capError) return res.status(400).json({ message: capError });
+      }
       assignment.role = req.body.role;
       if (isHeadCoach) assignment.approvalStatus = "pending";
     }

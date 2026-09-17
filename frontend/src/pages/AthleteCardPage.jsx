@@ -6,6 +6,7 @@ import IDCard from "../components/IDCard";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { saveCanvasAsImage } from "../utils/saveCanvasAsImage";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../i18n/LanguageContext";
 
 function formatDob(dob) {
   if (!dob) return null;
@@ -17,6 +18,7 @@ function formatDob(dob) {
 }
 
 export default function AthleteCardPage() {
+  const { t } = useLanguage();
   const { id } = useParams();
   const { isPlayer, isHeadCoach } = useAuth();
   const [searchParams] = useSearchParams();
@@ -39,7 +41,7 @@ export default function AthleteCardPage() {
         const teams = [...new Set((data.assignments || []).map((a) => a.team))];
         setSelectedTeam(requestedTeam && teams.includes(requestedTeam) ? requestedTeam : teams[0] || null);
       })
-      .catch((err) => setError(err.response?.data?.message || "Failed to load"));
+      .catch((err) => setError(err.response?.data?.message || t("athleteCardPage.failedToLoad")));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -121,7 +123,7 @@ export default function AthleteCardPage() {
       await saveCanvasAsImage(canvas, `${cardAthlete.verifyId || cardAthlete.fullName || "id-card"}.jpg`);
     } catch (err) {
       console.error("Failed to save card as JPG:", err);
-      alert("Couldn't save the card as an image. Please try again.");
+      alert(t("athleteCardPage.couldNotSaveJpg"));
     } finally {
       setSaving(false);
     }
@@ -133,9 +135,9 @@ export default function AthleteCardPage() {
           ID card is only rendered when exporting (print or save-as-JPG),
           via the hidden card below. */}
       <div className="dash-header no-print">
-        <h2>Athlete record</h2>
+        <h2>{t("athleteCardPage.title")}</h2>
         <Link to={isPlayer ? "/player" : isHeadCoach ? "/coach" : "/admin"} className="link-btn">
-          ← Back to dashboard
+          {t("athleteCardPage.backToDashboard")}
         </Link>
       </div>
 
@@ -157,11 +159,11 @@ export default function AthleteCardPage() {
               <div>
                 <h3 style={{ margin: "0 0 2px" }}>{athlete.fullName}</h3>
                 {athlete.khmerName && <p className="khmer-name">{athlete.khmerName}</p>}
-                <p className="verify-id">ID: {athlete.verifyId}</p>
+                <p className="verify-id">{t("athleteCardPage.idLabel")} {athlete.verifyId}</p>
                 <div className="athlete-detail-badges">
                   <span className={`badge ${athlete.status}`}>{athlete.status}</span>
                   <span className={`badge ${athlete.isAvailable ? "verified" : "rejected"}`}>
-                    {athlete.isAvailable ? "Available" : "Not available"}
+                    {athlete.isAvailable ? t("athleteCardPage.available") : t("athleteCardPage.notAvailable")}
                   </span>
                 </div>
               </div>
@@ -169,38 +171,40 @@ export default function AthleteCardPage() {
 
             {teams.length > 1 && (
               <div className="field" style={{ maxWidth: 280, margin: "12px 0 0" }}>
-                <label>Card for team</label>
+                <label>{t("athleteCardPage.cardForTeam")}</label>
                 <select value={selectedTeam || ""} onChange={(e) => setSelectedTeam(e.target.value)}>
-                  {teams.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
+                  {teams.map((team) => (
+                    <option key={team} value={team}>
+                      {team}
                     </option>
                   ))}
                 </select>
-                <p className="help-text">This person has {teams.length} teams — each prints its own card.</p>
+                <p className="help-text">
+                  {t("athleteCardPage.multiTeamNote").replace("{count}", teams.length)}
+                </p>
               </div>
             )}
 
             <div className="detail-grid">
               <div className="detail-item">
-                <div className="detail-label">Date of birth</div>
+                <div className="detail-label">{t("athleteCardPage.dateOfBirth")}</div>
                 <div className="detail-value">{formatDob(athlete.dateOfBirth) || "—"}</div>
               </div>
               <div className="detail-item">
-                <div className="detail-label">Gender</div>
+                <div className="detail-label">{t("athleteCardPage.gender")}</div>
                 <div className="detail-value">{athlete.gender || "—"}</div>
               </div>
               <div className="detail-item">
-                <div className="detail-label">Team</div>
+                <div className="detail-label">{t("athleteCardPage.team")}</div>
                 <div className="detail-value">{cardAthlete.team || "—"}</div>
               </div>
               <div className="detail-item">
-                <div className="detail-label">Role</div>
+                <div className="detail-label">{t("athleteCardPage.role")}</div>
                 <div className="detail-value">{cardAthlete.role || "—"}</div>
               </div>
               {!isPlayer && (
                 <div className="detail-item">
-                  <div className="detail-label">Jersey #</div>
+                  <div className="detail-label">{t("athleteCardPage.jersey")}</div>
                   <div className="detail-value">
                     {athlete.assignments
                       ?.filter((a) => a.team === selectedTeam)
@@ -210,20 +214,23 @@ export default function AthleteCardPage() {
                 </div>
               )}
               <div className="detail-item detail-item-wide">
-                <div className="detail-label">Address</div>
+                <div className="detail-label">{t("athleteCardPage.address")}</div>
                 <div className="detail-value">{athlete.address || "—"}</div>
               </div>
               {!isPlayer && (
                 <div className="detail-item detail-item-wide">
-                  <div className="detail-label">Verification</div>
+                  <div className="detail-label">{t("athleteCardPage.verification")}</div>
                   <div className="detail-value">
                     {athlete.lastVerifiedAt
-                      ? `Last verified ${new Date(athlete.lastVerifiedAt).toLocaleDateString()}`
-                      : "Never verified in person"}
+                      ? t("athleteCardPage.lastVerified").replace(
+                          "{date}",
+                          new Date(athlete.lastVerifiedAt).toLocaleDateString()
+                        )
+                      : t("athleteCardPage.neverVerified")}
                     {(!athlete.lastVerifiedAt ||
                       Date.now() - new Date(athlete.lastVerifiedAt).getTime() > 365 * 24 * 60 * 60 * 1000) && (
                       <span className="badge rejected" style={{ marginLeft: 8 }}>
-                        Needs renewal
+                        {t("athleteCardPage.needsRenewal")}
                       </span>
                     )}
                     <button
@@ -233,20 +240,23 @@ export default function AthleteCardPage() {
                       onClick={renewVerification}
                       disabled={renewing}
                     >
-                      {renewing ? "Renewing…" : "Renew (verified today)"}
+                      {renewing ? t("athleteCardPage.renewing") : t("athleteCardPage.renewVerifiedToday")}
                     </button>
                     <div style={{ marginTop: 4 }}>
                       <button type="button" className="link-btn" onClick={loadScanLogs}>
-                        {scanLogsOpen ? "Hide QR-verify scan history ▲" : "Show QR-verify scan history ▼"}
+                        {scanLogsOpen
+                          ? t("athleteCardPage.hideScanHistory")
+                          : t("athleteCardPage.showScanHistory")}
                       </button>
                       {scanLogsOpen && (
                         <ul className="fee-items" style={{ marginTop: 4 }}>
-                          {scanLogs === null && <li>Loading…</li>}
-                          {scanLogs?.length === 0 && <li>No scans recorded yet.</li>}
+                          {scanLogs === null && <li>{t("athleteCardPage.loading")}</li>}
+                          {scanLogs?.length === 0 && <li>{t("athleteCardPage.noScansRecorded")}</li>}
                           {scanLogs?.map((log) => (
                             <li key={log._id}>
                               <span>
-                                {new Date(log.scannedAt).toLocaleString()} — {log.ip || "unknown IP"}
+                                {new Date(log.scannedAt).toLocaleString()} —{" "}
+                                {log.ip || t("athleteCardPage.unknownIp")}
                               </span>
                             </li>
                           ))}
@@ -258,26 +268,26 @@ export default function AthleteCardPage() {
               )}
               {!isPlayer && (
                 <div className="detail-item detail-item-wide">
-                  <div className="detail-label">Reference documents</div>
+                  <div className="detail-label">{t("athleteCardPage.referenceDocuments")}</div>
                   <div className="detail-value">
                     {athlete.supportingDocuments?.length ? (
                       <ul className="fee-items">
                         {athlete.supportingDocuments.map((doc) => (
                           <li key={doc._id}>
                             <a href={resolveFileUrl(doc.fileUrl)} target="_blank" rel="noreferrer">
-                              {doc.label || "Document"}
+                              {doc.label || t("athleteCardPage.document")}
                             </a>
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <span className="help-text">None on file</span>
+                      <span className="help-text">{t("athleteCardPage.noneOnFile")}</span>
                     )}
                   </div>
                 </div>
               )}
               <div className="detail-item detail-item-wide">
-                <div className="detail-label">Fee / debt (this team)</div>
+                <div className="detail-label">{t("athleteCardPage.feeDebtThisTeam")}</div>
                 <div className="detail-value">
                   {teamFee.owed > 0 ? (
                     <>
@@ -286,7 +296,7 @@ export default function AthleteCardPage() {
                         className="badge rejected fee-toggle"
                         onClick={() => setFeeExpanded((v) => !v)}
                       >
-                        Owes ${teamFee.owed} {feeExpanded ? "▲" : "▼"}
+                        {t("athleteCardPage.owes").replace("{amount}", teamFee.owed)} {feeExpanded ? "▲" : "▼"}
                       </button>
                       {feeExpanded && (
                         <ul className="fee-items" style={{ marginTop: 6 }}>
@@ -302,7 +312,7 @@ export default function AthleteCardPage() {
                       )}
                     </>
                   ) : (
-                    <span className="badge verified">Fee paid</span>
+                    <span className="badge verified">{t("athleteCardPage.feePaid")}</span>
                   )}
                 </div>
               </div>
@@ -315,11 +325,11 @@ export default function AthleteCardPage() {
                   className="btn btn-outline"
                   style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
                 >
-                  Edit
+                  {t("athleteCardPage.edit")}
                 </Link>
               )}
               <button className="btn btn-primary" onClick={() => window.print()}>
-                Export / Print card
+                {t("athleteCardPage.exportPrint")}
               </button>
               <button
                 className="btn btn-outline"
@@ -327,7 +337,7 @@ export default function AthleteCardPage() {
                 onClick={handleSaveAsJpg}
                 disabled={saving}
               >
-                {saving ? "Saving…" : "Save as JPG"}
+                {saving ? t("athleteCardPage.saving") : t("athleteCardPage.saveAsJpg")}
               </button>
             </div>
           </div>

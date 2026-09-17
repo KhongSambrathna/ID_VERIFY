@@ -1,0 +1,81 @@
+export const km = {
+  "adminUsers.title": "អ្នកប្រើប្រាស់ និងតួនាទី",
+  "adminUsers.intro":
+    "បង្កើតគណនីគ្រូបង្វឹកដើម្បីឱ្យពួកគេអាចរៀបចំបញ្ជីកីឡាករនៃក្រុមខ្លួនឯង — ពួកគេអាចទាញយកតែកីឡាករដែលបានចុះឈ្មោះក្នុងក្រុមខ្លួនប៉ុណ្ណោះ មិនអាចបន្ថែមថ្មីបានទេ។ បង្កើតគណនីកីឡាករ (គណនីរួមមួយក្នុងមួយក្រុម) ដើម្បីឱ្យកីឡាករមើលបញ្ជីក្រុម និងស្ថានភាពថ្លៃសេវា/បំណុលរបស់ពួកគេ — មើលបានតែប៉ុណ្ណោះ មិនអាចកែសម្រួលបានទេ។",
+  "adminUsers.telegramHelp":
+    'ការជូនដំណឹងតាម Telegram (សំណើថ្មីរង់ចាំ អនុម័ត/បដិសេធ ថ្លៃសេវាថ្មី) ត្រូវការ bot token កំណត់នៅផ្នែក backend ជាមុនសិន (ផ្ញើសារទៅ @BotFather លើ Telegram → /newbot → យក token ទៅដាក់ក្នុងអថេរបរិស្ថាន Render ជា TELEGRAM_BOT_TOKEN)។ នៅពេលរួចរាល់ អ្នកប្រើប្រាស់ម្នាក់ៗខាងក្រោមបើកសន្ទនាជាមួយ bot នោះ ផ្ញើសារអ្វីមួយទៅវា រកមើលលេខសម្គាល់សន្ទនា (chat id) ខ្លួនឯង (ឧ. តាមរយៈ @userinfobot) ហើយបិទភ្ជាប់វានៅជួរ "Telegram chat ID"។',
+  "adminUsers.createNewUser": "បង្កើតអ្នកប្រើប្រាស់ថ្មី",
+  "adminUsers.creating": "កំពុងបង្កើត…",
+  "adminUsers.createUser": "បង្កើតអ្នកប្រើប្រាស់",
+  "adminUsers.roleAdmin": "អ្នកគ្រប់គ្រង",
+  "adminUsers.roleHeadCoach": "គ្រូបង្វឹកប្រធាន",
+  "adminUsers.rolePlayer": "កីឡាករ (មើលប៉ុណ្ណោះ, រួម)",
+  "adminUsers.rolePlayerLabel": "កីឡាករ",
+  "adminUsers.playerHelp":
+    "គណនីរួមមួយសម្រាប់កីឡាករគ្រប់រូបក្នុងក្រុមនេះ — ពួកគេអាចមើលបញ្ជីក្រុមទាំងមូល និងស្ថានភាពថ្លៃសេវា/បំណុល ប៉ុន្តែមិនអាចបន្ថែម កែសម្រួល ឬលុបអ្វីទាំងអស់។",
+  "adminUsers.telegramChatId": "Telegram chat ID",
+  "adminUsers.telegramPlaceholder": "ឧ. 123456789",
+  "adminUsers.noUsers": "មិនទាន់មានអ្នកប្រើប្រាស់ទេ។",
+  "adminUsers.playerAccountsTitle": "គណនីកីឡាករ (ចូលសម្រាប់ការប្រកួត)",
+  "adminUsers.playerAccountsIntro":
+    'គណនីផ្ទាល់ខ្លួនមួយក្នុងមួយកីឡាករ — ឈ្មោះអ្នកប្រើគឺជាលេខសម្គាល់កីឡាករផ្ទាល់ខ្លួន (ឧ. 001-100-2991) លេខសម្ងាត់លំនាំដើម "12345" ត្រូវបានស្នើឱ្យកំណត់ថ្មីនៅពេលចូលដំបូង។ ប្រើសម្រាប់ការចុះឈ្មោះខ្លួនឯងចូលរួមការប្រកួត; ខុសពីគណនីកីឡាករក្រុមរួមខាងលើ។',
+  "adminUsers.generateMissing": "បង្កើតគណនីកីឡាករដែលខ្វះ",
+  "adminUsers.generating": "កំពុងបង្កើត…",
+  "adminUsers.created": "បានបង្កើត",
+  "adminUsers.skipped": "បានរំលង",
+  "adminUsers.alreadyHadLogin": " (មានគណនីរួចហើយ ឬមិនទាន់មានលេខសម្គាល់)",
+  "adminUsers.mustChangePassword": "ត្រូវប្តូរលេខសម្ងាត់",
+  "adminUsers.telegramLinked": "បានភ្ជាប់ Telegram",
+  "adminUsers.resetting": "កំពុងកំណត់ឡើងវិញ…",
+  "adminUsers.resetPassword": "កំណត់លេខសម្ងាត់ឡើងវិញ",
+  "adminUsers.noPlayerAccounts": "មិនទាន់មានគណនីកីឡាករផ្ទាល់ខ្លួនទេ។",
+  "adminUsers.confirmResetPasswordPrefix": "កំណត់លេខសម្ងាត់របស់",
+  "adminUsers.confirmResetPasswordSuffix":
+    "ត្រឡប់ទៅលំនាំដើមវិញឬ? ពួកគេនឹងត្រូវប្តូរលេខសម្ងាត់ថ្មីនៅពេលចូលលើកក្រោយ។",
+  "adminUsers.confirmDeleteUser": "លុបគណនីអ្នកប្រើប្រាស់នេះឬ? ពួកគេនឹងលែងអាចចូលប្រើបានទៀត។",
+  "adminUsers.failedToLoadUsers": "បរាជ័យក្នុងការផ្ទុកអ្នកប្រើប្រាស់",
+  "adminUsers.failedToGenerate": "បរាជ័យក្នុងការបង្កើតគណនីកីឡាករ",
+  "adminUsers.failedToResetPassword": "បរាជ័យក្នុងការកំណត់លេខសម្ងាត់ឡើងវិញ",
+  "adminUsers.failedToCreateUser": "បរាជ័យក្នុងការបង្កើតអ្នកប្រើប្រាស់",
+};
+
+export const en = {
+  "adminUsers.title": "Users & roles",
+  "adminUsers.intro":
+    "Create Head Coach logins so coaches can build their own team's lineups — they can only pull athletes already registered in their team, never add new ones. Create a Player login (one shared account per team) so players can view their team's roster and fee/debt status — read-only, no editing.",
+  "adminUsers.telegramHelp":
+    'Telegram alerts (new pending approvals, approve/reject, new fees) need a bot token set on the backend first (message @BotFather on Telegram → /newbot → put the token in Render\'s environment variables as TELEGRAM_BOT_TOKEN). Once that\'s done, each user below opens a chat with that bot, sends it any message, looks up their own numeric chat id (e.g. via @userinfobot), and pastes it in the "Telegram chat ID" column.',
+  "adminUsers.createNewUser": "Create new user",
+  "adminUsers.creating": "Creating…",
+  "adminUsers.createUser": "Create user",
+  "adminUsers.roleAdmin": "Admin",
+  "adminUsers.roleHeadCoach": "Head Coach",
+  "adminUsers.rolePlayer": "Player (read-only, shared)",
+  "adminUsers.rolePlayerLabel": "Player",
+  "adminUsers.playerHelp":
+    "One shared login for every player on this team — they can see the whole team's roster and fee/debt status, but can never add, edit, or remove anything.",
+  "adminUsers.telegramChatId": "Telegram chat ID",
+  "adminUsers.telegramPlaceholder": "e.g. 123456789",
+  "adminUsers.noUsers": "No users yet.",
+  "adminUsers.playerAccountsTitle": "Player accounts (tournament sign-in)",
+  "adminUsers.playerAccountsIntro":
+    'One individual login per athlete — username is their own player ID (e.g. 001-100-2991), default password "12345", forced to set their own at first sign-in. Used for tournament self-registration; separate from the shared team Player login above.',
+  "adminUsers.generateMissing": "Generate missing player logins",
+  "adminUsers.generating": "Generating…",
+  "adminUsers.created": "Created",
+  "adminUsers.skipped": "skipped",
+  "adminUsers.alreadyHadLogin": " (already had a login, or no verify ID yet)",
+  "adminUsers.mustChangePassword": "Must change password",
+  "adminUsers.telegramLinked": "Telegram linked",
+  "adminUsers.resetting": "Resetting…",
+  "adminUsers.resetPassword": "Reset password",
+  "adminUsers.noPlayerAccounts": "No individual player logins yet.",
+  "adminUsers.confirmResetPasswordPrefix": "Reset",
+  "adminUsers.confirmResetPasswordSuffix":
+    "'s password back to the default? They'll be asked to change it at next sign-in.",
+  "adminUsers.confirmDeleteUser": "Delete this user login? They won't be able to sign in anymore.",
+  "adminUsers.failedToLoadUsers": "Failed to load users",
+  "adminUsers.failedToGenerate": "Failed to generate player accounts",
+  "adminUsers.failedToResetPassword": "Failed to reset password",
+  "adminUsers.failedToCreateUser": "Failed to create user",
+};

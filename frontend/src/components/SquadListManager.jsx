@@ -4,6 +4,7 @@ import jsPDF from "jspdf";
 import api from "../api/axios";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { jerseyNumberForTeam } from "../utils/rolesForTeam";
+import { useLanguage } from "../i18n/LanguageContext";
 
 const MIN_SQUAD = 15;
 const MAX_SQUAD = 22;
@@ -56,16 +57,18 @@ function feeSummaryForTeam(athlete, team) {
 }
 
 function SquadCountNote({ count }) {
+  const { t } = useLanguage();
   const inRange = count >= MIN_SQUAD && count <= MAX_SQUAD;
   return (
     <p className={`squad-count-note ${inRange ? "ok" : "warn"}`}>
-      {inRange ? "✓" : "⚠"} {count} selected — a match squad is usually {MIN_SQUAD}–{MAX_SQUAD} people
-      (players plus head coach, assistant coach, and medic).
+      {inRange ? "✓" : "⚠"} {count} {t("squadListManager.selectedLabel")} —{" "}
+      {t("squadListManager.usualSquadPrefix")} {MIN_SQUAD}–{MAX_SQUAD} {t("squadListManager.usualSquadSuffix")}
     </p>
   );
 }
 
 function AthletePicker({ athletes, selected, onToggle }) {
+  const { t } = useLanguage();
   return (
     <div className="athletes-select">
       {athletes.map((athlete) => (
@@ -89,13 +92,13 @@ function AthletePicker({ athletes, selected, onToggle }) {
               {athlete.jerseyNumber !== null && athlete.jerseyNumber !== undefined && (
                 <span className="picker-meta">#{athlete.jerseyNumber} </span>
               )}
-              {athlete.fullName} <span className="picker-meta">({athlete.role || "PLAYER"} · {formatDob(athlete.dateOfBirth) || "DOB —"})</span>
+              {athlete.fullName} <span className="picker-meta">({athlete.role || "PLAYER"} · {formatDob(athlete.dateOfBirth) || t("squadListManager.dobDash")})</span>
               {athlete.feeOwed > 0 && (
                 <span
                   className="badge rejected picker-debt-badge"
                   title={(athlete.fees || []).map((f) => `$${f.amount}${f.note ? ` — ${f.note}` : ""}`).join(", ")}
                 >
-                  Owes ${athlete.feeOwed}
+                  {t("squadListManager.owes")} ${athlete.feeOwed}
                 </span>
               )}
             </span>
@@ -109,6 +112,7 @@ function AthletePicker({ athletes, selected, onToggle }) {
 // The printable/exportable roster sheet — rendered off-screen and captured
 // with html2canvas for both the JPG and PDF export paths.
 function SquadExportSheet({ innerRef, team, squadName, members }) {
+  const { t } = useLanguage();
   return (
     <div className="squad-export-sheet" ref={innerRef}>
       <div className="squad-export-header">
@@ -133,7 +137,7 @@ function SquadExportSheet({ innerRef, team, squadName, members }) {
                 <p className="squad-export-name-en">{a.fullName}</p>
                 {a.khmerName && <p className="squad-export-name-kh">{a.khmerName}</p>}
                 <p className="squad-export-meta">
-                  {rolesForTeam(a, team) || "PLAYER"} · DOB {formatDob(a.dateOfBirth) || "—"}
+                  {rolesForTeam(a, team) || "PLAYER"} · {t("common.dateOfBirth")} {formatDob(a.dateOfBirth) || "—"}
                 </p>
               </div>
             </div>
@@ -149,6 +153,7 @@ function SquadExportSheet({ innerRef, team, squadName, members }) {
 // one. `athletes` can be passed as [] in that case since the create/edit
 // picker is never rendered.
 export default function SquadListManager({ team, athletes, readOnly = false }) {
+  const { t } = useLanguage();
   const [lineups, setLineups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -178,7 +183,7 @@ export default function SquadListManager({ team, athletes, readOnly = false }) {
       setLineups(data);
       setError("");
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load squad lists");
+      setError(err.response?.data?.message || t("squadListManager.failedToLoad"));
     } finally {
       setLoading(false);
     }
@@ -192,7 +197,7 @@ export default function SquadListManager({ team, athletes, readOnly = false }) {
 
   const createLineup = async () => {
     if (!newLineupName.trim()) {
-      alert("Please enter a name for this squad list");
+      alert(t("squadListManager.nameRequired"));
       return;
     }
     try {
@@ -206,17 +211,17 @@ export default function SquadListManager({ team, athletes, readOnly = false }) {
       setShowNewLineupForm(false);
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to create squad list");
+      alert(err.response?.data?.message || t("squadListManager.failedToCreate"));
     }
   };
 
   const deleteLineup = async (id) => {
-    if (!confirm("Delete this squad list?")) return;
+    if (!confirm(t("squadListManager.confirmDelete"))) return;
     try {
       await api.delete(`/coach/lineup/${id}`);
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to delete squad list");
+      alert(err.response?.data?.message || t("squadListManager.failedToDelete"));
     }
   };
 
@@ -234,7 +239,7 @@ export default function SquadListManager({ team, athletes, readOnly = false }) {
 
   const saveEditLineup = async () => {
     if (!editLineupName.trim()) {
-      alert("Please enter a name for this squad list");
+      alert(t("squadListManager.nameRequired"));
       return;
     }
     setSavingEdit(true);
@@ -247,7 +252,7 @@ export default function SquadListManager({ team, athletes, readOnly = false }) {
       cancelEditLineup();
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to update squad list");
+      alert(err.response?.data?.message || t("squadListManager.failedToUpdate"));
     } finally {
       setSavingEdit(false);
     }
@@ -278,7 +283,7 @@ export default function SquadListManager({ team, athletes, readOnly = false }) {
       });
     } catch (err) {
       console.error(err);
-      alert("Couldn't export the squad list as a JPG. Please try again.");
+      alert(t("squadListManager.failedExportJpg"));
     } finally {
       setExportingId(null);
     }
@@ -310,35 +315,35 @@ export default function SquadListManager({ team, athletes, readOnly = false }) {
       });
     } catch (err) {
       console.error(err);
-      alert("Couldn't export the squad list as a PDF. Please try again.");
+      alert(t("squadListManager.failedExportPdf"));
     } finally {
       setExportingId(null);
     }
   };
 
-  if (!team) return <p className="help-text">Choose a team first.</p>;
-  if (loading) return <p>Loading…</p>;
+  if (!team) return <p className="help-text">{t("squadListManager.chooseTeamFirst")}</p>;
+  if (loading) return <p>{t("common.loading")}</p>;
   if (error) return <p className="error-text">{error}</p>;
 
   return (
     <div>
       <div className="lineup-header">
-        <h3>Squad lists — {team}</h3>
+        <h3>{t("squadListManager.title")} — {team}</h3>
         {!readOnly && !showNewLineupForm && (
           <button className="btn btn-primary" onClick={() => setShowNewLineupForm(true)}>
-            + Create squad list
+            {t("squadListManager.createButton")}
           </button>
         )}
       </div>
 
       {!readOnly && showNewLineupForm && (
         <div className="lineup-form card">
-          <h4>Create squad list</h4>
+          <h4>{t("squadListManager.create")}</h4>
           <div className="field">
-            <label>Name</label>
+            <label>{t("common.name")}</label>
             <input
               type="text"
-              placeholder="e.g., vs Angkor FC — Round 3"
+              placeholder={t("squadListManager.namePlaceholder")}
               value={newLineupName}
               onChange={(e) => setNewLineupName(e.target.value)}
             />
@@ -350,7 +355,7 @@ export default function SquadListManager({ team, athletes, readOnly = false }) {
 
           <div className="form-actions">
             <button className="btn btn-primary" onClick={createLineup}>
-              Create squad list
+              {t("squadListManager.create")}
             </button>
             <button
               className="btn btn-outline"
@@ -360,14 +365,14 @@ export default function SquadListManager({ team, athletes, readOnly = false }) {
                 setNewLineupName("");
               }}
             >
-              Cancel
+              {t("common.cancel")}
             </button>
           </div>
         </div>
       )}
 
       {lineups.length === 0 ? (
-        <p>No squad lists yet. Create one to get started.</p>
+        <p>{t("squadListManager.noneYet")}</p>
       ) : (
         <div className="lineups-list">
           {lineups.map((lineup) => {
@@ -377,7 +382,7 @@ export default function SquadListManager({ team, athletes, readOnly = false }) {
                 {isEditing ? (
                   <>
                     <div className="field">
-                      <label>Name</label>
+                      <label>{t("common.name")}</label>
                       <input
                         type="text"
                         value={editLineupName}
@@ -395,10 +400,10 @@ export default function SquadListManager({ team, athletes, readOnly = false }) {
 
                     <div className="form-actions">
                       <button className="btn btn-primary" onClick={saveEditLineup} disabled={savingEdit}>
-                        {savingEdit ? "Saving…" : "Save changes"}
+                        {savingEdit ? t("common.saving") : t("squadListManager.saveChanges")}
                       </button>
                       <button className="btn btn-outline" onClick={cancelEditLineup}>
-                        Cancel
+                        {t("common.cancel")}
                       </button>
                     </div>
                   </>
@@ -409,7 +414,7 @@ export default function SquadListManager({ team, athletes, readOnly = false }) {
                       <div className="dash-actions">
                         {!readOnly && (
                           <button className="link-btn" onClick={() => startEditLineup(lineup)}>
-                            Edit
+                            {t("common.edit")}
                           </button>
                         )}
                         <button
@@ -417,18 +422,18 @@ export default function SquadListManager({ team, athletes, readOnly = false }) {
                           onClick={() => exportJpg(lineup)}
                           disabled={exportingId === `${lineup._id}-jpg`}
                         >
-                          {exportingId === `${lineup._id}-jpg` ? "Exporting…" : "Export JPG"}
+                          {exportingId === `${lineup._id}-jpg` ? t("squadListManager.exporting") : t("squadListManager.exportJpg")}
                         </button>
                         <button
                           className="link-btn"
                           onClick={() => exportPdf(lineup)}
                           disabled={exportingId === `${lineup._id}-pdf`}
                         >
-                          {exportingId === `${lineup._id}-pdf` ? "Exporting…" : "Export PDF"}
+                          {exportingId === `${lineup._id}-pdf` ? t("squadListManager.exporting") : t("squadListManager.exportPdf")}
                         </button>
                         {!readOnly && (
                           <button className="btn btn-danger" onClick={() => deleteLineup(lineup._id)}>
-                            Delete
+                            {t("common.delete")}
                           </button>
                         )}
                       </div>
@@ -453,19 +458,19 @@ export default function SquadListManager({ team, athletes, readOnly = false }) {
                           />
                           <div className="athlete-info">
                             <p className="name">
-                              {item.athleteId?.fullName || "Unknown"}
+                              {item.athleteId?.fullName || t("squadListManager.unknownAthlete")}
                               {feeOwedForTeam(item.athleteId, lineup.team) > 0 && (
                                 <span
                                   className="badge rejected picker-debt-badge"
                                   title={feeSummaryForTeam(item.athleteId, lineup.team)}
                                 >
-                                  Owes ${feeOwedForTeam(item.athleteId, lineup.team)}
+                                  {t("squadListManager.owes")} ${feeOwedForTeam(item.athleteId, lineup.team)}
                                 </span>
                               )}
                             </p>
                             <p className="role">
                               {rolesForTeam(item.athleteId, lineup.team) || "PLAYER"} ·{" "}
-                              {formatDob(item.athleteId?.dateOfBirth) || "DOB —"} ·{" "}
+                              {formatDob(item.athleteId?.dateOfBirth) || t("squadListManager.dobDash")} ·{" "}
                               {item.athleteId?.gender || "—"}
                             </p>
                           </div>

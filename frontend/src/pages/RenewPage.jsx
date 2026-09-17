@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../i18n/LanguageContext";
 
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -14,6 +15,7 @@ function needsRenewal(lastVerifiedAt) {
 // on, and so renewing can be done one at a time, several selected at once,
 // or all at once — the main dashboard table was getting too wide for this.
 export default function RenewPage() {
+  const { t } = useLanguage();
   const { isHeadCoach } = useAuth();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +50,7 @@ export default function RenewPage() {
       }
       setRows([...byId.values()].sort((x, y) => x.fullName.localeCompare(y.fullName)));
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load athletes");
+      setError(err.response?.data?.message || t("renewPage.failedToLoad"));
     } finally {
       setLoading(false);
     }
@@ -93,7 +95,7 @@ export default function RenewPage() {
       await api.put(`/athletes/${id}/renew`);
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to renew");
+      alert(err.response?.data?.message || t("renewPage.failedToRenew"));
     } finally {
       setRenewingId(null);
     }
@@ -107,7 +109,7 @@ export default function RenewPage() {
       setSelected(new Set());
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to renew selected");
+      alert(err.response?.data?.message || t("renewPage.failedToRenewSelected"));
     } finally {
       setBulkRenewing(false);
     }
@@ -115,14 +117,14 @@ export default function RenewPage() {
 
   const renewAllVisible = async () => {
     if (visible.length === 0) return;
-    if (!confirm(`Renew all ${visible.length} listed people now?`)) return;
+    if (!confirm(t("renewPage.confirmRenewAll").replace("{count}", visible.length))) return;
     setBulkRenewing(true);
     try {
       await api.put("/athletes/bulk-renew", { athleteIds: visible.map((r) => r._id) });
       setSelected(new Set());
       load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to renew");
+      alert(err.response?.data?.message || t("renewPage.failedToRenew"));
     } finally {
       setBulkRenewing(false);
     }
@@ -131,32 +133,31 @@ export default function RenewPage() {
   return (
     <div className="container dash-body">
       <div className="dash-header">
-        <h2>ID renewal</h2>
+        <h2>{t("renewPage.title")}</h2>
         <Link to={isHeadCoach ? "/coach" : "/admin"} className="link-btn">
-          ← Back to dashboard
+          {t("renewPage.backToDashboard")}
         </Link>
       </div>
       <p className="help-text" style={{ maxWidth: 640 }}>
-        Renewing just confirms someone's identity documents were checked again in person — it doesn't
-        expire or hide anyone, it only clears the "Needs renewal" flag for another year.
+        {t("renewPage.helpText")}
       </p>
 
       <div className="dash-actions" style={{ marginBottom: 12, flexWrap: "wrap" }}>
         <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <input type="checkbox" checked={onlyNeeding} onChange={(e) => setOnlyNeeding(e.target.checked)} />
-          Only show people needing renewal
+          {t("renewPage.onlyNeeding")}
         </label>
         <button className="btn btn-outline" onClick={renewAllVisible} disabled={bulkRenewing || visible.length === 0}>
-          {bulkRenewing ? "Renewing…" : `Renew all listed (${visible.length})`}
+          {bulkRenewing ? t("renewPage.renewing") : t("renewPage.renewAllListed").replace("{count}", visible.length)}
         </button>
         {selected.size > 0 && (
           <button className="btn btn-primary" onClick={renewSelected} disabled={bulkRenewing}>
-            {bulkRenewing ? "Renewing…" : `Renew selected (${selected.size})`}
+            {bulkRenewing ? t("renewPage.renewing") : t("renewPage.renewSelectedBtn").replace("{count}", selected.size)}
           </button>
         )}
       </div>
 
-      {loading && <p>Loading…</p>}
+      {loading && <p>{t("common.loading")}</p>}
       {error && <p className="error-text">{error}</p>}
 
       {!loading && !error && (
@@ -167,11 +168,11 @@ export default function RenewPage() {
                 <th>
                   <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} />
                 </th>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Team(s)</th>
-                <th>Last verified</th>
-                <th>Actions</th>
+                <th>{t("renewPage.colId")}</th>
+                <th>{t("renewPage.colName")}</th>
+                <th>{t("renewPage.colTeams")}</th>
+                <th>{t("renewPage.colLastVerified")}</th>
+                <th>{t("renewPage.colActions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -184,27 +185,27 @@ export default function RenewPage() {
                       onChange={() => toggleOne(r._id)}
                     />
                   </td>
-                  <td data-label="ID">{r.verifyId}</td>
-                  <td data-label="Name">
+                  <td data-label={t("renewPage.colId")}>{r.verifyId}</td>
+                  <td data-label={t("renewPage.colName")}>
                     {r.fullName}
                     {r.khmerName && <span className="khmer-name"> {r.khmerName}</span>}
                   </td>
-                  <td data-label="Team(s)">{r.teams.join(", ") || "—"}</td>
-                  <td data-label="Last verified">
-                    {r.lastVerifiedAt ? new Date(r.lastVerifiedAt).toLocaleDateString() : "Never"}
+                  <td data-label={t("renewPage.colTeams")}>{r.teams.join(", ") || "—"}</td>
+                  <td data-label={t("renewPage.colLastVerified")}>
+                    {r.lastVerifiedAt ? new Date(r.lastVerifiedAt).toLocaleDateString() : t("renewPage.never")}
                     {needsRenewal(r.lastVerifiedAt) && (
                       <span className="badge rejected" style={{ marginLeft: 6 }}>
-                        Needs renewal
+                        {t("renewPage.needsRenewal")}
                       </span>
                     )}
                   </td>
-                  <td data-label="Actions" className="actions-cell">
+                  <td data-label={t("renewPage.colActions")} className="actions-cell">
                     <button
                       className="link-btn"
                       onClick={() => renewOne(r._id)}
                       disabled={renewingId === r._id}
                     >
-                      {renewingId === r._id ? "Renewing…" : "Renew"}
+                      {renewingId === r._id ? t("renewPage.renewing") : t("renewPage.renew")}
                     </button>
                   </td>
                 </tr>
@@ -212,7 +213,7 @@ export default function RenewPage() {
               {visible.length === 0 && (
                 <tr>
                   <td colSpan={6} style={{ textAlign: "center", color: "#777" }}>
-                    {rows.length === 0 ? "No athletes yet." : "No one currently needs renewal."}
+                    {rows.length === 0 ? t("renewPage.noAthletesYet") : t("renewPage.noOneNeeds")}
                   </td>
                 </tr>
               )}

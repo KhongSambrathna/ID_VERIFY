@@ -1,0 +1,31 @@
+export const km = {
+  "allCardsPage.failedToLoad": "បរាជ័យក្នុងការផ្ទុកបញ្ជីកីឡាករ",
+  "allCardsPage.title": "កាតសម្គាល់ខ្លួនទាំងអស់ ({count})",
+  "allCardsPage.backToDashboard": "← ត្រឡប់ទៅផ្ទាំងគ្រប់គ្រង",
+  "allCardsPage.exportPrintSelected": "នាំចេញ / បោះពុម្ពដែលបានជ្រើសរើស",
+  "allCardsPage.exporting": "កំពុងនាំចេញ…",
+  "allCardsPage.exportPng": "នាំចេញជា PNG",
+  "allCardsPage.filterByTeam": "ត្រងតាមក្រុម",
+  "allCardsPage.allTeams": "គ្រប់ក្រុមទាំងអស់",
+  "allCardsPage.filterByRole": "ត្រងតាមតួនាទី",
+  "allCardsPage.allRoles": "គ្រប់តួនាទីទាំងអស់",
+  "allCardsPage.noMatch": "គ្មានកីឡាករត្រូវនឹងលក្ខខណ្ឌត្រងនេះទេ។",
+  "allCardsPage.nothingToExport": "គ្មានអ្វីត្រូវនាំចេញទេ។",
+  "allCardsPage.exportPngFailed": "មិនអាចនាំចេញកាតជា PNG បានទេ។ សូមសាកល្បងម្តងទៀត។",
+};
+
+export const en = {
+  "allCardsPage.failedToLoad": "Failed to load athletes",
+  "allCardsPage.title": "All ID cards ({count})",
+  "allCardsPage.backToDashboard": "← Back to dashboard",
+  "allCardsPage.exportPrintSelected": "Export / Print selected",
+  "allCardsPage.exporting": "Exporting…",
+  "allCardsPage.exportPng": "Export PNG",
+  "allCardsPage.filterByTeam": "Filter by team",
+  "allCardsPage.allTeams": "All teams",
+  "allCardsPage.filterByRole": "Filter by role",
+  "allCardsPage.allRoles": "All roles",
+  "allCardsPage.noMatch": "No athletes match this filter.",
+  "allCardsPage.nothingToExport": "Nothing to export.",
+  "allCardsPage.exportPngFailed": "Couldn't export cards as PNG. Please try again.",
+};
