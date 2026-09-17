@@ -30,6 +30,7 @@ import TournamentsPage from "./pages/TournamentsPage";
 import TournamentSquadPage from "./pages/TournamentSquadPage";
 import PlayerSquadListPage from "./pages/PlayerSquadListPage";
 import PricingPage from "./pages/PricingPage";
+import PosterGenerator from "./pages/PosterGenerator";
 
 export default function App() {
   return (
@@ -129,6 +130,14 @@ export default function App() {
           element={
             <ProtectedRoute role="ADMIN">
               <AdminShop />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/poster"
+          element={
+            <ProtectedRoute role="ADMIN">
+              <PosterGenerator />
             </ProtectedRoute>
           }
         />

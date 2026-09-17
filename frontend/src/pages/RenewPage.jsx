@@ -186,11 +186,11 @@ export default function RenewPage() {
                     />
                   </td>
                   <td data-label={t("renewPage.colId")}>{r.verifyId}</td>
-                  <td data-label={t("renewPage.colName")}>
+                  <td data-label={t("renewPage.colName")} className="caps-display">
                     {r.fullName}
                     {r.khmerName && <span className="khmer-name"> {r.khmerName}</span>}
                   </td>
-                  <td data-label={t("renewPage.colTeams")}>{r.teams.join(", ") || "—"}</td>
+                  <td data-label={t("renewPage.colTeams")} className="caps-display">{r.teams.join(", ") || "—"}</td>
                   <td data-label={t("renewPage.colLastVerified")}>
                     {r.lastVerifiedAt ? new Date(r.lastVerifiedAt).toLocaleDateString() : t("renewPage.never")}
                     {needsRenewal(r.lastVerifiedAt) && (

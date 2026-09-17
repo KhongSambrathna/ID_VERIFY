@@ -196,7 +196,7 @@ export default function AdminSubscriptions() {
                   return (
                     <Fragment key={team._id}>
                       <tr>
-                        <td data-label={t("common.team")}>{team.name}</td>
+                        <td data-label={t("common.team")} className="caps-display">{team.name}</td>
                         <td data-label={t("common.status")}>
                           {status === "active" && (
                             <span className="badge verified">{t("adminSubscriptions.statusActive")}</span>

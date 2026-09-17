@@ -157,7 +157,7 @@ export default function AthleteCardPage() {
                 alt={athlete.fullName}
               />
               <div>
-                <h3 style={{ margin: "0 0 2px" }}>{athlete.fullName}</h3>
+                <h3 className="caps-display" style={{ margin: "0 0 2px" }}>{athlete.fullName}</h3>
                 {athlete.khmerName && <p className="khmer-name">{athlete.khmerName}</p>}
                 <p className="verify-id">{t("athleteCardPage.idLabel")} {athlete.verifyId}</p>
                 <div className="athlete-detail-badges">

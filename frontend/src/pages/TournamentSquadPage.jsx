@@ -268,7 +268,7 @@ export default function TournamentSquadPage() {
               {athleteResults.map((a) => (
                 <li key={a.assignmentId || a._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span>
-                    {a.fullName} — {a.team}
+                    <span className="caps-display">{a.fullName} — {a.team}</span>
                     {a.feeOwed > 0 ? ` ${t("tournamentSquadPage.owesAmount").replace("{amount}", a.feeOwed)}` : ""}
                   </span>
                   <button className="action-btn positive" disabled={actingId === a._id} onClick={() => registerOnBehalf(a)}>
@@ -302,7 +302,7 @@ export default function TournamentSquadPage() {
                   </p>
                   <p className="role">
                     {r.khmerName ? `${r.khmerName} · ` : ""}
-                    {t("tournamentSquadPage.dobLabel")} {formatDob(r.dateOfBirth) || "—"} · {r.team}
+                    {t("tournamentSquadPage.dobLabel")} {formatDob(r.dateOfBirth) || "—"} · <span className="caps-display">{r.team}</span>
                     {r.registeredBy ? t("tournamentSquadPage.registeredByStaff") : ""}
                   </p>
                 </div>

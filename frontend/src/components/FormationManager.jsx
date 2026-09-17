@@ -160,7 +160,7 @@ function PitchBoard({ posterRef, team, formationName, rowsData, subAthletes }) {
           <p className="formation-subs-title">{t("formationManager.substitutes")}</p>
           <ul className="formation-subs-list">
             {subAthletes.map((a) => (
-              <li key={a._id}>{a.fullName}</li>
+              <li key={a._id} className="caps-display">{a.fullName}</li>
             ))}
           </ul>
         </div>

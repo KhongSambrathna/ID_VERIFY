@@ -1,21 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/axios";
 import { useLanguage } from "../i18n/LanguageContext";
-
-// Secondary tools tucked into one dropdown instead of a row of buttons —
-// this page was accumulating one new button per feature and getting
-// cluttered. "+ Add athlete" stays a primary button since it's the most
-// common action; everything else lives here.
-const TOOL_LINKS = [
-  { to: "/admin/users", labelKey: "adminDashboard.manageUsers" },
-  { to: "/admin/sponsors", labelKey: "adminDashboard.trustedByLogos" },
-  { to: "/admin/matchday", labelKey: "adminDashboard.matchDay" },
-  { to: "/admin/shop", labelKey: "adminDashboard.shop" },
-  { to: "/admin/cards", labelKey: "adminDashboard.exportAllCards" },
-  { to: "/admin/stats", labelKey: "adminDashboard.pendingDebtReport" },
-  { to: "/admin/renew", labelKey: "adminDashboard.idRenewal" },
-];
 
 export default function AdminDashboard() {
   const { t } = useLanguage();
@@ -27,8 +13,6 @@ export default function AdminDashboard() {
   const [selectedPending, setSelectedPending] = useState([]);
   const [bulkApproving, setBulkApproving] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
-  const [toolsOpen, setToolsOpen] = useState(false);
-  const toolsRef = useRef(null);
 
   const load = async () => {
     setLoading(true);
@@ -46,18 +30,7 @@ export default function AdminDashboard() {
     load();
   }, []);
 
-  // Close the Tools dropdown on an outside click, same pattern as the navbar.
-  useEffect(() => {
-    if (!toolsOpen) return;
-    const onClickOutside = (e) => {
-      if (toolsRef.current && !toolsRef.current.contains(e.target)) setToolsOpen(false);
-    };
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [toolsOpen]);
-
   const exportCsv = async () => {
-    setToolsOpen(false);
     setExportingCsv(true);
     try {
       const { data } = await api.get("/athletes/export.csv", { responseType: "blob" });
@@ -154,28 +127,22 @@ export default function AdminDashboard() {
           <Link to="/admin/new" className="btn btn-primary">
             {t("adminDashboard.addAthlete")}
           </Link>
-          <div className="tools-dropdown" ref={toolsRef}>
-            <button
-              type="button"
-              className="btn btn-outline"
-              style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
-              onClick={() => setToolsOpen((v) => !v)}
-            >
-              {t("adminDashboard.tools")}
-            </button>
-            {toolsOpen && (
-              <div className="tools-dropdown-menu">
-                {TOOL_LINKS.map((l) => (
-                  <Link key={l.to} to={l.to} onClick={() => setToolsOpen(false)}>
-                    {t(l.labelKey)}
-                  </Link>
-                ))}
-                <button type="button" onClick={exportCsv} disabled={exportingCsv}>
-                  {exportingCsv ? t("adminDashboard.exporting") : t("adminDashboard.exportRosterCsv")}
-                </button>
-              </div>
-            )}
-          </div>
+          <Link
+            to="/admin/cards"
+            className="btn btn-outline"
+            style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
+          >
+            {t("adminDashboard.exportAllCards")}
+          </Link>
+          <button
+            type="button"
+            className="btn btn-outline"
+            style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
+            onClick={exportCsv}
+            disabled={exportingCsv}
+          >
+            {exportingCsv ? t("adminDashboard.exporting") : t("adminDashboard.exportRosterCsv")}
+          </button>
         </div>
       </div>
 
@@ -225,9 +192,9 @@ export default function AdminDashboard() {
               {all.map((a) => (
                 <tr key={a.assignmentId}>
                   <td data-label={t("adminDashboard.colId")}>{a.verifyId}</td>
-                  <td data-label={t("adminDashboard.colName")}>{a.fullName}</td>
+                  <td data-label={t("adminDashboard.colName")} className="caps-display">{a.fullName}</td>
                   <td data-label={t("adminDashboard.colRole")}>{a.role || "—"}</td>
-                  <td data-label={t("adminDashboard.colTeam")}>{a.team || "—"}</td>
+                  <td data-label={t("adminDashboard.colTeam")} className="caps-display">{a.team || "—"}</td>
                   <td data-label={t("adminDashboard.colJersey")}>{a.jerseyNumber ?? "—"}</td>
                   <td data-label={t("adminDashboard.colAvailable")}>
                     <span className={`badge ${a.isAvailable ? "verified" : "rejected"}`}>
@@ -332,9 +299,9 @@ export default function AdminDashboard() {
                       )}
                     </td>
                     <td data-label={t("adminDashboard.colId")}>{a.verifyId}</td>
-                    <td data-label={t("adminDashboard.colName")}>{a.fullName}</td>
+                    <td data-label={t("adminDashboard.colName")} className="caps-display">{a.fullName}</td>
                     <td data-label={t("adminDashboard.colRole")}>{a.role || "—"}</td>
-                    <td data-label={t("adminDashboard.colTeam")}>{a.team || "—"}</td>
+                    <td data-label={t("adminDashboard.colTeam")} className="caps-display">{a.team || "—"}</td>
                     <td data-label={t("adminDashboard.colApproval")}>
                       {a.pendingRemoval ? (
                         <span className="badge rejected">{t("adminDashboard.removalRequested")}</span>

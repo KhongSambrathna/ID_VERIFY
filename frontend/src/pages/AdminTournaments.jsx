@@ -388,7 +388,7 @@ export default function AdminTournaments() {
                                 {detail.registrations.map((r) => (
                                   <li key={r._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                     <span>
-                                      {r.fullName} {r.khmerName ? `(${r.khmerName})` : ""} — {r.team}
+                                      <span className="caps-display">{r.fullName} {r.khmerName ? `(${r.khmerName})` : ""} — {r.team}</span>
                                       {r.jerseyNumber != null ? ` · #${r.jerseyNumber}` : ""}
                                       {r.isOverage ? ` · ${t("adminTournaments.overageSuffix")}` : ""}
                                       {r.registeredBy ? ` · ${t("adminTournaments.registeredByStaffSuffix")}` : ""}
@@ -413,7 +413,7 @@ export default function AdminTournaments() {
                                 {athletes.map((a) => (
                                   <li key={a.assignmentId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                     <span>
-                                      {a.fullName} — {a.team}
+                                      <span className="caps-display">{a.fullName} — {a.team}</span>
                                       {a.feeOwed > 0 ? ` (${t("adminTournaments.owes")} $${a.feeOwed})` : ""}
                                     </span>
                                     <button

@@ -106,8 +106,8 @@ export default function DebtReportPage() {
                         />
                       </td>
                       <td data-label={t("debtReport.id")}>{a.verifyId}</td>
-                      <td data-label={t("common.name")}>{a.fullName}</td>
-                      <td data-label={t("common.team")}>{a.team || "—"}</td>
+                      <td data-label={t("common.name")} className="caps-display">{a.fullName}</td>
+                      <td data-label={t("common.team")} className="caps-display">{a.team || "—"}</td>
                       <td data-label={t("common.role")}>{a.role || "—"}</td>
                       <td data-label={t("debtReport.owes")}>
                         <span className="badge rejected">${a.feeOwed}</span>

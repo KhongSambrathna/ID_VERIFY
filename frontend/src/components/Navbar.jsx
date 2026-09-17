@@ -102,6 +102,7 @@ export default function Navbar() {
             <NavDropdown label={t("navbar.reports")}>
               <Link to="/debt-report" onClick={closeMenu}>{t("navbar.debtReport")}</Link>
               <Link to="/admin/stats" onClick={closeMenu}>{t("navbar.stats")}</Link>
+              {isAdmin && <Link to="/admin/cards" onClick={closeMenu}>{t("navbar.exportCards")}</Link>}
             </NavDropdown>
           )}
 
@@ -109,8 +110,17 @@ export default function Navbar() {
             <NavDropdown label={t("navbar.manage")}>
               <Link to="/admin/renew" onClick={closeMenu}>{t("navbar.idRenewal")}</Link>
               <Link to="/admin/tournaments" onClick={closeMenu}>{t("navbar.tournaments")}</Link>
+              {isAdmin && <Link to="/admin/matchday" onClick={closeMenu}>{t("navbar.matchDay")}</Link>}
               {isAdmin && <Link to="/admin/users" onClick={closeMenu}>{t("navbar.users")}</Link>}
               {isAdmin && <Link to="/admin/subscriptions" onClick={closeMenu}>{t("navbar.subscriptions")}</Link>}
+            </NavDropdown>
+          )}
+
+          {isAuthed && isAdmin && (
+            <NavDropdown label={t("navbar.marketing")}>
+              <Link to="/admin/sponsors" onClick={closeMenu}>{t("navbar.sponsors")}</Link>
+              <Link to="/admin/shop" onClick={closeMenu}>{t("navbar.shopManage")}</Link>
+              <Link to="/admin/poster" onClick={closeMenu}>{t("navbar.posterGenerator")}</Link>
             </NavDropdown>
           )}
 

@@ -77,7 +77,7 @@ export default function StatsPage() {
                 <tbody>
                   {stats.teams.map((teamRow) => (
                     <tr key={teamRow.team}>
-                      <td data-label={t("common.team")}>{teamRow.team}</td>
+                      <td data-label={t("common.team")} className="caps-display">{teamRow.team}</td>
                       <td data-label={t("statsPage.athletes")}>{teamRow.athleteCount}</td>
                       <td data-label={t("statsPage.pending")}>{teamRow.pendingCount}</td>
                       <td data-label={t("statsPage.debt")}>${teamRow.totalDebt}</td>

@@ -92,7 +92,7 @@ function AthletePicker({ athletes, selected, onToggle }) {
               {athlete.jerseyNumber !== null && athlete.jerseyNumber !== undefined && (
                 <span className="picker-meta">#{athlete.jerseyNumber} </span>
               )}
-              {athlete.fullName} <span className="picker-meta">({athlete.role || "PLAYER"} · {formatDob(athlete.dateOfBirth) || t("squadListManager.dobDash")})</span>
+              <span className="caps-display">{athlete.fullName}</span> <span className="picker-meta">({athlete.role || "PLAYER"} · {formatDob(athlete.dateOfBirth) || t("squadListManager.dobDash")})</span>
               {athlete.feeOwed > 0 && (
                 <span
                   className="badge rejected picker-debt-badge"

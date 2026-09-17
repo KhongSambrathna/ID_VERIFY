@@ -100,8 +100,8 @@ a {
 .navbar nav a {
   color: #d6dce6;
   text-decoration: none;
-  margin-left: 24px;
-  font-size: 15px;
+  margin-left: 16px;
+  font-size: 14px;
   white-space: nowrap;
 }
 .navbar nav a:hover {
@@ -146,13 +146,13 @@ a {
    stacked section instead, using the same open/closed state. */
 .nav-group {
   position: relative;
-  margin-left: 24px;
+  margin-left: 16px;
 }
 .nav-group-btn {
   background: none;
   border: none;
   color: #d6dce6;
-  font-size: 15px;
+  font-size: 14px;
   font-family: inherit;
   cursor: pointer;
   padding: 0;
@@ -196,7 +196,7 @@ a {
 
 /* Khmer/English toggle button in the navbar. */
 .lang-switch {
-  margin-left: 24px;
+  margin-left: 16px;
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.25);
   color: white;
@@ -1312,12 +1312,18 @@ table.athletes .actions-cell {
   .features .grid { grid-template-columns: 1fr; }
 }
 
-/* ---------- Mobile layout ---------- */
-@media (max-width: 640px) {
-  .container {
-    padding: 0 16px;
-  }
-
+/* ---------- Collapsible nav ---------- */
+/* The navbar now carries 3 grouped dropdowns (Reports/Manage/Marketing)
+   plus several direct links, which stopped fitting on one line well
+   before the general phone breakpoint below — the row would wrap inside
+   the fixed-height bar and the wrapped items got clipped/overlapped by
+   the page content underneath (never acceptable — a wrapped/2-row nav
+   should never be visible, it should always collapse cleanly to the
+   hamburger button instead). Switching to the same hamburger panel used
+   on phones, starting at a much wider "narrower desktop window" size,
+   with generous margin above the widest this nav could realistically
+   need, avoids that regardless of how many links get added later. */
+@media (max-width: 1200px) {
   .nav-toggle {
     display: flex;
   }
@@ -1345,8 +1351,8 @@ table.athletes .actions-cell {
     border-bottom: none;
   }
 
-  /* On mobile the whole nav is already a stacked vertical panel, so a
-     group's menu just flows inline (indented) instead of floating. */
+  /* With the whole nav already a stacked vertical panel, a group's menu
+     just flows inline (indented) instead of floating. */
   .navbar nav .nav-group {
     margin-left: 0;
     width: 100%;
@@ -1371,6 +1377,13 @@ table.athletes .actions-cell {
   .navbar nav .lang-switch {
     margin: 10px 4px;
     align-self: flex-start;
+  }
+}
+
+/* ---------- Mobile layout ---------- */
+@media (max-width: 640px) {
+  .container {
+    padding: 0 16px;
   }
 
   /* Shop storefront — force 2 columns instead of the 1 huge column
@@ -1553,50 +1566,6 @@ table.athletes .actions-cell {
 .tab-btn.active {
   color: var(--navy);
   border-bottom-color: var(--gold);
-}
-
-/* Admin dashboard's "Tools" dropdown — secondary links/actions tucked away
-   so the header doesn't grow a new button per feature. */
-.tools-dropdown {
-  position: relative;
-  display: inline-block;
-}
-.tools-dropdown-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  background: white;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
-  padding: 6px;
-  display: flex;
-  flex-direction: column;
-  min-width: 210px;
-  z-index: 30;
-}
-.tools-dropdown-menu a,
-.tools-dropdown-menu button {
-  display: block;
-  width: 100%;
-  padding: 9px 10px;
-  border-radius: 6px;
-  text-align: left;
-  color: var(--navy);
-  text-decoration: none;
-  font-size: 14px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
-}
-.tools-dropdown-menu a:hover,
-.tools-dropdown-menu button:hover:not(:disabled) {
-  background: #f2f2f2;
-}
-.tools-dropdown-menu button:disabled {
-  color: #999;
-  cursor: default;
 }
 
 .athletes-grid {
@@ -2472,5 +2441,78 @@ table.athletes .actions-cell {
    bilingual font choices regardless of the site-wide language toggle. */
 html:lang(km) body {
   font-family: var(--font-khmer-body);
+}
+
+/* ---------- Uppercase player-name / team-name displays ----------
+   `.caps-display` is added directly at each spot that renders ONLY a
+   player's name and/or team (never mixed with role/DOB/gender/badge text
+   that happens to share a broader class like `.value-en` or
+   `.detail-value` — those are edited per-instance instead). The classes
+   below were already dedicated to name/team text before this change, so
+   they're covered here once instead of touching every component that
+   uses them. Uppercasing has no visual effect on Khmer script, so a name
+   line that mixes an English name with a Khmer name (or, for `.name`,
+   with a small status badge — see the override below) is safe to
+   transform as a whole. */
+.caps-display,
+.squad-export-name-en,
+.squad-export-team,
+.startingxi-card-name,
+.startingxi-matchup,
+.pitch-token-name,
+.assignment-team,
+.name {
+  text-transform: uppercase;
+}
+/* `.name` is reused in a couple of places for "athlete name + a small
+   status badge" (over-age, a debt amount) — text-transform inherits, so
+   without this the badge's own label would get shouted too. */
+.name .badge {
+  text-transform: none;
+}
+
+/* ---------- Poster generator (admin) ----------
+   The poster preview itself (PosterGenerator.jsx) is styled entirely with
+   inline styles, not classes here — it needs Moul/Siemreap/Barlow Condensed
+   regardless of the site language toggle, and the html:lang(km) body rule
+   right above this block would otherwise win that fight on a single-class
+   selector. Only the surrounding form/layout chrome lives in this file. */
+.poster-gen-layout {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  margin-top: 18px;
+}
+.poster-gen-controls {
+  flex: 1 1 320px;
+  min-width: 280px;
+  max-width: 420px;
+}
+.poster-gen-canvas-wrap {
+  flex: 0 0 auto;
+}
+.poster-gen-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.poster-gen-stats-toggle {
+  margin-bottom: 22px;
+}
+.poster-gen-export-note {
+  max-width: 540px;
+  margin-top: 10px;
+}
+@media (max-width: 900px) {
+  .poster-gen-layout {
+    flex-direction: column;
+  }
+  .poster-gen-controls {
+    max-width: none;
+    width: 100%;
+  }
 }
 

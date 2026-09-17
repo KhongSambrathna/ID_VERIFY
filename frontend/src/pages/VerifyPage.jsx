@@ -113,7 +113,7 @@ export default function VerifyPage() {
               alt={athlete.fullName}
             />
             <div className="status-icon">{STATUS_META[athlete.status].icon}</div>
-            <h2 style={{ marginBottom: 2 }}>{athlete.fullName}</h2>
+            <h2 className="caps-display" style={{ marginBottom: 2 }}>{athlete.fullName}</h2>
             {athlete.khmerName && <p style={{ margin: "0 0 4px" }}>{athlete.khmerName}</p>}
             <p className="verify-id" style={{ margin: "0 0 10px" }}>
               {t("id")}: {athlete.verifyId}
@@ -143,7 +143,7 @@ export default function VerifyPage() {
               ).flatMap((m, i) => [
                 <div className="detail-item" key={`team-${i}`}>
                   <div className="detail-label">{t("team")}</div>
-                  <div className="detail-value">{m.team || "—"}</div>
+                  <div className="detail-value caps-display">{m.team || "—"}</div>
                 </div>,
                 <div className="detail-item" key={`role-${i}`}>
                   <div className="detail-label">{t("role")}</div>

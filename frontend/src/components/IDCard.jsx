@@ -84,7 +84,7 @@ export default function IDCard({ athlete, hideActions }) {
           <div className="id-card-fields">
             <div className="id-card-field">
               <div className="value-kh">ឈ្មោះ : {athlete.khmerName || "—"}</div>
-              <div className="value-en">NAME : {athlete.fullName}</div>
+              <div className="value-en caps-display">NAME : {athlete.fullName}</div>
             </div>
 
             <div className="id-card-row">
@@ -97,7 +97,7 @@ export default function IDCard({ athlete, hideActions }) {
             <div className="id-card-row">
               <div className="id-card-field inline">
                 <span className="label">ក្រុម / Team</span>
-                <span className="value-en">{athlete.team || "—"}</span>
+                <span className="value-en caps-display">{athlete.team || "—"}</span>
               </div>
             </div>
 

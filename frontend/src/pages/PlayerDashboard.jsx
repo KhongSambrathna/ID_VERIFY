@@ -75,7 +75,7 @@ export default function PlayerDashboard() {
                 alt={athlete.fullName}
                 className="athlete-photo"
               />
-              <h4>{athlete.fullName}</h4>
+              <h4 className="caps-display">{athlete.fullName}</h4>
               {athlete.khmerName && <p className="khmer-name">{athlete.khmerName}</p>}
               <p className="role">{athlete.role || "PLAYER"}</p>
               <p className="verify-id">{t("common.verifyId")}: {athlete.verifyId}</p>

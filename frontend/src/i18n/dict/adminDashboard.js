@@ -1,14 +1,7 @@
 export const km = {
-  "adminDashboard.manageUsers": "គ្រប់គ្រងអ្នកប្រើប្រាស់",
-  "adminDashboard.trustedByLogos": "និមិត្តសញ្ញាដៃគូ",
-  "adminDashboard.matchDay": "ថ្ងៃប្រកួត",
-  "adminDashboard.shop": "ហាង",
   "adminDashboard.exportAllCards": "នាំចេញកាតទាំងអស់",
-  "adminDashboard.pendingDebtReport": "របាយការណ៍រង់ចាំ និង ជំពាក់ថ្លៃ",
-  "adminDashboard.idRenewal": "ការបន្តអត្តសញ្ញាណប័ណ្ណ",
   "adminDashboard.title": "កំណត់ត្រាកីឡាករ",
   "adminDashboard.addAthlete": "+ បន្ថែមកីឡាករ",
-  "adminDashboard.tools": "ឧបករណ៍ ▾",
   "adminDashboard.exporting": "កំពុងនាំចេញ…",
   "adminDashboard.exportRosterCsv": "នាំចេញបញ្ជីឈ្មោះ (CSV)",
   "adminDashboard.searchPlaceholder": "ស្វែងរកតាមឈ្មោះ ក្រុម តួនាទី ឬលេខសម្គាល់…",
@@ -54,16 +47,9 @@ export const km = {
 };
 
 export const en = {
-  "adminDashboard.manageUsers": "Manage users",
-  "adminDashboard.trustedByLogos": "Trusted by logos",
-  "adminDashboard.matchDay": "Match day",
-  "adminDashboard.shop": "Shop",
   "adminDashboard.exportAllCards": "Export all cards",
-  "adminDashboard.pendingDebtReport": "Pending & debt report",
-  "adminDashboard.idRenewal": "ID renewal",
   "adminDashboard.title": "Athlete records",
   "adminDashboard.addAthlete": "+ Add athlete",
-  "adminDashboard.tools": "Tools ▾",
   "adminDashboard.exporting": "Exporting…",
   "adminDashboard.exportRosterCsv": "Export roster (CSV)",
   "adminDashboard.searchPlaceholder": "Search by name, team, role, or ID…",

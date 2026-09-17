@@ -218,7 +218,7 @@ export default function AdminUsers() {
                 <tr key={u._id}>
                   <td data-label={t("common.username")}>{u.username}</td>
                   <td data-label={t("common.role")}>{ROLE_LABELS[u.role] || t("adminUsers.roleAdmin")}</td>
-                  <td data-label={t("common.team")}>{u.team || "—"}</td>
+                  <td data-label={t("common.team")} className="caps-display">{u.team || "—"}</td>
                   <td data-label={t("adminUsers.telegramChatId")}>
                     <input
                       type="text"
@@ -297,7 +297,7 @@ export default function AdminUsers() {
               {playerAccounts.map((a) => (
                 <tr key={a._id}>
                   <td data-label={t("common.username")}>{a.username}</td>
-                  <td data-label={t("common.team")}>{a.team || "—"}</td>
+                  <td data-label={t("common.team")} className="caps-display">{a.team || "—"}</td>
                   <td data-label={t("adminUsers.mustChangePassword")}>
                     {a.mustChangePassword ? t("common.yes") : t("common.no")}
                   </td>
