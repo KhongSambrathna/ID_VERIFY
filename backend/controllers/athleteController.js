@@ -175,10 +175,15 @@ exports.getAthleteById = async (req, res) => {
     }
 
     // Reference/ID documents (national ID copy, birth certificate, etc.) are
-    // for Admin and Head Coach only — used to prove identity in person when
-    // an opposing team asks to check. A shared Player login can see
-    // everything else on this record (fees included) but never these.
-    if (req.adminRole === "PLAYER") {
+    // hidden from a Player account viewing someone ELSE's record (used to
+    // prove identity in person when an opposing team asks to check — a
+    // shared Player login can see everything else, fees included, but never
+    // these). The one exception: an individual Player account looking at
+    // their OWN record needs to see (and manage) their own uploaded
+    // documents — that's the whole point of the "verify document" self-edit
+    // flow below, so it stays exempt from the strip.
+    const isOwnRecord = req.adminRole === "PLAYER" && req.athleteId && String(req.athleteId) === String(athlete._id);
+    if (req.adminRole === "PLAYER" && !isOwnRecord) {
       const obj = athlete.toObject();
       delete obj.supportingDocuments;
       return res.json(obj);
@@ -194,8 +199,12 @@ exports.getAthleteById = async (req, res) => {
 // (name, DOB, gender, address, photo, plus admin-only `status`). Team/role
 // assignments are managed separately below (add/edit/remove), since one
 // edit here can't mean "for which team" once a person has more than one.
+// An individual Player account (not the shared/legacy team-wide login) may
+// also reach this, scoped to editing their OWN record only (see
+// isPlayerSelf below) — same editable fields as a Head Coach edit.
 const ADMIN_EDITABLE_FIELDS = ["fullName", "khmerName", "dateOfBirth", "gender", "address", "status"];
 const HEAD_COACH_EDITABLE_FIELDS = ["fullName", "khmerName", "dateOfBirth", "gender", "address"];
+const PLAYER_EDITABLE_FIELDS = ["fullName", "khmerName", "dateOfBirth", "gender", "address"];
 
 // Date-of-birth needs its own comparison — the form sends "YYYY-MM-DD" but
 // the stored value is a Date — so a plain string compare would treat every
@@ -218,7 +227,16 @@ exports.updateAthlete = async (req, res) => {
     if (!athlete) return res.status(404).json({ message: "Athlete not found" });
 
     const isHeadCoach = req.adminRole === "HEAD_COACH";
+    // An individual Player account (athleteId set on login) editing their
+    // OWN record — the shared/legacy team-wide Player login (athleteId
+    // null) never matches this and falls through to the 403 below, same as
+    // a Player trying to edit anyone else's record.
+    const isPlayerSelf =
+      req.adminRole === "PLAYER" && req.athleteId && String(req.athleteId) === String(athlete._id);
     if (isHeadCoach && !athlete.assignments.some((a) => a.team === req.adminTeam)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    if (req.adminRole === "PLAYER" && !isPlayerSelf) {
       return res.status(403).json({ message: "Access denied" });
     }
 
@@ -227,7 +245,11 @@ exports.updateAthlete = async (req, res) => {
     // unmodified (e.g. just opening Edit and clicking Save) must be a no-op,
     // not a re-approval trigger.
     let changed = false;
-    const editableFields = isHeadCoach ? HEAD_COACH_EDITABLE_FIELDS : ADMIN_EDITABLE_FIELDS;
+    const editableFields = isHeadCoach
+      ? HEAD_COACH_EDITABLE_FIELDS
+      : isPlayerSelf
+      ? PLAYER_EDITABLE_FIELDS
+      : ADMIN_EDITABLE_FIELDS;
     editableFields.forEach((field) => {
       if (req.body[field] === undefined) return;
       if (valuesDiffer(field, athlete[field], req.body[field])) {
@@ -318,10 +340,18 @@ exports.updateAthlete = async (req, res) => {
     // assignment(s) back to "pending" for re-review — this never touches
     // the person's OTHER teams' assignments, which stay exactly as they
     // were (still approved/public if they already were). This only fires
-    // when a real change was made above.
+    // when a real change was made above. A Player editing their OWN profile
+    // touches every team/role they hold instead — the edit (and any new/
+    // removed supporting document) is one change to the whole person, not
+    // to a single team, so every assignment needs a fresh Admin look before
+    // it's public again.
     if (isHeadCoach) {
       athlete.assignments.forEach((a) => {
         if (a.team === req.adminTeam) a.approvalStatus = "pending";
+      });
+    } else if (isPlayerSelf) {
+      athlete.assignments.forEach((a) => {
+        a.approvalStatus = "pending";
       });
     }
 
@@ -329,6 +359,11 @@ exports.updateAthlete = async (req, res) => {
 
     if (isHeadCoach) {
       notifyAdmins(`✏️ ${athlete.fullName}'s record on ${req.adminTeam} was edited — needs re-approval.`);
+    } else if (isPlayerSelf) {
+      const text = `✏️ ${athlete.fullName} updated their own profile — needs re-approval.`;
+      notifyAdmins(text);
+      const teams = [...new Set(athlete.assignments.map((a) => a.team))];
+      teams.forEach((team) => notifyTeamCoaches(team, text));
     }
 
     res.json(athlete);

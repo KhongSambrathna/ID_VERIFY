@@ -10,6 +10,9 @@ const {
   registerSelf,
   registerOnBehalf,
   unregister,
+  setRegistrationPaid,
+  settleTournamentNow,
+  setRegistrationClosed,
   exportRegistrationsCsv,
 } = require("../controllers/tournamentController");
 
@@ -31,5 +34,12 @@ router.delete("/:id/registrations/:registrationId", requireRole("ADMIN", "HEAD_C
 
 // Admin/Head Coach registering someone who has no login of their own.
 router.post("/:id/register-admin", requireRole("ADMIN", "HEAD_COACH"), registerOnBehalf);
+
+// Note "paid their entry fee on match day" / force-settle unpaid → debt.
+router.patch("/:id/registrations/:registrationId/paid", requireRole("ADMIN", "HEAD_COACH"), setRegistrationPaid);
+router.post("/:id/settle-debts", requireRole("ADMIN", "HEAD_COACH"), settleTournamentNow);
+
+// Open/close self-service registration for this tournament.
+router.patch("/:id/registration-status", requireRole("ADMIN", "HEAD_COACH"), setRegistrationClosed);
 
 module.exports = router;

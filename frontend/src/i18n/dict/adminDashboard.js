@@ -44,6 +44,12 @@ export const km = {
   "adminDashboard.failedToBulkApprove": "បរាជ័យក្នុងការអនុម័តជាបណ្តុំ",
   "adminDashboard.confirmDeleteWholeRecord": "នេះជាក្រុម/តួនាទីតែមួយគត់របស់អ្នកនេះ — ការដកវាចេញនឹងលុបកំណត់ត្រាទាំងមូលរបស់អ្នកនេះ។ បន្តទេ?",
   "adminDashboard.confirmRemoveAssignment": "ដកក្រុម/តួនាទីនេះចេញ?",
+  "adminDashboard.myTelegramCardTitle": "តភ្ជាប់ Telegram របស់ខ្ញុំ",
+  "adminDashboard.myTelegramHelp": "ត្រូវការសម្រាប់មុខងារ \"ភ្លេចលេខសម្ងាត់\" ដោយខ្លួនឯង សម្រាប់គណនី Admin របស់អ្នកផ្ទាល់។",
+  "adminDashboard.myTelegramLabel": "Telegram Chat ID",
+  "adminDashboard.myTelegramPlaceholder": "បញ្ចូល Chat ID របស់អ្នក…",
+  "adminDashboard.savingTelegram": "កំពុងរក្សាទុក…",
+  "adminDashboard.telegramSaved": "បានរក្សាទុក",
 };
 
 export const en = {
@@ -92,4 +98,10 @@ export const en = {
   "adminDashboard.failedToBulkApprove": "Failed to bulk-approve",
   "adminDashboard.confirmDeleteWholeRecord": "This is their only team — removing it will delete this person's whole record. Continue?",
   "adminDashboard.confirmRemoveAssignment": "Remove this team/role?",
+  "adminDashboard.myTelegramCardTitle": "Link my Telegram",
+  "adminDashboard.myTelegramHelp": "Needed for the self-service \"forgot password\" flow, for your own Admin account.",
+  "adminDashboard.myTelegramLabel": "Telegram Chat ID",
+  "adminDashboard.myTelegramPlaceholder": "Enter your chat ID…",
+  "adminDashboard.savingTelegram": "Saving…",
+  "adminDashboard.telegramSaved": "Saved",
 };

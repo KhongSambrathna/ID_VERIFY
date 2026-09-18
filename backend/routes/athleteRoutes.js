@@ -41,9 +41,12 @@ router.get("/search", searchAthletes);
 router.use(requireAuth);
 
 // Read-only — Admin (every team), Head Coach and Player (both forced to
-// their own team by the controller) can all view. A Player account is NEVER
-// allowed past this point — every route below is Admin/Head Coach only, so
-// a shared player login can look but never touch anything.
+// their own team by the controller) can all view. A Player account is
+// otherwise NEVER allowed past this point — every route below is
+// Admin/Head Coach only, with one exception: PUT /:id also accepts PLAYER,
+// scoped by the controller to an individual Player account editing their
+// own record (see updateAthlete's isPlayerSelf check) — a shared
+// team-wide Player login can still never write anything.
 router.get("/", requireRole("ADMIN", "HEAD_COACH", "PLAYER"), getAllAthletes);
 // These bare paths must stay above /:id and /bulk-approve above /:id for
 // PUT — otherwise Express swallows them as an :id param instead.
@@ -70,9 +73,13 @@ router.post(
   ]),
   createAthlete
 );
+// PLAYER is allowed here too — an individual Player account (not the
+// shared/legacy team-wide login) editing their OWN record, gated inside
+// updateAthlete. requireActiveSubscription is a no-op for any role other
+// than HEAD_COACH, so it stays harmless for a Player submit.
 router.put(
   "/:id",
-  requireRole("ADMIN", "HEAD_COACH"),
+  requireRole("ADMIN", "HEAD_COACH", "PLAYER"),
   requireActiveSubscription,
   upload.fields([
     { name: "photo", maxCount: 1 },

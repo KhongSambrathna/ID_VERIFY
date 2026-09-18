@@ -149,7 +149,14 @@ export default function TournamentsPage() {
             <tbody>
               {tournaments.map((tour) => (
                 <tr key={tour._id}>
-                  <td data-label={t("common.name")}>{tour.name}</td>
+                  <td data-label={t("common.name")}>
+                    {tour.name}
+                    {tour.registrationClosed && (
+                      <span className="badge rejected" style={{ marginLeft: 6 }}>
+                        {t("tournamentsPage.closedBadge")}
+                      </span>
+                    )}
+                  </td>
                   <td data-label={t("tournamentsPage.entryFeeHeader")}>${tour.entryFee || 0}</td>
                   <td data-label={t("tournamentsPage.datesHeader")}>
                     {tour.matchDates?.length ? tour.matchDates.map(formatDate).join(", ") : "—"}
@@ -167,10 +174,14 @@ export default function TournamentsPage() {
                         <button className="link-btn" onClick={() => navigate(`/tournaments/${tour._id}/squad`)}>
                           {t("tournamentsPage.viewSquad")}
                         </button>
-                        <button className="action-btn danger" disabled={registeringId === tour._id} onClick={() => unregister(tour)}>
-                          {t("common.cancel")}
-                        </button>
+                        {!tour.registrationClosed && (
+                          <button className="action-btn danger" disabled={registeringId === tour._id} onClick={() => unregister(tour)}>
+                            {t("common.cancel")}
+                          </button>
+                        )}
                       </>
+                    ) : tour.registrationClosed ? (
+                      <span className="help-text">{t("tournamentsPage.closedHelp")}</span>
                     ) : (
                       <button className="action-btn positive" disabled={registeringId === tour._id} onClick={() => register(tour)}>
                         {registeringId === tour._id ? t("tournamentsPage.registering") : t("tournamentsPage.registerButton")}

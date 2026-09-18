@@ -77,6 +77,13 @@ export default function TournamentSquadPage() {
   const [athleteSearch, setAthleteSearch] = useState("");
   const [athleteResults, setAthleteResults] = useState([]);
 
+  const [payOpenId, setPayOpenId] = useState(null);
+  const [payAmount, setPayAmount] = useState("");
+  const [paySaving, setPaySaving] = useState(false);
+  const [payError, setPayError] = useState("");
+  const [settling, setSettling] = useState(false);
+  const [closing, setClosing] = useState(false);
+
   const exportRef = useRef(null);
   const [showExportSheet, setShowExportSheet] = useState(false);
 
@@ -146,6 +153,61 @@ export default function TournamentSquadPage() {
       alert(err.response?.data?.message || t("tournamentSquadPage.failedToRemove"));
     } finally {
       setActingId(null);
+    }
+  };
+
+  const toggleRegistrationClosed = async () => {
+    setClosing(true);
+    try {
+      await api.patch(`/tournaments/${id}/registration-status`, { closed: !tournament.registrationClosed });
+      load();
+    } catch (err) {
+      alert(err.response?.data?.message || t("tournamentSquadPage.failedToUpdateClosed"));
+    } finally {
+      setClosing(false);
+    }
+  };
+
+  const openPayForm = (row) => {
+    setPayOpenId(row._id);
+    setPayAmount(String(row.feePaidAmount > 0 ? row.feePaidAmount : tournament.entryFee));
+    setPayError("");
+  };
+
+  const closePayForm = () => {
+    setPayOpenId(null);
+    setPayError("");
+  };
+
+  const savePayAmount = async (row) => {
+    const amount = Number(payAmount);
+    if (!Number.isFinite(amount) || amount < 0 || amount > tournament.entryFee) {
+      setPayError(t("tournamentSquadPage.payAmountInvalid"));
+      return;
+    }
+    setPaySaving(true);
+    setPayError("");
+    try {
+      await api.patch(`/tournaments/${id}/registrations/${row._id}/paid`, { amount });
+      setPayOpenId(null);
+      load();
+    } catch (err) {
+      setPayError(err.response?.data?.message || t("tournamentSquadPage.failedToUpdatePaid"));
+    } finally {
+      setPaySaving(false);
+    }
+  };
+
+  const settleNow = async () => {
+    if (!confirm(t("tournamentSquadPage.confirmSettleNow"))) return;
+    setSettling(true);
+    try {
+      await api.post(`/tournaments/${id}/settle-debts`);
+      load();
+    } catch (err) {
+      alert(err.response?.data?.message || t("tournamentSquadPage.failedToSettle"));
+    } finally {
+      setSettling(false);
     }
   };
 
@@ -219,7 +281,14 @@ export default function TournamentSquadPage() {
   return (
     <div className="container dash-body">
       <div className="dash-header">
-        <h2>{tournament.name} {t("tournamentSquadPage.squadListSuffix")}</h2>
+        <h2>
+          {tournament.name} {t("tournamentSquadPage.squadListSuffix")}
+          {tournament.registrationClosed && (
+            <span className="badge rejected" style={{ marginLeft: 8, verticalAlign: "middle" }}>
+              {t("tournamentSquadPage.closedBadge")}
+            </span>
+          )}
+        </h2>
         <p>
           {t("tournamentSquadPage.registeredCount").replace("{count}", tournament.registrations.length)}
           {tournament.matchDates?.length ? ` · ${tournament.matchDates.map(formatDate).join(", ")}` : ""}
@@ -227,6 +296,11 @@ export default function TournamentSquadPage() {
       </div>
 
       <div className="dash-actions" style={{ marginBottom: 16 }}>
+        {!isPlayer && (
+          <button className="btn btn-outline" disabled={closing} onClick={toggleRegistrationClosed}>
+            {tournament.registrationClosed ? t("tournamentSquadPage.openRegistrationButton") : t("tournamentSquadPage.closeRegistrationButton")}
+          </button>
+        )}
         <button className="btn btn-outline" onClick={exportJpg} disabled={exporting !== null}>
           {exporting === "jpg" ? t("tournamentSquadPage.exporting") : t("tournamentSquadPage.exportImage")}
         </button>
@@ -236,6 +310,14 @@ export default function TournamentSquadPage() {
         <Link className="link-btn" to={backTo} onClick={(e) => { e.preventDefault(); navigate(backTo); }}>
           {t("tournamentSquadPage.backToTournaments")}
         </Link>
+        {!isPlayer && tournament.entryFee > 0 && !tournament.debtSettledAt && tournament.registrations.length > 0 && (
+          <button className="btn btn-outline" disabled={settling} onClick={settleNow}>
+            {settling ? t("tournamentSquadPage.settling") : t("tournamentSquadPage.settleNowButton")}
+          </button>
+        )}
+        {!isPlayer && tournament.entryFee > 0 && tournament.debtSettledAt && (
+          <span className="badge verified">{t("tournamentSquadPage.settledBadge")}</span>
+        )}
       </div>
 
       {!isPlayer && tournament.teamLineups?.length > 0 && (
@@ -288,28 +370,81 @@ export default function TournamentSquadPage() {
           {tournament.registrations.map((r, idx) => {
             const isMine = isPlayer && athleteId && String(r.athlete) === String(athleteId);
             return (
-              <div key={r._id || idx} className="lineup-athlete">
-                <span className="number">{r.jerseyNumber ?? idx + 1}</span>
-                <img
-                  src={r.photoUrl ? resolveFileUrl(r.photoUrl) : "https://placehold.co/40x40?text=Photo"}
-                  alt={r.fullName}
-                  className="tiny-photo"
-                />
-                <div className="athlete-info">
-                  <p className="name">
-                    {r.fullName}
-                    {r.isOverage && <span className="badge pending" style={{ marginLeft: 6 }}>{t("tournamentSquadPage.overAge")}</span>}
-                  </p>
-                  <p className="role">
-                    {r.khmerName ? `${r.khmerName} · ` : ""}
-                    {t("tournamentSquadPage.dobLabel")} {formatDob(r.dateOfBirth) || "—"} · <span className="caps-display">{r.team}</span>
-                    {r.registeredBy ? t("tournamentSquadPage.registeredByStaff") : ""}
-                  </p>
+              <div key={r._id || idx} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div className="lineup-athlete">
+                  <span className="number">{r.jerseyNumber ?? idx + 1}</span>
+                  <img
+                    src={r.photoUrl ? resolveFileUrl(r.photoUrl) : "https://placehold.co/40x40?text=Photo"}
+                    alt={r.fullName}
+                    className="tiny-photo"
+                  />
+                  <div className="athlete-info">
+                    <p className="name">
+                      {r.fullName}
+                      {r.isOverage && <span className="badge pending" style={{ marginLeft: 6 }}>{t("tournamentSquadPage.overAge")}</span>}
+                    </p>
+                    <p className="role">
+                      {r.khmerName ? `${r.khmerName} · ` : ""}
+                      {t("tournamentSquadPage.dobLabel")} {formatDob(r.dateOfBirth) || "—"} · <span className="caps-display">{r.team}</span>
+                      {r.registeredBy ? t("tournamentSquadPage.registeredByStaff") : ""}
+                    </p>
+                  </div>
+                  {!isPlayer && tournament.entryFee > 0 && (
+                    r.convertedToDebt ? (
+                      <span className="badge rejected">{t("tournamentSquadPage.convertedToDebtBadge")}</span>
+                    ) : r.feePaid ? (
+                      <span className="badge verified">{t("tournamentSquadPage.paidBadge")}</span>
+                    ) : r.feePaidAmount > 0 ? (
+                      <span className="badge pending">
+                        {t("tournamentSquadPage.partialBadge")
+                          .replace("{amount}", r.feePaidAmount)
+                          .replace("{fee}", tournament.entryFee)}
+                      </span>
+                    ) : (
+                      <span className="badge pending">{t("tournamentSquadPage.unpaidBadge")}</span>
+                    )
+                  )}
+                  {!isPlayer && tournament.entryFee > 0 && !r.convertedToDebt && (
+                    <button className="link-btn" onClick={() => openPayForm(r)}>
+                      {t("tournamentSquadPage.setAmountButton")}
+                    </button>
+                  )}
+                  {!isPlayer && (
+                    <button className="link-btn" disabled={actingId === r._id} onClick={() => removeRegistration(r)}>
+                      {t("common.remove")}
+                    </button>
+                  )}
+                  {isPlayer && isMine && !tournament.registrationClosed && (
+                    <button className="link-btn" disabled={actingId === r._id} onClick={() => removeRegistration(r)}>
+                      {t("common.cancel")}
+                    </button>
+                  )}
                 </div>
-                {(!isPlayer || isMine) && (
-                  <button className="link-btn" disabled={actingId === r._id} onClick={() => removeRegistration(r)}>
-                    {isMine ? t("common.cancel") : t("common.remove")}
-                  </button>
+                {payOpenId === r._id && (
+                  <div className="field" style={{ maxWidth: 260, marginLeft: 44 }}>
+                    <label>{t("tournamentSquadPage.payAmountLabel").replace("{fee}", tournament.entryFee)}</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max={tournament.entryFee}
+                      step="0.01"
+                      value={payAmount}
+                      onChange={(e) => setPayAmount(e.target.value)}
+                    />
+                    {payError && (
+                      <p className="error-text" style={{ margin: "4px 0" }}>
+                        {payError}
+                      </p>
+                    )}
+                    <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                      <button type="button" className="btn btn-primary" disabled={paySaving} onClick={() => savePayAmount(r)}>
+                        {paySaving ? t("tournamentSquadPage.payingSavingBtn") : t("tournamentSquadPage.paySaveBtn")}
+                      </button>
+                      <button type="button" className="btn btn-outline" onClick={closePayForm}>
+                        {t("common.cancel")}
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             );

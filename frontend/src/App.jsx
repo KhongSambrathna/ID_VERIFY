@@ -23,6 +23,7 @@ import DebtReportPage from "./pages/DebtReportPage";
 import StatsPage from "./pages/StatsPage";
 import RenewPage from "./pages/RenewPage";
 import PlayerDashboard from "./pages/PlayerDashboard";
+import PlayerEditProfile from "./pages/PlayerEditProfile";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import AdminTournaments from "./pages/AdminTournaments";
@@ -31,6 +32,7 @@ import TournamentSquadPage from "./pages/TournamentSquadPage";
 import PlayerSquadListPage from "./pages/PlayerSquadListPage";
 import PricingPage from "./pages/PricingPage";
 import PosterGenerator from "./pages/PosterGenerator";
+import PaymentReturn from "./pages/PaymentReturn";
 
 export default function App() {
   return (
@@ -182,6 +184,14 @@ export default function App() {
           }
         />
         <Route
+          path="/player/edit"
+          element={
+            <ProtectedRoute role="PLAYER">
+              <PlayerEditProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/tournaments"
           element={
             <ProtectedRoute role={["ADMIN", "HEAD_COACH"]}>
@@ -210,6 +220,14 @@ export default function App() {
           element={
             <ProtectedRoute role="PLAYER">
               <PlayerSquadListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payment/return"
+          element={
+            <ProtectedRoute role={["ADMIN", "HEAD_COACH", "PLAYER"]}>
+              <PaymentReturn />
             </ProtectedRoute>
           }
         />

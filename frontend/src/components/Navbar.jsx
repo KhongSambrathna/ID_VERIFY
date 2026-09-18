@@ -127,6 +127,9 @@ export default function Navbar() {
           {isAuthed && isPlayer && athleteId && (
             <Link to="/tournaments" onClick={closeMenu}>{t("navbar.tournaments")}</Link>
           )}
+          {isAuthed && isPlayer && athleteId && (
+            <Link to="/player/edit" onClick={closeMenu}>{t("navbar.editProfile")}</Link>
+          )}
           {isAuthed && isPlayer && (
             <Link to="/squad-list" onClick={closeMenu}>{t("navbar.squadList")}</Link>
           )}

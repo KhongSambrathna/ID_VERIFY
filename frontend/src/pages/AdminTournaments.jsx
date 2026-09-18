@@ -62,6 +62,13 @@ export default function AdminTournaments() {
   const [athletes, setAthletes] = useState([]);
   const [registering, setRegistering] = useState(null);
 
+  const [payOpenId, setPayOpenId] = useState(null);
+  const [payAmount, setPayAmount] = useState("");
+  const [paySaving, setPaySaving] = useState(false);
+  const [payError, setPayError] = useState("");
+  const [settling, setSettling] = useState(false);
+  const [closingId, setClosingId] = useState(null);
+
   const load = async () => {
     setLoading(true);
     try {
@@ -203,6 +210,64 @@ export default function AdminTournaments() {
     }
   };
 
+  const openPayForm = (row, entryFee) => {
+    setPayOpenId(row._id);
+    setPayAmount(String(row.feePaidAmount > 0 ? row.feePaidAmount : entryFee));
+    setPayError("");
+  };
+
+  const closePayForm = () => {
+    setPayOpenId(null);
+    setPayError("");
+  };
+
+  const savePayAmount = async (row) => {
+    const amount = Number(payAmount);
+    if (!Number.isFinite(amount) || amount < 0 || amount > detail.entryFee) {
+      setPayError(t("adminTournaments.payAmountInvalid"));
+      return;
+    }
+    setPaySaving(true);
+    setPayError("");
+    try {
+      await api.patch(`/tournaments/${expandedId}/registrations/${row._id}/paid`, { amount });
+      setPayOpenId(null);
+      await loadDetail(expandedId);
+      load();
+    } catch (err) {
+      setPayError(err.response?.data?.message || t("adminTournaments.failedToUpdatePaid"));
+    } finally {
+      setPaySaving(false);
+    }
+  };
+
+  const settleNow = async () => {
+    if (!confirm(t("adminTournaments.confirmSettleNow"))) return;
+    setSettling(true);
+    try {
+      await api.post(`/tournaments/${expandedId}/settle-debts`);
+      await loadDetail(expandedId);
+      load();
+    } catch (err) {
+      alert(err.response?.data?.message || t("adminTournaments.failedToSettle"));
+    } finally {
+      setSettling(false);
+    }
+  };
+
+  const toggleRegistrationClosed = async (tour) => {
+    setClosingId(tour._id);
+    try {
+      await api.patch(`/tournaments/${tour._id}/registration-status`, { closed: !tour.registrationClosed });
+      if (expandedId === tour._id) await loadDetail(tour._id);
+      load();
+    } catch (err) {
+      alert(err.response?.data?.message || t("adminTournaments.failedToUpdateClosed"));
+    } finally {
+      setClosingId(null);
+    }
+  };
+
   const exportCsv = async (tour) => {
     try {
       const { data } = await api.get(`/tournaments/${tour._id}/export.csv`, { responseType: "blob" });
@@ -327,7 +392,14 @@ export default function AdminTournaments() {
               {tournaments.map((tour) => (
                 <Fragment key={tour._id}>
                   <tr>
-                    <td data-label={t("common.name")}>{tour.name}</td>
+                    <td data-label={t("common.name")}>
+                      {tour.name}
+                      {tour.registrationClosed && (
+                        <span className="badge rejected" style={{ marginLeft: 6 }}>
+                          {t("adminTournaments.closedBadge")}
+                        </span>
+                      )}
+                    </td>
                     <td data-label={t("common.team")}>{tour.team || t("adminTournaments.allTeams")}</td>
                     <td data-label={t("adminTournaments.entryFeeHeader")}>${tour.entryFee || 0}</td>
                     <td data-label={t("adminTournaments.datesHeader")}>
@@ -339,7 +411,14 @@ export default function AdminTournaments() {
                         ? t("adminTournaments.capSuffix").replace("{count}", tour.registrationCount).replace("{max}", tour.maxParticipants)
                         : ""}
                     </td>
-                    <td data-label={t("adminTournaments.registeredHeader")}>{tour.registrationCount}</td>
+                    <td data-label={t("adminTournaments.registeredHeader")}>
+                      {tour.registrationCount}
+                      {tour.entryFee > 0 && tour.unpaidCount > 0 && (
+                        <span className="badge pending" style={{ marginLeft: 6 }}>
+                          {t("adminTournaments.unpaidCountSuffix").replace("{count}", tour.unpaidCount)}
+                        </span>
+                      )}
+                    </td>
                     <td data-label={t("common.actions")} className="actions-cell">
                       <button className="action-btn" onClick={() => toggleExpand(tour)}>
                         {expandedId === tour._id ? t("adminTournaments.hide") : t("adminTournaments.viewRegister")}
@@ -349,6 +428,13 @@ export default function AdminTournaments() {
                       </button>
                       <button className="action-btn" onClick={() => exportCsv(tour)}>
                         {t("common.export")}
+                      </button>
+                      <button
+                        className="action-btn"
+                        disabled={closingId === tour._id}
+                        onClick={() => toggleRegistrationClosed(tour)}
+                      >
+                        {tour.registrationClosed ? t("adminTournaments.openRegistrationButton") : t("adminTournaments.closeRegistrationButton")}
                       </button>
                       <button className="action-btn danger" onClick={() => remove(tour._id)}>
                         {t("common.delete")}
@@ -362,9 +448,19 @@ export default function AdminTournaments() {
                         {!detailLoading && detail && (
                           <div style={{ padding: "8px 4px" }}>
                             {detail.description && <p className="help-text">{detail.description}</p>}
-                            <h4 style={{ marginBottom: 6 }}>
-                              {t("adminTournaments.registeredPlayersHeading").replace("{count}", detail.registrations.length)}
-                            </h4>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                              <h4 style={{ marginBottom: 6 }}>
+                                {t("adminTournaments.registeredPlayersHeading").replace("{count}", detail.registrations.length)}
+                              </h4>
+                              {detail.entryFee > 0 && detail.debtSettledAt && (
+                                <span className="badge verified">{t("adminTournaments.settledBadge")}</span>
+                              )}
+                              {detail.entryFee > 0 && !detail.debtSettledAt && detail.registrations.length > 0 && (
+                                <button type="button" className="action-btn" disabled={settling} onClick={settleNow}>
+                                  {settling ? t("adminTournaments.settling") : t("adminTournaments.settleNowButton")}
+                                </button>
+                              )}
+                            </div>
                             {detail.teamLineups?.length > 0 && (
                               <p className="help-text" style={{ marginTop: -4 }}>
                                 {t("adminTournaments.syncHelpPrefix")}{" "}
@@ -386,16 +482,70 @@ export default function AdminTournaments() {
                             ) : (
                               <ul className="fee-items" style={{ marginBottom: 12 }}>
                                 {detail.registrations.map((r) => (
-                                  <li key={r._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                    <span>
-                                      <span className="caps-display">{r.fullName} {r.khmerName ? `(${r.khmerName})` : ""} — {r.team}</span>
-                                      {r.jerseyNumber != null ? ` · #${r.jerseyNumber}` : ""}
-                                      {r.isOverage ? ` · ${t("adminTournaments.overageSuffix")}` : ""}
-                                      {r.registeredBy ? ` · ${t("adminTournaments.registeredByStaffSuffix")}` : ""}
-                                    </span>
-                                    <button className="link-btn" onClick={() => removeRegistration(r._id)}>
-                                      {t("common.remove")}
-                                    </button>
+                                  <li key={r._id} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+                                      <span>
+                                        <span className="caps-display">{r.fullName} {r.khmerName ? `(${r.khmerName})` : ""} — {r.team}</span>
+                                        {r.jerseyNumber != null ? ` · #${r.jerseyNumber}` : ""}
+                                        {r.isOverage ? ` · ${t("adminTournaments.overageSuffix")}` : ""}
+                                        {r.registeredBy ? ` · ${t("adminTournaments.registeredByStaffSuffix")}` : ""}
+                                      </span>
+                                      <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                                        {detail.entryFee > 0 &&
+                                          (r.convertedToDebt ? (
+                                            <span className="badge rejected">{t("adminTournaments.convertedToDebtBadge")}</span>
+                                          ) : r.feePaid ? (
+                                            <span className="badge verified">{t("adminTournaments.paidBadge")}</span>
+                                          ) : r.feePaidAmount > 0 ? (
+                                            <span className="badge pending">
+                                              {t("adminTournaments.partialBadge")
+                                                .replace("{amount}", r.feePaidAmount)
+                                                .replace("{fee}", detail.entryFee)}
+                                            </span>
+                                          ) : (
+                                            <span className="badge pending">{t("adminTournaments.unpaidBadge")}</span>
+                                          ))}
+                                        {detail.entryFee > 0 && !r.convertedToDebt && (
+                                          <button type="button" className="link-btn" onClick={() => openPayForm(r, detail.entryFee)}>
+                                            {t("adminTournaments.setAmountButton")}
+                                          </button>
+                                        )}
+                                        <button className="link-btn" onClick={() => removeRegistration(r._id)}>
+                                          {t("common.remove")}
+                                        </button>
+                                      </span>
+                                    </div>
+                                    {payOpenId === r._id && (
+                                      <div className="field" style={{ maxWidth: 260 }}>
+                                        <label>{t("adminTournaments.payAmountLabel").replace("{fee}", detail.entryFee)}</label>
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          max={detail.entryFee}
+                                          step="0.01"
+                                          value={payAmount}
+                                          onChange={(e) => setPayAmount(e.target.value)}
+                                        />
+                                        {payError && (
+                                          <p className="error-text" style={{ margin: "4px 0" }}>
+                                            {payError}
+                                          </p>
+                                        )}
+                                        <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                                          <button
+                                            type="button"
+                                            className="btn btn-primary"
+                                            disabled={paySaving}
+                                            onClick={() => savePayAmount(r)}
+                                          >
+                                            {paySaving ? t("adminTournaments.payingSavingBtn") : t("adminTournaments.paySaveBtn")}
+                                          </button>
+                                          <button type="button" className="btn btn-outline" onClick={closePayForm}>
+                                            {t("common.cancel")}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
                                   </li>
                                 ))}
                               </ul>

@@ -18,10 +18,21 @@ export default function DebtReportPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [teamFilter, setTeamFilter] = useState("");
+  const [search, setSearch] = useState("");
+  // Inline "record a payment received" form state, keyed by assignmentId.
+  // `cashMethod` is "CASH" (received in person) or "ABA_QR" (paid by
+  // scanning the team's ABA Merchant KHQR — see the Coach dashboard's
+  // "Team's ABA payment QR" card — and reported back to be recorded here).
+  const [cashOpenId, setCashOpenId] = useState(null);
+  const [cashAmount, setCashAmount] = useState("");
+  const [cashMethod, setCashMethod] = useState("CASH");
+  const [cashNote, setCashNote] = useState("");
+  const [cashSaving, setCashSaving] = useState(false);
+  const [cashError, setCashError] = useState("");
 
-  useEffect(() => {
+  const load = () => {
     setLoading(true);
-    api
+    return api
       .get("/athletes")
       .then(({ data }) => {
         setAthletes(data);
@@ -29,7 +40,50 @@ export default function DebtReportPage() {
       })
       .catch((err) => setError(err.response?.data?.message || t("debtReport.failedToLoadAthletes")))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const openCashForm = (a) => {
+    setCashOpenId(a.assignmentId);
+    setCashAmount(String(a.feeOwed));
+    setCashMethod("CASH");
+    setCashNote("");
+    setCashError("");
+  };
+
+  const closeCashForm = () => {
+    setCashOpenId(null);
+    setCashError("");
+  };
+
+  const saveCashPayment = async (a) => {
+    const amount = Number(cashAmount);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > a.feeOwed) {
+      setCashError(t("debtReport.cashAmountInvalid"));
+      return;
+    }
+    setCashSaving(true);
+    setCashError("");
+    try {
+      await api.post("/payments/cash", {
+        athleteId: a._id,
+        assignmentId: a.assignmentId,
+        amount,
+        method: cashMethod,
+        note: cashNote,
+      });
+      setCashOpenId(null);
+      await load();
+    } catch (err) {
+      setCashError(err.response?.data?.message || t("debtReport.cashSaveFailed"));
+    } finally {
+      setCashSaving(false);
+    }
+  };
 
   const teams = useMemo(
     () => [...new Set(athletes.map((a) => a.team).filter(Boolean))].sort(),
@@ -37,11 +91,19 @@ export default function DebtReportPage() {
   );
 
   const owing = useMemo(() => {
+    const q = search.trim().toLowerCase();
     return athletes
       .filter((a) => a.feeOwed > 0)
       .filter((a) => !teamFilter || a.team === teamFilter)
+      .filter(
+        (a) =>
+          !q ||
+          [a.fullName, a.khmerName, a.team, a.role, a.verifyId]
+            .filter(Boolean)
+            .some((field) => field.toLowerCase().includes(q))
+      )
       .sort((a, b) => b.feeOwed - a.feeOwed);
-  }, [athletes, teamFilter]);
+  }, [athletes, teamFilter, search]);
 
   const total = owing.reduce((sum, a) => sum + (a.feeOwed || 0), 0);
 
@@ -52,18 +114,27 @@ export default function DebtReportPage() {
         <p>{t("debtReport.intro")}</p>
       </div>
 
-      {isAdmin && teams.length > 1 && (
+      <div className="filter-row" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <div className="field search-field" style={{ maxWidth: 260 }}>
-          <select value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)}>
-            <option value="">{t("debtReport.allTeams")}</option>
-            {teams.map((team) => (
-              <option key={team} value={team}>
-                {team}
-              </option>
-            ))}
-          </select>
+          <input
+            placeholder={t("debtReport.searchPlaceholder")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
-      )}
+        {isAdmin && teams.length > 1 && (
+          <div className="field search-field" style={{ maxWidth: 260 }}>
+            <select value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)}>
+              <option value="">{t("debtReport.allTeams")}</option>
+              {teams.map((team) => (
+                <option key={team} value={team}>
+                  {team}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
 
       {loading && <p>{t("common.loading")}</p>}
       {error && <p className="error-text">{error}</p>}
@@ -121,6 +192,54 @@ export default function DebtReportPage() {
                         <Link className="action-btn" to={`/admin/athlete/${a._id}/edit`}>
                           {t("common.edit")}
                         </Link>
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={() => (cashOpenId === a.assignmentId ? closeCashForm() : openCashForm(a))}
+                        >
+                          {t("debtReport.recordCash")}
+                        </button>
+                        {cashOpenId === a.assignmentId && (
+                          <div
+                            className="field"
+                            style={{ width: "100%", marginTop: 8, maxWidth: 260 }}
+                          >
+                            <label>{t("debtReport.cashMethodLabel")}</label>
+                            <select value={cashMethod} onChange={(e) => setCashMethod(e.target.value)}>
+                              <option value="CASH">{t("debtReport.methodCash")}</option>
+                              <option value="ABA_QR">{t("debtReport.methodAbaQr")}</option>
+                            </select>
+                            <label style={{ marginTop: 6 }}>{t("debtReport.cashAmountLabel")}</label>
+                            <input
+                              type="number"
+                              min="0.01"
+                              max={a.feeOwed}
+                              step="0.01"
+                              value={cashAmount}
+                              onChange={(e) => setCashAmount(e.target.value)}
+                            />
+                            <label style={{ marginTop: 6 }}>{t("debtReport.cashNoteLabel")}</label>
+                            <input type="text" value={cashNote} onChange={(e) => setCashNote(e.target.value)} />
+                            {cashError && (
+                              <p className="error-text" style={{ margin: "4px 0" }}>
+                                {cashError}
+                              </p>
+                            )}
+                            <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                              <button
+                                type="button"
+                                className="btn btn-primary"
+                                disabled={cashSaving}
+                                onClick={() => saveCashPayment(a)}
+                              >
+                                {cashSaving ? t("debtReport.cashSavingBtn") : t("debtReport.cashSaveBtn")}
+                              </button>
+                              <button type="button" className="btn btn-outline" onClick={closeCashForm}>
+                                {t("debtReport.cashCancelBtn")}
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}

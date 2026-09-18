@@ -37,6 +37,21 @@ const teamSchema = new mongoose.Schema(
       default: null,
     },
     subscriptionExpiresAt: { type: Date, default: null },
+
+    // A static KHQR image (screenshot/export from the team's own ABA
+    // Merchant mobile app) that this team's players scan to pay their fees
+    // — for a team whose only ABA product is the Merchant app (no PayWay
+    // API access), this is the whole payment flow: no amount is embedded in
+    // a static QR, so whoever pays has to type the amount themselves, and
+    // an Admin/Head Coach then manually records it as received (see
+    // paymentController.recordCashPayment, method "ABA_QR"). Uploaded/
+    // removed by that team's own Head Coach only (see
+    // teamController.uploadMyKhqr/removeMyKhqr) — this is deliberately
+    // per-team, not club-wide, since each team is its own paying tenant
+    // with (potentially) its own separate ABA Merchant account.
+    abaKhqrImageUrl: { type: String, default: null },
+    abaKhqrImagePublicId: { type: String, default: null },
+
     subscriptionHistory: {
       type: [
         {

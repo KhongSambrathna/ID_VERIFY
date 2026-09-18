@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/axios";
+import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
 
 export default function AdminDashboard() {
   const { t } = useLanguage();
+  const { user, login } = useAuth();
   const [athletes, setAthletes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -13,6 +15,28 @@ export default function AdminDashboard() {
   const [selectedPending, setSelectedPending] = useState([]);
   const [bulkApproving, setBulkApproving] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
+
+  // This Admin's OWN Telegram chat id — needed for the self-service "forgot
+  // password" flow on the sign-in page. (An Admin can also set it from the
+  // Users page for any account, but this is the quick self-service path for
+  // their own login.)
+  const [telegramDraft, setTelegramDraft] = useState(user?.telegramChatId || "");
+  const [savingTelegram, setSavingTelegram] = useState(false);
+  const [telegramSaved, setTelegramSaved] = useState(false);
+
+  const saveTelegram = async () => {
+    setSavingTelegram(true);
+    setTelegramSaved(false);
+    try {
+      const { data } = await api.put("/auth/me/telegram", { telegramChatId: telegramDraft });
+      login(localStorage.getItem("token"), data);
+      setTelegramSaved(true);
+    } catch (err) {
+      alert(err.response?.data?.message || t("common.failedToSave"));
+    } finally {
+      setSavingTelegram(false);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -144,6 +168,32 @@ export default function AdminDashboard() {
             {exportingCsv ? t("adminDashboard.exporting") : t("adminDashboard.exportRosterCsv")}
           </button>
         </div>
+      </div>
+
+      <div className="card" style={{ maxWidth: 420, marginBottom: 24 }}>
+        <h4 style={{ marginTop: 0 }}>{t("adminDashboard.myTelegramCardTitle")}</h4>
+        <p className="help-text" style={{ marginTop: -6 }}>
+          {t("adminDashboard.myTelegramHelp")}
+        </p>
+        <div className="field">
+          <label>{t("adminDashboard.myTelegramLabel")}</label>
+          <input
+            placeholder={t("adminDashboard.myTelegramPlaceholder")}
+            value={telegramDraft}
+            onChange={(e) => {
+              setTelegramDraft(e.target.value);
+              setTelegramSaved(false);
+            }}
+          />
+        </div>
+        <button
+          className="btn btn-outline"
+          style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
+          onClick={saveTelegram}
+          disabled={savingTelegram}
+        >
+          {savingTelegram ? t("adminDashboard.savingTelegram") : telegramSaved ? t("adminDashboard.telegramSaved") : t("common.save")}
+        </button>
       </div>
 
       <div className="field search-field">

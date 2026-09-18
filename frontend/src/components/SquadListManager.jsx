@@ -46,8 +46,8 @@ function feeOwedForTeam(athlete, team) {
   return (match?.fees || []).reduce((sum, f) => sum + (f.amount || 0), 0);
 }
 
-// A joined "$10 — Uniform fee, $15 — Registration" string for a tooltip —
-// same dual-shape handling as above.
+// A joined "$10 — Uniform fee, $15 — Registration" string for a
+// tooltip — same dual-shape handling as above.
 function feeSummaryForTeam(athlete, team) {
   if (!athlete) return "";
   const fees = !athlete.assignments

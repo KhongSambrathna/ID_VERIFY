@@ -74,10 +74,78 @@ function summarize(t, athleteId) {
     overageLimitYear: t.overageLimitYear ?? null,
     overageUsed: t.registrations.filter((r) => r.isOverage).length,
     maxParticipants: t.maxParticipants ?? null,
+    registrationClosed: !!t.registrationClosed,
     registrationCount: t.registrations.length,
+    unpaidCount:
+      t.entryFee > 0
+        ? t.registrations.filter((r) => !r.convertedToDebt && (r.feePaidAmount || 0) < t.entryFee).length
+        : 0,
+    debtSettledAt: t.debtSettledAt || null,
     myRegistrationId: mine ? mine._id : null,
     createdAt: t.createdAt,
   };
+}
+
+// "<Tournament name> (<match date(s)>)" — or just the name when no match
+// date is set — used as the owed-fee note so a debt that came from a
+// tournament is identifiable at a glance in the Debt report/CSV/athlete
+// fee list, same as any other fee note there.
+function tournamentFeeNote(tournament) {
+  const dates = (tournament.matchDates || [])
+    .map((d) => {
+      const date = new Date(d);
+      return isNaN(date) ? null : date.toISOString().slice(0, 10);
+    })
+    .filter(Boolean);
+  return `Tournament fee — ${tournament.name}${dates.length ? ` (${dates.join(", ")})` : ""}`;
+}
+
+// A tournament counts as "ended" once a full day has passed since its last
+// match date — the buffer just avoids settling mid-day, before the last
+// game has actually been played. Tournaments with no dates set never
+// auto-settle; use the explicit "settle now" action for those instead.
+function hasTournamentEnded(tournament) {
+  if (!tournament.matchDates || tournament.matchDates.length === 0) return false;
+  const last = tournament.matchDates.reduce((max, d) => (d > max ? d : max), tournament.matchDates[0]);
+  const cutoff = new Date(last).getTime() + 24 * 60 * 60 * 1000;
+  return Date.now() > cutoff;
+}
+
+// Rolls each still-unpaid (or partially-paid) registration's REMAINING
+// entry fee into the athlete's normal owed-fee list (the same `fees[]` the
+// Debt report/cash-payment/ABA flow already reads and writes) — a plain,
+// one-off fee row, functionally identical to an admin adding it by hand
+// via "Edit athlete". Runs at most once per tournament (`debtSettledAt`
+// guards it), and only once it has actually ended, unless `force` is
+// passed (the explicit "settle now" action, for a tournament with no match
+// dates set, or to close it early). Never throws — a lookup failure for
+// one registration just skips that row, so one bad record can't block the
+// rest of the list from being read.
+async function settleUnpaidToDebt(tournament, { force = false } = {}) {
+  if (tournament.debtSettledAt) return false;
+  if (!tournament.entryFee || tournament.entryFee <= 0) return false;
+  if (!force && !hasTournamentEnded(tournament)) return false;
+
+  const unpaid = tournament.registrations.filter(
+    (r) => !r.convertedToDebt && (r.feePaidAmount || 0) < tournament.entryFee
+  );
+  for (const r of unpaid) {
+    try {
+      const remaining = tournament.entryFee - (r.feePaidAmount || 0);
+      const athlete = await Athlete.findById(r.athlete);
+      if (!athlete) continue;
+      const assignment = athlete.assignments.find((a) => a.team === r.team);
+      if (!assignment) continue;
+      assignment.fees.push({ amount: remaining, note: tournamentFeeNote(tournament) });
+      await athlete.save();
+      r.convertedToDebt = true;
+    } catch {
+      // Skip this row; it stays eligible to retry next time settlement runs.
+    }
+  }
+  tournament.debtSettledAt = new Date();
+  await tournament.save();
+  return true;
 }
 
 // Pulls the age-rule fields out of a create/update request body, with
@@ -147,6 +215,20 @@ exports.listTournaments = async (req, res) => {
       filter = team ? { $or: [{ team: "" }, { team }] } : { team: "" };
     }
     const tournaments = await Tournament.find(filter).sort({ createdAt: -1 });
+
+    // Best-effort auto-settle on the way past — only staff trigger it (a
+    // Player's own list view shouldn't be the thing that mutates other
+    // athletes' debt), and one tournament's error never blocks the rest.
+    if (req.adminRole !== "PLAYER") {
+      for (const t of tournaments) {
+        try {
+          await settleUnpaidToDebt(t);
+        } catch {
+          // Leave it unsettled; the next list/detail load retries.
+        }
+      }
+    }
+
     res.json(tournaments.map((t) => summarize(t, req.adminRole === "PLAYER" ? req.athleteId : null)));
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -190,6 +272,15 @@ exports.getTournament = async (req, res) => {
         }
       });
       if (changed) await tournament.save();
+    }
+
+    // Same reasoning as listTournaments — staff-only, best-effort.
+    if (req.adminRole !== "PLAYER") {
+      try {
+        await settleUnpaidToDebt(tournament);
+      } catch {
+        // Leave it unsettled; the next list/detail load retries.
+      }
     }
 
     // Tell the caller whether THEY (when they're an individual Player
@@ -377,6 +468,9 @@ exports.registerSelf = async (req, res) => {
     if (tournament.team && tournament.team !== req.adminTeam) {
       return res.status(403).json({ message: "Access denied" });
     }
+    if (tournament.registrationClosed) {
+      return res.status(403).json({ message: "Registration is closed for this tournament." });
+    }
 
     const row = await buildRegistration(tournament, req.athleteId, req.body.team);
     tournament.registrations.push(row);
@@ -452,6 +546,14 @@ exports.unregister = async (req, res) => {
     if (!isOwnRow && !isOwnTeamsRegistration && !canManage(req, tournament)) {
       return res.status(403).json({ message: "Access denied" });
     }
+    // Staff (isOwnTeamsRegistration / canManage) can still remove anyone at
+    // any time — this only blocks a PLAYER cancelling their own row once
+    // registration has been closed.
+    if (isOwnRow && tournament.registrationClosed) {
+      return res.status(403).json({
+        message: "Registration is closed for this tournament — ask your Admin/Head Coach to remove you.",
+      });
+    }
 
     const removedAthleteId = row.athlete;
     const removedTeam = row.team;
@@ -472,6 +574,88 @@ exports.unregister = async (req, res) => {
   }
 };
 
+// PATCH /api/tournaments/:id/registrations/:registrationId/paid  (Admin, or
+// Head Coach for their own team's registrations) — body: { amount }. Sets
+// the cash amount collected so far for this registration's entry fee (can
+// be less than the tournament's entryFee for a partial payment, e.g. paid
+// in installments). Just a note in the list, not a payment record of its
+// own. Locked once the row has already been converted to regular debt;
+// collect the rest through the Debt report instead, same as any other
+// owed fee.
+exports.setRegistrationPaid = async (req, res) => {
+  try {
+    const tournament = await Tournament.findById(req.params.id);
+    if (!tournament) return res.status(404).json({ message: "Tournament not found" });
+
+    const row = tournament.registrations.id(req.params.registrationId);
+    if (!row) return res.status(404).json({ message: "Registration not found" });
+
+    const isOwnTeamsRegistration = req.adminRole === "HEAD_COACH" && row.team === req.adminTeam;
+    if (!isOwnTeamsRegistration && !canManage(req, tournament)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    if (row.convertedToDebt) {
+      return res.status(409).json({
+        message: "This has already been converted to regular debt — record the payment from the Debt report instead.",
+      });
+    }
+
+    const amount = Number(req.body.amount);
+    if (!Number.isFinite(amount) || amount < 0) {
+      return res.status(400).json({ message: "Invalid amount" });
+    }
+    if (amount > tournament.entryFee) {
+      return res.status(400).json({ message: `Amount can't exceed the entry fee ($${tournament.entryFee})` });
+    }
+
+    row.feePaidAmount = amount;
+    row.feePaid = amount >= tournament.entryFee && tournament.entryFee > 0;
+    row.feePaidAt = amount > 0 ? new Date() : null;
+    row.feePaidBy = amount > 0 ? req.adminId : null;
+
+    await tournament.save();
+    res.json(tournament);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// POST /api/tournaments/:id/settle-debts  (Admin, or Head Coach for their
+// own team's tournament) — forces the unpaid → debt conversion right now,
+// regardless of match dates (for a tournament with no dates set, or to
+// close it out early). No-op (still returns 200) if already settled.
+exports.settleTournamentNow = async (req, res) => {
+  try {
+    const tournament = await Tournament.findById(req.params.id);
+    if (!tournament) return res.status(404).json({ message: "Tournament not found" });
+    if (!canManage(req, tournament)) return res.status(403).json({ message: "Access denied" });
+
+    await settleUnpaidToDebt(tournament, { force: true });
+    res.json(tournament);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PATCH /api/tournaments/:id/registration-status  (Admin, or Head Coach for
+// their own team's tournament) — body: { closed: boolean }. Stops (or
+// re-allows) players registering/cancelling themselves; staff can always
+// register-on-behalf or remove anyone regardless of this setting.
+exports.setRegistrationClosed = async (req, res) => {
+  try {
+    const tournament = await Tournament.findById(req.params.id);
+    if (!tournament) return res.status(404).json({ message: "Tournament not found" });
+    if (!canManage(req, tournament)) return res.status(403).json({ message: "Access denied" });
+
+    tournament.registrationClosed = !!req.body.closed;
+    await tournament.save();
+    res.json(tournament);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // GET /api/tournaments/:id/export.csv  (Admin, or Head Coach for their own
 // team's tournament) — the registered-player list, for handing out or
 // keeping offline.
@@ -485,7 +669,7 @@ exports.exportRegistrationsCsv = async (req, res) => {
       const s = v === null || v === undefined ? "" : String(v);
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const header = ["Verify ID", "Full name", "Khmer name", "Team", "Jersey #", "Over-age", "Registered by"];
+    const header = ["Verify ID", "Full name", "Khmer name", "Team", "Jersey #", "Over-age", "Registered by", "Fee paid"];
     const lines = [header.map(escapeCsv).join(",")];
     tournament.registrations.forEach((r) => {
       lines.push(
@@ -497,6 +681,11 @@ exports.exportRegistrationsCsv = async (req, res) => {
           r.jerseyNumber ?? "",
           r.isOverage ? "Yes" : "",
           r.registeredBy ? "Admin/Coach" : "Self",
+          tournament.entryFee > 0
+            ? r.convertedToDebt
+              ? "Converted to debt"
+              : `$${r.feePaidAmount || 0} of $${tournament.entryFee}`
+            : "",
         ]
           .map(escapeCsv)
           .join(",")

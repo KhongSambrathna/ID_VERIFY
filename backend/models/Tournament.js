@@ -23,6 +23,22 @@ const registrationSchema = new mongoose.Schema(
     // and used up one of the limited overage exception slots to register.
     // Always false when the tournament has no age limit set.
     isOverage: { type: Boolean, default: false },
+    // Set by Admin/Head Coach when this player pays the entry fee in person
+    // (typically cash, on match day) — a simple note in the list, not a
+    // payment record of its own. `feePaidAmount` is the actual cash amount
+    // entered (can be less than the tournament's entryFee for a partial
+    // payment); `feePaid` is kept true only once that amount covers the
+    // full entry fee. Once `convertedToDebt` is true below, none of this is
+    // editable here any more; any remaining/late payment is collected the
+    // normal way, via the Debt report's cash-payment / ABA flow.
+    feePaidAmount: { type: Number, default: 0, min: 0 },
+    feePaid: { type: Boolean, default: false },
+    feePaidAt: { type: Date, default: null },
+    feePaidBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
+    // true once this registration's unpaid entry fee has been rolled into
+    // the athlete's regular owed-fee list (see Tournament.debtSettledAt) —
+    // from that point on it's tracked as ordinary debt, not here.
+    convertedToDebt: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
@@ -49,8 +65,17 @@ const tournamentSchema = new mongoose.Schema(
     overageLimitYear: { type: Number, default: null },
     // Total registration cap across the whole tournament. null/0 = no cap.
     maxParticipants: { type: Number, default: null },
+    // Set by Admin/Head Coach to stop players from self-registering or
+    // self-cancelling (e.g. once the roster is final) — staff can still
+    // register/remove someone by hand at any time, and can flip this back
+    // open again whenever they want.
+    registrationClosed: { type: Boolean, default: false },
     registrations: { type: [registrationSchema], default: [] },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
+    // Set once anyone still unpaid at tournament-end has had their entry fee
+    // converted into regular debt (see settleUnpaidToDebt in the
+    // controller) — guards that conversion from ever running twice.
+    debtSettledAt: { type: Date, default: null },
     // One auto-managed Lineup ("Squad list", the same thing the My Team >
     // Squad list tab manages) per team registering in this tournament — kept
     // in sync as people register/unregister, so a coach can go straight from

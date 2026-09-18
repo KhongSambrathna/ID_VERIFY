@@ -23,6 +23,37 @@ export const km = {
   "coachDashboard.confirmRemoveAssignment":
     "ស្នើសុំដកតួនាទី/ក្រុមនេះចេញឬ? អ្នកគ្រប់គ្រងត្រូវការបញ្ជាក់ជាមុនសិន។",
   "coachDashboard.failedToRequestRemoval": "បរាជ័យក្នុងការស្នើសុំដកចេញ",
+  "coachDashboard.tabPlayerAccounts": "គណនីកីឡាករ",
+  "coachDashboard.playerAccountsTitle": "គណនីកីឡាករ (ចូលបុគ្គល)",
+  "coachDashboard.playerAccountsIntro":
+    "កំណត់ពាក្យសម្ងាត់ឡើងវិញសម្រាប់គណនីចូលបុគ្គលរបស់កីឡាករនៅក្នុងក្រុមរបស់អ្នក — ប្រើនៅពេលកីឡាករភ្លេចពាក្យសម្ងាត់ ហើយមុខងារ \"ភ្លេចពាក្យសម្ងាត់\" ដោយខ្លួនឯងមិនដំណើរការ (ឧ. មិនទាន់ភ្ជាប់ Telegram)។",
+  "coachDashboard.mustChangePassword": "ត្រូវប្តូរពាក្យសម្ងាត់",
+  "coachDashboard.telegramLinked": "បានភ្ជាប់ Telegram",
+  "coachDashboard.resetPassword": "កំណត់ពាក្យសម្ងាត់ឡើងវិញ",
+  "coachDashboard.resetting": "កំពុងកំណត់ឡើងវិញ…",
+  "coachDashboard.confirmResetPasswordPrefix": "កំណត់ពាក្យសម្ងាត់របស់",
+  "coachDashboard.confirmResetPasswordSuffix": " ទៅជា 12345 ឡើងវិញឬ? កីឡាករនឹងត្រូវប្តូរវានៅពេលចូលលើកក្រោយ។",
+  "coachDashboard.failedToResetPassword": "មិនអាចកំណត់ពាក្យសម្ងាត់ឡើងវិញបានទេ",
+  "coachDashboard.noPlayerAccounts": "គ្មានគណនីកីឡាករចូលបុគ្គលនៅក្នុងក្រុមរបស់អ្នកនៅឡើយទេ។",
+  "coachDashboard.myTelegramCardTitle": "តភ្ជាប់ Telegram របស់ខ្ញុំ",
+  "coachDashboard.myTelegramHelp":
+    "ត្រូវការសម្រាប់មុខងារ \"ភ្លេចលេខសម្ងាត់\" ដោយខ្លួនឯង — សម្រាប់គណនីគ្រូបង្វឹករបស់អ្នកផ្ទាល់ (មិនមែនគណនីកីឡាករទេ)។",
+  "coachDashboard.myTelegramLabel": "Telegram Chat ID",
+  "coachDashboard.myTelegramPlaceholder": "បញ្ចូល Chat ID របស់អ្នក…",
+  "coachDashboard.savingTelegram": "កំពុងរក្សាទុក…",
+  "coachDashboard.telegramSaved": "បានរក្សាទុក",
+  "coachDashboard.khqrCardTitle": "QR ទូទាត់ ABA របស់ក្រុម",
+  "coachDashboard.khqrHelp":
+    "ដាក់រូប QR ពី App ABA Merchant របស់អ្នក (Save Image ពី App រួចបង្ហោះទីនេះ) ដើម្បីអោយកីឡាករស្កេនទូទាត់ថ្លៃសេវា។ QR នេះមិនកំណត់ចំនួនទឹកប្រាក់ដោយស្វ័យប្រវត្តិទេ — កីឡាករត្រូវវាយបញ្ចូលចំនួនដោយខ្លួនឯង ហើយអ្នក ឬគ្រូបង្វឹកត្រូវចុចបញ្ជាក់ថាបានទទួលទឹកប្រាក់នៅក្នុងទំព័រ \"ជំពាក់ថ្លៃ\"។",
+  "coachDashboard.khqrUploadLabel": "បង្ហោះរូប QR",
+  "coachDashboard.khqrReplaceLabel": "ប្តូររូប QR ថ្មី",
+  "coachDashboard.khqrSave": "រក្សាទុក",
+  "coachDashboard.khqrUploading": "កំពុងបង្ហោះ…",
+  "coachDashboard.khqrUploadFailed": "មិនអាចបង្ហោះរូប QR បានទេ",
+  "coachDashboard.khqrRemove": "លុបចេញ",
+  "coachDashboard.khqrRemoving": "កំពុងលុប…",
+  "coachDashboard.khqrRemoveFailed": "មិនអាចលុបរូប QR បានទេ",
+  "coachDashboard.confirmRemoveKhqr": "លុបរូប QR ទូទាត់ ABA របស់ក្រុមនេះឬ?",
 };
 
 export const en = {
@@ -50,4 +81,35 @@ export const en = {
   "coachDashboard.confirmRemoveAssignment":
     "Request removal of this team/role? An Admin needs to confirm it.",
   "coachDashboard.failedToRequestRemoval": "Failed to request removal",
+  "coachDashboard.tabPlayerAccounts": "Player accounts",
+  "coachDashboard.playerAccountsTitle": "Player accounts (individual logins)",
+  "coachDashboard.playerAccountsIntro":
+    "Reset the password for an individual player login on your team — use this when a player forgets their password and the self-service \"forgot password\" flow isn't available to them (e.g. Telegram isn't linked yet).",
+  "coachDashboard.mustChangePassword": "Must change password",
+  "coachDashboard.telegramLinked": "Telegram linked",
+  "coachDashboard.resetPassword": "Reset password",
+  "coachDashboard.resetting": "Resetting…",
+  "coachDashboard.confirmResetPasswordPrefix": "Reset the password for",
+  "coachDashboard.confirmResetPasswordSuffix": " back to 12345? They'll be required to change it next time they sign in.",
+  "coachDashboard.failedToResetPassword": "Could not reset the password",
+  "coachDashboard.noPlayerAccounts": "No individual player accounts on your team yet.",
+  "coachDashboard.myTelegramCardTitle": "Link my Telegram",
+  "coachDashboard.myTelegramHelp":
+    "Needed for the self-service \"forgot password\" flow — for your own Head Coach account (not a player account).",
+  "coachDashboard.myTelegramLabel": "Telegram Chat ID",
+  "coachDashboard.myTelegramPlaceholder": "Enter your chat ID…",
+  "coachDashboard.savingTelegram": "Saving…",
+  "coachDashboard.telegramSaved": "Saved",
+  "coachDashboard.khqrCardTitle": "Team's ABA payment QR",
+  "coachDashboard.khqrHelp":
+    "Upload the QR code from your ABA Merchant app (save the image from the app, then upload it here) so players can scan it to pay fees. This QR doesn't carry an amount automatically — the player has to type it in themselves, and you or a coach then confirm the payment was received on the \"Debt report\" page.",
+  "coachDashboard.khqrUploadLabel": "Upload QR image",
+  "coachDashboard.khqrReplaceLabel": "Replace with a new QR image",
+  "coachDashboard.khqrSave": "Save",
+  "coachDashboard.khqrUploading": "Uploading…",
+  "coachDashboard.khqrUploadFailed": "Could not upload the QR image",
+  "coachDashboard.khqrRemove": "Remove",
+  "coachDashboard.khqrRemoving": "Removing…",
+  "coachDashboard.khqrRemoveFailed": "Could not remove the QR image",
+  "coachDashboard.confirmRemoveKhqr": "Remove this team's ABA payment QR image?",
 };

@@ -1,6 +1,8 @@
 const Team = require("../models/Team");
 const Athlete = require("../models/Athlete");
 const { PLANS, PLAN_ORDER, BILLING_CYCLES, planInfo, priceFor, totalFor, monthsFor } = require("../utils/subscriptionPlans");
+const uploadBufferToCloudinary = require("../utils/uploadToCloudinary");
+const cloudinary = require("../config/cloudinary");
 
 // GET /api/teams  (admin only) — for the Team dropdowns (add athlete, assign coach)
 // Each team doc already includes subscriptionPlan/subscriptionExpiresAt/
@@ -58,6 +60,70 @@ exports.getMySubscription = async (req, res) => {
       plan,
       maxPlayers: plan ? planInfo(plan).maxPlayers : planInfo("BASIC").maxPlayers,
     });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// GET /api/teams/mine/khqr  (Head Coach or Player, own team) — just the
+// current KHQR image (or null), for the "scan to pay" card on the Coach
+// dashboard and the Player dashboard's pay flow. Never the full Team
+// document, same reasoning as getMySubscription above.
+exports.getMyKhqr = async (req, res) => {
+  try {
+    const team = await Team.findOne({ name: req.adminTeam });
+    res.json({ team: req.adminTeam, khqrImageUrl: team?.abaKhqrImageUrl || null });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PUT /api/teams/mine/khqr  (Head Coach only, multipart: khqr) — uploads
+// (replacing any existing one) this Head Coach's own team's static ABA
+// Merchant KHQR image. No amount is embedded in it — see the Team model
+// comment — this is a stand-in for full PayWay API access, not that flow.
+exports.uploadMyKhqr = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "A QR image file is required" });
+    const team = await Team.findOne({ name: req.adminTeam });
+    if (!team) return res.status(404).json({ message: "Your team was not found" });
+
+    const oldPublicId = team.abaKhqrImagePublicId;
+    const { url, publicId } = await uploadBufferToCloudinary(req.file.buffer, {
+      folder: "athlete-verify/khqr",
+      resourceType: "image",
+    });
+    team.abaKhqrImageUrl = url;
+    team.abaKhqrImagePublicId = publicId;
+    await team.save();
+
+    if (oldPublicId) {
+      cloudinary.uploader.destroy(oldPublicId).catch((err) => console.warn("Old KHQR cleanup failed:", err.message));
+    }
+
+    res.json({ khqrImageUrl: team.abaKhqrImageUrl });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// DELETE /api/teams/mine/khqr  (Head Coach only) — removes it (e.g. it's
+// outdated, or the team switched to a different payment method).
+exports.removeMyKhqr = async (req, res) => {
+  try {
+    const team = await Team.findOne({ name: req.adminTeam });
+    if (!team) return res.status(404).json({ message: "Your team was not found" });
+
+    if (team.abaKhqrImagePublicId) {
+      cloudinary.uploader
+        .destroy(team.abaKhqrImagePublicId)
+        .catch((err) => console.warn("KHQR cleanup failed:", err.message));
+    }
+    team.abaKhqrImageUrl = null;
+    team.abaKhqrImagePublicId = null;
+    await team.save();
+
+    res.json({ khqrImageUrl: null });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

@@ -1,8 +1,12 @@
+import { useNavigate } from "react-router-dom";
 import TrustedBy from "../components/TrustedBy";
+import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
 
 export default function Landing() {
   const { t } = useLanguage();
+  const { isAuthed, logout } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <>
@@ -14,9 +18,23 @@ export default function Landing() {
             <a href="/search" className="btn btn-primary">
               {t("landing.findPlayerCta")}
             </a>
-            <a href="/login" className="btn btn-outline">
-              {t("landing.adminSignIn")}
-            </a>
+            {isAuthed ? (
+              <a
+                href="#"
+                className="btn btn-outline"
+                onClick={(e) => {
+                  e.preventDefault();
+                  logout();
+                  navigate("/");
+                }}
+              >
+                {t("landing.logout")}
+              </a>
+            ) : (
+              <a href="/login" className="btn btn-outline">
+                {t("landing.adminSignIn")}
+              </a>
+            )}
             <a href="#how" className="btn btn-outline">
               {t("landing.howItWorksLink")}
             </a>

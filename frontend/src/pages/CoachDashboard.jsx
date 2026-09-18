@@ -20,20 +20,107 @@ function formatDob(dob) {
 
 export default function CoachDashboard() {
   const { t } = useLanguage();
-  const { team } = useAuth();
+  const { team, user, login } = useAuth();
   const [athletes, setAthletes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchParams] = useSearchParams();
   // Lets a link from elsewhere (e.g. a tournament's squad page) land
   // directly on a specific tab, e.g. /coach?tab=lineups.
-  const validTabs = ["athletes", "lineups", "formations", "startingxi"];
+  const validTabs = ["athletes", "lineups", "formations", "startingxi", "accounts"];
   const tabFromUrl = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState(validTabs.includes(tabFromUrl) ? tabFromUrl : "athletes");
 
+  // Individual per-athlete Player logins (tournament self-registration) on
+  // this Head Coach's own team — the backend already scopes both endpoints
+  // to req.adminTeam, so nothing here needs to filter again. Only their
+  // password can be reset from here; creating/generating accounts stays an
+  // Admin-only action on the Users page.
+  const [playerAccounts, setPlayerAccounts] = useState([]);
+  const [playerAccountsLoading, setPlayerAccountsLoading] = useState(true);
+  const [resettingId, setResettingId] = useState(null);
+
+  // This Head Coach's OWN Telegram chat id — needed for the self-service
+  // "forgot password" flow on the sign-in page (own account, not one of the
+  // player accounts managed below).
+  const [telegramDraft, setTelegramDraft] = useState(user?.telegramChatId || "");
+  const [savingTelegram, setSavingTelegram] = useState(false);
+  const [telegramSaved, setTelegramSaved] = useState(false);
+
+  // This team's static ABA Merchant KHQR image — the "scan to pay" fallback
+  // for a team that only has the ABA Merchant app (no PayWay API access).
+  // See backend/models/Team.js for why this exists.
+  const [khqrImageUrl, setKhqrImageUrl] = useState(null);
+  const [khqrLoading, setKhqrLoading] = useState(true);
+  const [khqrFile, setKhqrFile] = useState(null);
+  const [khqrUploading, setKhqrUploading] = useState(false);
+  const [khqrRemoving, setKhqrRemoving] = useState(false);
+  const [khqrError, setKhqrError] = useState("");
+
   useEffect(() => {
     loadData();
+    loadPlayerAccounts();
+    loadKhqr();
   }, []);
+
+  const saveTelegram = async () => {
+    setSavingTelegram(true);
+    setTelegramSaved(false);
+    try {
+      const { data } = await api.put("/auth/me/telegram", { telegramChatId: telegramDraft });
+      login(localStorage.getItem("token"), data);
+      setTelegramSaved(true);
+    } catch (err) {
+      alert(err.response?.data?.message || t("common.failedToSave"));
+    } finally {
+      setSavingTelegram(false);
+    }
+  };
+
+  const loadKhqr = async () => {
+    setKhqrLoading(true);
+    try {
+      const { data } = await api.get("/teams/mine/khqr");
+      setKhqrImageUrl(data.khqrImageUrl || null);
+    } catch {
+      // Leave it blank rather than blocking the rest of the dashboard.
+    } finally {
+      setKhqrLoading(false);
+    }
+  };
+
+  const uploadKhqr = async () => {
+    if (!khqrFile) return;
+    setKhqrUploading(true);
+    setKhqrError("");
+    try {
+      const formData = new FormData();
+      formData.append("khqr", khqrFile);
+      const { data } = await api.put("/teams/mine/khqr", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setKhqrImageUrl(data.khqrImageUrl || null);
+      setKhqrFile(null);
+    } catch (err) {
+      setKhqrError(err.response?.data?.message || t("coachDashboard.khqrUploadFailed"));
+    } finally {
+      setKhqrUploading(false);
+    }
+  };
+
+  const removeKhqr = async () => {
+    if (!confirm(t("coachDashboard.confirmRemoveKhqr"))) return;
+    setKhqrRemoving(true);
+    setKhqrError("");
+    try {
+      await api.delete("/teams/mine/khqr");
+      setKhqrImageUrl(null);
+    } catch (err) {
+      setKhqrError(err.response?.data?.message || t("coachDashboard.khqrRemoveFailed"));
+    } finally {
+      setKhqrRemoving(false);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -44,6 +131,36 @@ export default function CoachDashboard() {
       setError(err.response?.data?.message || t("common.failedToLoad"));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPlayerAccounts = async () => {
+    setPlayerAccountsLoading(true);
+    try {
+      const { data } = await api.get("/auth/player-accounts");
+      setPlayerAccounts(data);
+    } catch {
+      // Leave the list empty rather than blocking the rest of the dashboard.
+    } finally {
+      setPlayerAccountsLoading(false);
+    }
+  };
+
+  const resetPlayerPassword = async (account) => {
+    if (
+      !confirm(
+        `${t("coachDashboard.confirmResetPasswordPrefix")} ${account.username}${t("coachDashboard.confirmResetPasswordSuffix")}`
+      )
+    )
+      return;
+    setResettingId(account._id);
+    try {
+      await api.put(`/auth/player-accounts/${account._id}/reset-password`);
+      loadPlayerAccounts();
+    } catch (err) {
+      alert(err.response?.data?.message || t("coachDashboard.failedToResetPassword"));
+    } finally {
+      setResettingId(null);
     }
   };
 
@@ -116,6 +233,12 @@ export default function CoachDashboard() {
           onClick={() => setActiveTab("startingxi")}
         >
           {t("coachDashboard.tabStartingXI")}
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "accounts" ? "active" : ""}`}
+          onClick={() => setActiveTab("accounts")}
+        >
+          {t("coachDashboard.tabPlayerAccounts")}
         </button>
       </div>
 
@@ -223,6 +346,136 @@ export default function CoachDashboard() {
       {activeTab === "startingxi" && (
         <div className="tab-content">
           <StartingXIManager team={team} />
+        </div>
+      )}
+
+      {/* PLAYER ACCOUNTS TAB */}
+      {activeTab === "accounts" && (
+        <div className="tab-content">
+          <div className="card" style={{ maxWidth: 420, marginBottom: 24 }}>
+            <h4 style={{ marginTop: 0 }}>{t("coachDashboard.myTelegramCardTitle")}</h4>
+            <p className="help-text" style={{ marginTop: -6 }}>
+              {t("coachDashboard.myTelegramHelp")}
+            </p>
+            <div className="field">
+              <label>{t("coachDashboard.myTelegramLabel")}</label>
+              <input
+                placeholder={t("coachDashboard.myTelegramPlaceholder")}
+                value={telegramDraft}
+                onChange={(e) => {
+                  setTelegramDraft(e.target.value);
+                  setTelegramSaved(false);
+                }}
+              />
+            </div>
+            <button
+              className="btn btn-outline"
+              style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
+              onClick={saveTelegram}
+              disabled={savingTelegram}
+            >
+              {savingTelegram ? t("coachDashboard.savingTelegram") : telegramSaved ? t("coachDashboard.telegramSaved") : t("common.save")}
+            </button>
+          </div>
+
+          <div className="card" style={{ maxWidth: 420, marginBottom: 24 }}>
+            <h4 style={{ marginTop: 0 }}>{t("coachDashboard.khqrCardTitle")}</h4>
+            <p className="help-text" style={{ marginTop: -6 }}>
+              {t("coachDashboard.khqrHelp")}
+            </p>
+            {khqrLoading ? (
+              <p>{t("common.loading")}</p>
+            ) : (
+              <>
+                {khqrImageUrl && (
+                  <img
+                    src={resolveFileUrl(khqrImageUrl)}
+                    alt="ABA KHQR"
+                    style={{ width: 180, height: 180, objectFit: "contain", display: "block", marginBottom: 10 }}
+                  />
+                )}
+                <div className="field">
+                  <label>{khqrImageUrl ? t("coachDashboard.khqrReplaceLabel") : t("coachDashboard.khqrUploadLabel")}</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setKhqrFile(e.target.files[0])}
+                  />
+                </div>
+                {khqrError && <p className="error-text" style={{ margin: "4px 0" }}>{khqrError}</p>}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    className="btn btn-outline"
+                    style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
+                    onClick={uploadKhqr}
+                    disabled={!khqrFile || khqrUploading}
+                  >
+                    {khqrUploading ? t("coachDashboard.khqrUploading") : t("coachDashboard.khqrSave")}
+                  </button>
+                  {khqrImageUrl && (
+                    <button
+                      type="button"
+                      className="link-btn"
+                      onClick={removeKhqr}
+                      disabled={khqrRemoving}
+                    >
+                      {khqrRemoving ? t("coachDashboard.khqrRemoving") : t("coachDashboard.khqrRemove")}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="dash-header" style={{ marginBottom: 12 }}>
+            <h3 style={{ margin: 0 }}>{t("coachDashboard.playerAccountsTitle")}</h3>
+            <p>{t("coachDashboard.playerAccountsIntro")}</p>
+          </div>
+          {playerAccountsLoading ? (
+            <p>{t("common.loading")}</p>
+          ) : (
+            <div className="table-scroll">
+              <table className="athletes">
+                <thead>
+                  <tr>
+                    <th>{t("common.username")}</th>
+                    <th>{t("coachDashboard.mustChangePassword")}</th>
+                    <th>{t("coachDashboard.telegramLinked")}</th>
+                    <th>{t("common.actions")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {playerAccounts.map((a) => (
+                    <tr key={a._id}>
+                      <td data-label={t("common.username")}>{a.username}</td>
+                      <td data-label={t("coachDashboard.mustChangePassword")}>
+                        {a.mustChangePassword ? t("common.yes") : t("common.no")}
+                      </td>
+                      <td data-label={t("coachDashboard.telegramLinked")}>
+                        {a.telegramChatId ? t("common.yes") : t("common.no")}
+                      </td>
+                      <td data-label={t("common.actions")} className="actions-cell">
+                        <button
+                          className="action-btn"
+                          disabled={resettingId === a._id}
+                          onClick={() => resetPlayerPassword(a)}
+                        >
+                          {resettingId === a._id ? t("coachDashboard.resetting") : t("coachDashboard.resetPassword")}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {playerAccounts.length === 0 && (
+                    <tr>
+                      <td colSpan={4} style={{ textAlign: "center", color: "#777" }}>
+                        {t("coachDashboard.noPlayerAccounts")}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

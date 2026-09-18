@@ -3,6 +3,7 @@ export const km = {
   "debtReport.intro":
     "អ្នកគ្រប់គ្នាដែលបច្ចុប្បន្នជំពាក់ថ្លៃសេវាលេង។ មើលបានតែអ្នកគ្រប់គ្រង និងគ្រូបង្វឹកប្រធានប៉ុណ្ណោះ — មិនដែលបង្ហាញនៅលើកាត ការនាំចេញ ឬទំព័រសាធារណៈណាមួយឡើយ។",
   "debtReport.allTeams": "ក្រុមទាំងអស់",
+  "debtReport.searchPlaceholder": "ស្វែងរកតាមឈ្មោះ ក្រុម តួនាទី ឬលេខសម្គាល់…",
   "debtReport.noOneOwes": "មិនមាននរណាម្នាក់ជំពាក់ថ្លៃសេវាទេ។",
   "debtReport.owingCountLabelSingular": "នាក់ជំពាក់",
   "debtReport.owingCountLabelPlural": "នាក់ជំពាក់",
@@ -11,6 +12,17 @@ export const km = {
   "debtReport.owes": "ជំពាក់",
   "debtReport.note": "កំណត់ចំណាំ",
   "debtReport.failedToLoadAthletes": "បរាជ័យក្នុងការផ្ទុកអត្តពលិក",
+  "debtReport.recordCash": "កត់ត្រាការទូទាត់",
+  "debtReport.cashMethodLabel": "វិធីទូទាត់",
+  "debtReport.methodCash": "សាច់ប្រាក់",
+  "debtReport.methodAbaQr": "ABA (ស្កេន QR)",
+  "debtReport.cashAmountLabel": "ចំនួនទឹកប្រាក់ដែលបានទទួល",
+  "debtReport.cashNoteLabel": "កំណត់ចំណាំ (ស្រេចចិត្ត)",
+  "debtReport.cashSaveBtn": "រក្សាទុក",
+  "debtReport.cashSavingBtn": "កំពុងរក្សាទុក…",
+  "debtReport.cashCancelBtn": "បោះបង់",
+  "debtReport.cashAmountInvalid": "ចំនួនទឹកប្រាក់មិនត្រឹមត្រូវ",
+  "debtReport.cashSaveFailed": "មិនអាចរក្សាទុកការទូទាត់នេះបានទេ",
 };
 
 export const en = {
@@ -18,6 +30,7 @@ export const en = {
   "debtReport.intro":
     "Everyone who currently owes a playing fee. Visible only to Admin and Head Coach — never shown on a card, export, or public page.",
   "debtReport.allTeams": "All teams",
+  "debtReport.searchPlaceholder": "Search by name, team, role, or ID…",
   "debtReport.noOneOwes": "No one currently owes a fee.",
   "debtReport.owingCountLabelSingular": "person owing",
   "debtReport.owingCountLabelPlural": "people owing",
@@ -26,4 +39,15 @@ export const en = {
   "debtReport.owes": "Owes",
   "debtReport.note": "Note",
   "debtReport.failedToLoadAthletes": "Failed to load athletes",
+  "debtReport.recordCash": "Record payment",
+  "debtReport.cashMethodLabel": "Payment method",
+  "debtReport.methodCash": "Cash",
+  "debtReport.methodAbaQr": "ABA (QR scan)",
+  "debtReport.cashAmountLabel": "Amount received",
+  "debtReport.cashNoteLabel": "Note (optional)",
+  "debtReport.cashSaveBtn": "Save",
+  "debtReport.cashSavingBtn": "Saving…",
+  "debtReport.cashCancelBtn": "Cancel",
+  "debtReport.cashAmountInvalid": "Invalid amount",
+  "debtReport.cashSaveFailed": "Could not save this payment",
 };

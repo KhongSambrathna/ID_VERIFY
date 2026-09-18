@@ -23,6 +23,8 @@ export const km = {
   "tournamentsPage.confirmCancel": "លុបចោលការចុះឈ្មោះក្នុង {name} មែនទេ?",
   "tournamentsPage.failedToCancel": "បរាជ័យក្នុងការលុបចោល",
   "tournamentsPage.noneOpen": "មិនទាន់មានការប្រកួតបើកនៅឡើយទេ។",
+  "tournamentsPage.closedBadge": "បិទការចុះឈ្មោះ",
+  "tournamentsPage.closedHelp": "ការចុះឈ្មោះបានបិទហើយ",
 };
 
 export const en = {
@@ -50,4 +52,6 @@ export const en = {
   "tournamentsPage.confirmCancel": "Cancel your registration for {name}?",
   "tournamentsPage.failedToCancel": "Failed to cancel",
   "tournamentsPage.noneOpen": "No tournaments are open right now.",
+  "tournamentsPage.closedBadge": "Registration closed",
+  "tournamentsPage.closedHelp": "Registration is closed",
 };

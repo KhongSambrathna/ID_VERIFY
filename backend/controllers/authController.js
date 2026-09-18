@@ -207,13 +207,17 @@ exports.changePassword = async (req, res) => {
   }
 };
 
-// POST /api/auth/forgot-password  (public) — body: { username }. Only an
-// individual Player account (athleteId set) with a Telegram chat id
-// already linked can self-serve; anything else (no such account, an
-// Admin/Head Coach account, no Telegram linked) gets the same generic
-// response so this can't be used to probe which usernames exist. The
-// no-Telegram-linked case is the expected fallback: ask your Admin/Head
-// Coach to reset it for you instead (see resetPlayerPassword above).
+// POST /api/auth/forgot-password  (public) — body: { username }. Any
+// account type — Admin, Head Coach, an individual per-athlete Player
+// login, or the older shared team-wide Player login — can self-serve here
+// as long as it already has a Telegram chat id linked (Admin/Head Coach
+// link their own from their dashboard; an individual Player links theirs
+// from the Tournaments page — see updateMyTelegram below for all of them).
+// No such account, or no Telegram linked, gets the exact same generic
+// response either way, so this can't be used to probe which usernames
+// exist. The no-Telegram-linked case is the expected fallback: link it
+// first, then try again — or for a Player, ask an Admin/Head Coach to
+// reset it instead (see resetPlayerPassword above).
 exports.forgotPassword = async (req, res) => {
   const generic = {
     message: "If that account has Telegram linked, a new temporary password was just sent there.",
@@ -222,7 +226,7 @@ exports.forgotPassword = async (req, res) => {
     const { username } = req.body;
     if (!username) return res.status(400).json({ message: "Username is required" });
 
-    const account = await Admin.findOne({ username, role: "PLAYER", athleteId: { $ne: null } });
+    const account = await Admin.findOne({ username });
     if (!account || !account.telegramChatId) return res.json(generic);
 
     const tempPassword = String(Math.floor(100000 + Math.random() * 900000)); // 6-digit code
@@ -242,10 +246,10 @@ exports.forgotPassword = async (req, res) => {
 };
 
 // PUT /api/auth/me/telegram  (any signed-in account, self-service) — lets
-// an individual Player set up their OWN Telegram chat id, needed for the
-// self-service forgot-password flow above. Same manual one-time lookup as
-// Admin/Head Coach already do (message the bot once, then get the numeric
-// chat id from @userinfobot).
+// ANY account (Admin, Head Coach, or an individual Player) link their own
+// Telegram chat id, needed for the self-service forgot-password flow
+// above. Same manual one-time lookup for everyone: message the bot once,
+// then get the numeric chat id from @userinfobot.
 exports.updateMyTelegram = async (req, res) => {
   try {
     const account = await Admin.findById(req.adminId);

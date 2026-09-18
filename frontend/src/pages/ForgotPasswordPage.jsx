@@ -3,12 +3,15 @@ import { Link } from "react-router-dom";
 import api from "../api/axios";
 import { useLanguage } from "../i18n/LanguageContext";
 
-// Self-service password recovery — only works for an individual Player
-// account that has already linked its own Telegram chat id (set from the
-// Tournaments page once signed in). Anyone else — Admin, Head Coach, a
-// player who hasn't linked Telegram, or the older shared team-wide Player
-// login — needs their Admin or Head Coach to reset it for them instead
-// (Manage users → Player accounts → Reset password). The response is
+// Self-service password recovery — works for ANY account (Admin, Head
+// Coach, or an individual Player) that has already linked its own
+// Telegram chat id: Admin from the Admin dashboard, Head Coach from the
+// Coach dashboard's "Player accounts" tab, and an individual Player from
+// the Tournaments page, all via the same "Link my Telegram" card once
+// signed in. Anyone who hasn't linked Telegram yet — or the older shared
+// team-wide Player login, which has no self-service link of its own — asks
+// an Admin/Head Coach to reset it for them instead (for a Player account:
+// Manage users → Player accounts → Reset password). The response is
 // always the same generic message either way, so this can't be used to
 // check which usernames exist.
 export default function ForgotPasswordPage() {

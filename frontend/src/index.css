@@ -1720,6 +1720,11 @@ table.athletes .actions-cell {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+}
+.lineup-athlete .athlete-info {
+  flex: 1 1 140px;
+  min-width: 0;
 }
 .lineup-athlete .number {
   font-family: var(--font-display);
