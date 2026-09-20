@@ -987,7 +987,7 @@ table.athletes .actions-cell {
   background: #f8eae7;
 }
 
-/* ---------- ID Card (5.4cm x 8.5cm printable card) ---------- */
+/* ---------- ID Card (7cm x 10.5cm printable card) ---------- */
 .id-card-actions {
   display: flex;
   gap: 10px;
@@ -1000,9 +1000,9 @@ table.athletes .actions-cell {
 }
 
 .id-card {
-  width: 204px; /* 5.4cm @ 96dpi */
-  min-height: 321px; /* 8.5cm @ 96dpi — grows if content needs more room on screen */
-  border-radius: 8px;
+  width: 265px; /* 7cm @ 96dpi */
+  min-height: 397px; /* 10.5cm @ 96dpi — grows if content needs more room on screen */
+  border-radius: 10px;
   border: 1px solid var(--line);
   background: white;
   box-shadow: 0 6px 18px rgba(16, 35, 63, 0.12);
@@ -1033,31 +1033,37 @@ table.athletes .actions-cell {
 .id-card-top {
   background: var(--navy);
   color: white;
-  padding: 8px 10px 6px;
+  padding: 7px 13px 5px;
   text-align: center;
 }
 .id-card-top .org {
   font-family: var(--font-khmer-name);
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.3;
 }
 .id-card-top .org .en {
   display: block;
   font-family: var(--font-display);
-  font-size: 8.5px;
+  font-size: 11px;
   letter-spacing: 0.04em;
   color: var(--gold);
   text-transform: uppercase;
   margin-top: 1px;
 }
+/* Back in its original spot between the header and the photo, at the
+   user's request — kept slightly more compact than its original padding/
+   font-size (was 4px/4px, 13px) so the card still fits a real 105mm sheet
+   even for a long, wrapping address; the footer restructuring below is
+   what does the heavy lifting for that fit, this is just enough trim to
+   keep a safe margin with the bar back in place. */
 .id-card-number {
   text-align: center;
   font-family: var(--font-display);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--navy);
   background: #efe9da;
-  padding: 3px 6px;
+  padding: 2px 8px;
   letter-spacing: 0.03em;
   white-space: nowrap;
   overflow: hidden;
@@ -1066,61 +1072,124 @@ table.athletes .actions-cell {
 .id-card-photo-wrap {
   display: flex;
   justify-content: center;
-  padding: 12px 0 6px;
+  padding: 10px 0 3px;
 }
 .id-card-photo {
-  width: 74px;
-  height: 90px;
+  width: 70px;
+  height: 84px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 5px;
   border: 1px solid var(--line);
   background: #eee;
 }
-.id-card-qr-corner {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
+/* ---- Footer row: issue-info (left) + QR/logo corner (right) ----
+   Used to be two position:absolute overlays floating over the card body,
+   which forced .id-card-fields to reserve a large, wasteful bottom padding
+   just in case the address text ran long enough to reach them. Now that
+   they're a normal-flow row placed AFTER .id-card-fields, they can never
+   overlap the fields above them by construction — no reserve needed. This
+   is what let the card's total height actually come back down to fit a
+   real 105mm sheet.
+
+   .id-card-fields no longer stretches with flex:1 — it used to, so it could
+   push this footer all the way to the card's bottom edge regardless of how
+   short the actual content was, which is exactly why a short address left a
+   big dead gap sitting right under the address line. Now fields sizes to
+   its own content, this footer follows it after a small fixed gap
+   (.id-card-fields margin-bottom), and any leftover room the card's fixed
+   105mm height still has to account for shows up as blank margin below the
+   footer instead — a much more normal place for it on an ID card. */
+.id-card-footer {
   display: flex;
   align-items: flex-end;
-  gap: 5px;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0 15px 4px; /* small guaranteed lift off the bottom edge even for a full, long card */
 }
-.id-card-team-logo {
-  width: 26px;
-  height: 26px;
-  object-fit: contain;
-  border-radius: 50%;
-  background: white;
-  border: 1px solid var(--line);
-  padding: 2px;
-  box-shadow: 0 1px 3px rgba(16, 35, 63, 0.15);
+.id-card-qr-corner {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
 }
+.id-card-issue-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.id-card-issue-info div {
+  font-family: var(--font-body);
+  font-size: 7px;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #8a8a8a;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.id-card-logo-block,
 .id-card-qr-block {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 1px;
 }
+.id-card-team-logo,
 .id-card-qr-block img {
-  width: 34px;
-  height: 34px;
+  width: 43px;
+  height: 43px;
+  object-fit: contain;
 }
-.id-card-qr-block .scan-label {
+/* Wraps onto 2 lines within the image's own 43px width instead of running
+   past it on one line — that overrun (e.g. "SCAN TO VERIFY" at its full
+   single-line width) was what pushed the whole footer row past the card's
+   right padding and right up against the printed edge. */
+.id-card-qr-corner .scan-label {
   font-family: var(--font-body);
-  font-size: 6px;
+  font-size: 8px;
+  line-height: 1.2;
   font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--navy);
   text-transform: uppercase;
-  white-space: nowrap;
+  white-space: normal;
+  width: 43px;
+  text-align: center;
+}
+/* Fills whatever blank space is still left below the footer — that space
+   only exists because the card has a fixed 105mm floor (min-height) but
+   real content is often shorter, e.g. a short address. This block is the
+   new last child in the flex column and takes flex:1, so it absorbs
+   exactly that leftover space (never forces the card to grow) and
+   centers the motto in it, both horizontally and vertically. min-height:0
+   lets it shrink below its own text height when little/no space is left
+   (a long, multi-line address), with overflow hidden as the fallback —
+   the card's fixed 105mm size always wins over showing this line in full. */
+.id-card-tagline {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0 15px;
+}
+.id-card-tagline p {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-khmer-body);
+  font-size: 7px;
+  line-height: 1.3;
+  color: #9a9a9a;
+  letter-spacing: 0.01em;
 }
 .id-card-fields {
-  flex: 1;
-  padding: 4px 12px 34px;
+  padding: 2px 15px 2px;
+  margin-bottom: 6px; /* fixed gap to the footer below — see .id-card-footer comment */
 }
 .id-card-row {
   display: flex;
-  gap: 8px;
-  margin-bottom: 5px;
+  gap: 10px;
+  margin-bottom: 1px;
 }
 .id-card-row .id-card-field {
   flex: 1;
@@ -1128,12 +1197,12 @@ table.athletes .actions-cell {
   margin-bottom: 0;
 }
 .id-card-field {
-  margin-bottom: 6px;
+  margin-bottom: 2px;
 }
 .id-card-field.inline {
   display: flex;
   align-items: baseline;
-  gap: 5px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 .id-card-field.inline .label {
@@ -1142,7 +1211,7 @@ table.athletes .actions-cell {
 }
 .id-card-field .label {
   font-family: var(--font-khmer-body);
-  font-size: 7.5px;
+  font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.02em;
   color: #8a8a8a;
@@ -1151,13 +1220,13 @@ table.athletes .actions-cell {
 }
 .id-card-field .value-kh {
   font-family: var(--font-khmer-name);
-  font-size: 12px;
+  font-size: 14px;
   color: var(--ink);
   line-height: 1.3;
 }
 .id-card-field .value-en {
   font-family: var(--font-body);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   color: var(--ink);
@@ -1165,14 +1234,15 @@ table.athletes .actions-cell {
 }
 .id-card-field.address {
   margin-top: 2px;
+  margin-bottom: 0;
 }
 .id-card-field.address .value-kh,
 .id-card-field.address .value-en {
   font-family: var(--font-khmer-body);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 400;
   text-transform: none;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 .id-card-print-page {
   margin-bottom: 24px;

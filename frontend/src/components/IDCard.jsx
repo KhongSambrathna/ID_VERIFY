@@ -35,6 +35,16 @@ function formatDob(dob) {
   return `${dd}-${mm}-${d.getFullYear()}`;
 }
 
+// One year after `date` — the card's "valid until" is just its last
+// in-person verification plus a year, the exact same window the
+// "needs renewal" badge elsewhere (AthleteCardPage) already uses, so the
+// two never disagree with each other.
+function addOneYear(date) {
+  const d = new Date(date);
+  d.setFullYear(d.getFullYear() + 1);
+  return d;
+}
+
 export default function IDCard({ athlete, hideActions }) {
   const { t } = useLanguage();
   const cardRef = useRef(null);
@@ -90,6 +100,8 @@ export default function IDCard({ athlete, hideActions }) {
   if (!athlete) return null;
 
   const dob = formatDob(athlete.dateOfBirth);
+  const issuedDate = formatDob(athlete.createdAt);
+  const validUntilDate = athlete.lastVerifiedAt ? formatDob(addOneYear(athlete.lastVerifiedAt)) : null;
 
   const saveAsJpg = async () => {
     if (!cardRef.current) return;
@@ -189,19 +201,36 @@ export default function IDCard({ athlete, hideActions }) {
             )}
           </div>
 
-          <div className="id-card-qr-corner">
-            {teamLogoUrl && (
-              <img
-                className="id-card-team-logo"
-                crossOrigin="anonymous"
-                src={resolveFileUrl(teamLogoUrl)}
-                alt={`${athlete.team} logo`}
-              />
-            )}
-            <div className="id-card-qr-block">
-              {qrDataUrl && <img src={qrDataUrl} alt={`Scan to view ${athlete.fullName}`} />}
-              <div className="scan-label">Scan To Verify</div>
+          <div className="id-card-footer">
+            <div className="id-card-issue-info">
+              <div>id-verify-liart.vercel.app</div>
+              {issuedDate && <div>ISSUED: {issuedDate}</div>}
+              <div>VALID: {validUntilDate || "PENDING"}</div>
             </div>
+
+            <div className="id-card-qr-corner">
+              {teamLogoUrl && (
+                <div className="id-card-logo-block">
+                  <img
+                    className="id-card-team-logo"
+                    crossOrigin="anonymous"
+                    src={resolveFileUrl(teamLogoUrl)}
+                    alt={`${athlete.team} logo`}
+                  />
+                  <div className="scan-label">Club Logo</div>
+                </div>
+              )}
+              <div className="id-card-qr-block">
+                {qrDataUrl && <img src={qrDataUrl} alt={`Scan to view ${athlete.fullName}`} />}
+                <div className="scan-label">Scan To Verify</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="id-card-tagline">
+            <p>
+              កត់ត្រា ផ្ទៀងផ្ទាត់ និងផលិតកាតសម្គាល់សម្រាប់កីឡាករ គ្រប់រូបក្នុងកម្មវិធីរបស់អ្នក
+            </p>
           </div>
         </div>
       </div>
