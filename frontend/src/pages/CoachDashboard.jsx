@@ -57,10 +57,20 @@ export default function CoachDashboard() {
   const [khqrRemoving, setKhqrRemoving] = useState(false);
   const [khqrError, setKhqrError] = useState("");
 
+  // This team's crest/logo — shown next to the QR code on every player's ID
+  // card (see IDCard.jsx). Same upload/remove shape as the KHQR image above.
+  const [logoImageUrl, setLogoImageUrl] = useState(null);
+  const [logoLoading, setLogoLoading] = useState(true);
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoRemoving, setLogoRemoving] = useState(false);
+  const [logoError, setLogoError] = useState("");
+
   useEffect(() => {
     loadData();
     loadPlayerAccounts();
     loadKhqr();
+    loadLogo();
   }, []);
 
   const saveTelegram = async () => {
@@ -119,6 +129,51 @@ export default function CoachDashboard() {
       setKhqrError(err.response?.data?.message || t("coachDashboard.khqrRemoveFailed"));
     } finally {
       setKhqrRemoving(false);
+    }
+  };
+
+  const loadLogo = async () => {
+    setLogoLoading(true);
+    try {
+      const { data } = await api.get("/teams/mine/logo");
+      setLogoImageUrl(data.logoUrl || null);
+    } catch {
+      // Leave it blank rather than blocking the rest of the dashboard.
+    } finally {
+      setLogoLoading(false);
+    }
+  };
+
+  const uploadLogo = async () => {
+    if (!logoFile) return;
+    setLogoUploading(true);
+    setLogoError("");
+    try {
+      const formData = new FormData();
+      formData.append("logo", logoFile);
+      const { data } = await api.put("/teams/mine/logo", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setLogoImageUrl(data.logoUrl || null);
+      setLogoFile(null);
+    } catch (err) {
+      setLogoError(err.response?.data?.message || t("coachDashboard.logoUploadFailed"));
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
+  const removeLogo = async () => {
+    if (!confirm(t("coachDashboard.confirmRemoveLogo"))) return;
+    setLogoRemoving(true);
+    setLogoError("");
+    try {
+      await api.delete("/teams/mine/logo");
+      setLogoImageUrl(null);
+    } catch (err) {
+      setLogoError(err.response?.data?.message || t("coachDashboard.logoRemoveFailed"));
+    } finally {
+      setLogoRemoving(false);
     }
   };
 
@@ -420,6 +475,55 @@ export default function CoachDashboard() {
                       disabled={khqrRemoving}
                     >
                       {khqrRemoving ? t("coachDashboard.khqrRemoving") : t("coachDashboard.khqrRemove")}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="card" style={{ maxWidth: 420, marginBottom: 24 }}>
+            <h4 style={{ marginTop: 0 }}>{t("coachDashboard.logoCardTitle")}</h4>
+            <p className="help-text" style={{ marginTop: -6 }}>
+              {t("coachDashboard.logoHelp")}
+            </p>
+            {logoLoading ? (
+              <p>{t("common.loading")}</p>
+            ) : (
+              <>
+                {logoImageUrl && (
+                  <img
+                    src={resolveFileUrl(logoImageUrl)}
+                    alt="Team logo"
+                    style={{ width: 90, height: 90, objectFit: "contain", display: "block", marginBottom: 10, borderRadius: "50%", border: "1px solid var(--line)" }}
+                  />
+                )}
+                <div className="field">
+                  <label>{logoImageUrl ? t("coachDashboard.logoReplaceLabel") : t("coachDashboard.logoUploadLabel")}</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setLogoFile(e.target.files[0])}
+                  />
+                </div>
+                {logoError && <p className="error-text" style={{ margin: "4px 0" }}>{logoError}</p>}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    className="btn btn-outline"
+                    style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
+                    onClick={uploadLogo}
+                    disabled={!logoFile || logoUploading}
+                  >
+                    {logoUploading ? t("coachDashboard.logoUploading") : t("coachDashboard.logoSave")}
+                  </button>
+                  {logoImageUrl && (
+                    <button
+                      type="button"
+                      className="link-btn"
+                      onClick={removeLogo}
+                      disabled={logoRemoving}
+                    >
+                      {logoRemoving ? t("coachDashboard.logoRemoving") : t("coachDashboard.logoRemove")}
                     </button>
                   )}
                 </div>

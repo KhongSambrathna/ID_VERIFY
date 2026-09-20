@@ -52,6 +52,16 @@ const teamSchema = new mongoose.Schema(
     abaKhqrImageUrl: { type: String, default: null },
     abaKhqrImagePublicId: { type: String, default: null },
 
+    // The team's own crest/badge — purely cosmetic, shown next to the QR
+    // code on that team's players' ID cards (see IDCard.jsx). No sensitive
+    // data involved (unlike the KHQR payment image above), so it's served
+    // from a public, unauthenticated route (teamController.getTeamLogo).
+    // Uploaded/removed either by that team's own Head Coach (uploadMyLogo/
+    // removeMyLogo) or by an Admin for any team (uploadTeamLogo/
+    // removeTeamLogo) — whichever is more convenient for a given club.
+    logoUrl: { type: String, default: null },
+    logoPublicId: { type: String, default: null },
+
     subscriptionHistory: {
       type: [
         {

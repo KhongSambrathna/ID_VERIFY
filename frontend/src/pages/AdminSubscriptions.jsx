@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState } from "react";
 import api from "../api/axios";
+import { resolveFileUrl } from "../utils/fileUrl";
 import { useLanguage } from "../i18n/LanguageContext";
 
 const PLAN_ORDER = ["BASIC", "PRO", "PRO_MAX", "UNLIMITED"];
@@ -29,6 +30,14 @@ export default function AdminSubscriptions() {
   const [drafts, setDrafts] = useState({});
   const [savingId, setSavingId] = useState(null);
   const [openHistoryId, setOpenHistoryId] = useState(null);
+
+  // Each team's crest/logo (shown next to the QR code on that team's ID
+  // cards — see IDCard.jsx) can be uploaded/replaced/removed right here by
+  // an Admin, for any team, without needing that team's own Head Coach to
+  // do it (they can also self-manage it from their own dashboard).
+  const [logoFiles, setLogoFiles] = useState({});
+  const [logoBusyId, setLogoBusyId] = useState(null);
+  const [logoErrors, setLogoErrors] = useState({});
 
   const load = async () => {
     setLoading(true);
@@ -118,6 +127,40 @@ export default function AdminSubscriptions() {
     }
   };
 
+  const uploadLogo = async (team) => {
+    const file = logoFiles[team._id];
+    if (!file) return;
+    setLogoBusyId(team._id);
+    setLogoErrors({ ...logoErrors, [team._id]: "" });
+    try {
+      const formData = new FormData();
+      formData.append("logo", file);
+      await api.put(`/teams/${team._id}/logo`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setLogoFiles({ ...logoFiles, [team._id]: null });
+      load();
+    } catch (err) {
+      setLogoErrors({ ...logoErrors, [team._id]: err.response?.data?.message || t("common.failedToSave") });
+    } finally {
+      setLogoBusyId(null);
+    }
+  };
+
+  const removeLogo = async (team) => {
+    if (!window.confirm(t("adminSubscriptions.confirmRemoveLogo").replace("{team}", team.name))) return;
+    setLogoBusyId(team._id);
+    setLogoErrors({ ...logoErrors, [team._id]: "" });
+    try {
+      await api.delete(`/teams/${team._id}/logo`);
+      load();
+    } catch (err) {
+      setLogoErrors({ ...logoErrors, [team._id]: err.response?.data?.message || t("common.failedToSave") });
+    } finally {
+      setLogoBusyId(null);
+    }
+  };
+
   const statusOf = (team) => {
     const expiresAt = team.subscriptionExpiresAt;
     if (!expiresAt) return "never";
@@ -180,6 +223,7 @@ export default function AdminSubscriptions() {
               <thead>
                 <tr>
                   <th>{t("common.team")}</th>
+                  <th>{t("adminSubscriptions.logoHeader")}</th>
                   <th>{t("common.status")}</th>
                   <th>{t("adminSubscriptions.planHeader")}</th>
                   <th>{t("adminSubscriptions.expiresHeader")}</th>
@@ -197,6 +241,49 @@ export default function AdminSubscriptions() {
                     <Fragment key={team._id}>
                       <tr>
                         <td data-label={t("common.team")} className="caps-display">{team.name}</td>
+                        <td data-label={t("adminSubscriptions.logoHeader")}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+                            {team.logoUrl && (
+                              <img
+                                src={resolveFileUrl(team.logoUrl)}
+                                alt={`${team.name} logo`}
+                                style={{ width: 36, height: 36, objectFit: "contain", borderRadius: "50%", border: "1px solid var(--line)" }}
+                              />
+                            )}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              style={{ width: 130, fontSize: 11 }}
+                              disabled={logoBusyId === team._id}
+                              onChange={(e) => setLogoFiles({ ...logoFiles, [team._id]: e.target.files[0] })}
+                            />
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              <button
+                                type="button"
+                                className="link-btn"
+                                disabled={!logoFiles[team._id] || logoBusyId === team._id}
+                                onClick={() => uploadLogo(team)}
+                              >
+                                {logoBusyId === team._id ? t("adminSubscriptions.logoSaving") : t("adminSubscriptions.logoSave")}
+                              </button>
+                              {team.logoUrl && (
+                                <button
+                                  type="button"
+                                  className="link-btn"
+                                  disabled={logoBusyId === team._id}
+                                  onClick={() => removeLogo(team)}
+                                >
+                                  {t("adminSubscriptions.logoRemove")}
+                                </button>
+                              )}
+                            </div>
+                            {logoErrors[team._id] && (
+                              <p className="error-text" style={{ margin: 0, fontSize: 11 }}>
+                                {logoErrors[team._id]}
+                              </p>
+                            )}
+                          </div>
+                        </td>
                         <td data-label={t("common.status")}>
                           {status === "active" && (
                             <span className="badge verified">{t("adminSubscriptions.statusActive")}</span>
@@ -313,7 +400,7 @@ export default function AdminSubscriptions() {
                       </tr>
                       {openHistoryId === team._id && (
                         <tr>
-                          <td colSpan={5}>
+                          <td colSpan={6}>
                             <ul className="fee-items">
                               {[...history].reverse().map((h, i) => (
                                 <li key={i}>
@@ -332,7 +419,7 @@ export default function AdminSubscriptions() {
                 })}
                 {teams.length === 0 && (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: "center", color: "#777" }}>
+                    <td colSpan={6} style={{ textAlign: "center", color: "#777" }}>
                       {t("adminSubscriptions.noTeams")}
                     </td>
                   </tr>

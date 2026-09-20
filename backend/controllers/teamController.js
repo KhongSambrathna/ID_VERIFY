@@ -129,6 +129,125 @@ exports.removeMyKhqr = async (req, res) => {
   }
 };
 
+// GET /api/teams/logo/:name  (public, no auth) — just the crest image for a
+// given team name, for display next to the QR code on that team's players'
+// ID cards. No sensitive data here (unlike the KHQR payment image), so this
+// sits above the "mine"/admin auth gates below, same reasoning as /plans.
+exports.getTeamLogo = async (req, res) => {
+  try {
+    const team = await Team.findOne({ name: req.params.name });
+    res.json({ logoUrl: team?.logoUrl || null });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// GET /api/teams/mine/logo  (Head Coach only) — this Head Coach's own
+// team's current crest (or null), for the upload card on the Coach
+// dashboard.
+exports.getMyLogo = async (req, res) => {
+  try {
+    const team = await Team.findOne({ name: req.adminTeam });
+    res.json({ team: req.adminTeam, logoUrl: team?.logoUrl || null });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PUT /api/teams/mine/logo  (Head Coach only, multipart: logo) — uploads
+// (replacing any existing one) this Head Coach's own team's crest/badge.
+exports.uploadMyLogo = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "A logo image file is required" });
+    const team = await Team.findOne({ name: req.adminTeam });
+    if (!team) return res.status(404).json({ message: "Your team was not found" });
+
+    const oldPublicId = team.logoPublicId;
+    const { url, publicId } = await uploadBufferToCloudinary(req.file.buffer, {
+      folder: "athlete-verify/logos",
+      resourceType: "image",
+    });
+    team.logoUrl = url;
+    team.logoPublicId = publicId;
+    await team.save();
+
+    if (oldPublicId) {
+      cloudinary.uploader.destroy(oldPublicId).catch((err) => console.warn("Old team logo cleanup failed:", err.message));
+    }
+
+    res.json({ logoUrl: team.logoUrl });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// DELETE /api/teams/mine/logo  (Head Coach only)
+exports.removeMyLogo = async (req, res) => {
+  try {
+    const team = await Team.findOne({ name: req.adminTeam });
+    if (!team) return res.status(404).json({ message: "Your team was not found" });
+
+    if (team.logoPublicId) {
+      cloudinary.uploader.destroy(team.logoPublicId).catch((err) => console.warn("Team logo cleanup failed:", err.message));
+    }
+    team.logoUrl = null;
+    team.logoPublicId = null;
+    await team.save();
+
+    res.json({ logoUrl: null });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PUT /api/teams/:id/logo  (admin only, multipart: logo) — lets an Admin
+// upload/replace a crest for ANY team directly, without needing that
+// team's Head Coach to do it themselves (e.g. the team has no Head Coach
+// account yet, or the Admin already has every club's logo on hand).
+exports.uploadTeamLogo = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "A logo image file is required" });
+    const team = await Team.findById(req.params.id);
+    if (!team) return res.status(404).json({ message: "Team not found" });
+
+    const oldPublicId = team.logoPublicId;
+    const { url, publicId } = await uploadBufferToCloudinary(req.file.buffer, {
+      folder: "athlete-verify/logos",
+      resourceType: "image",
+    });
+    team.logoUrl = url;
+    team.logoPublicId = publicId;
+    await team.save();
+
+    if (oldPublicId) {
+      cloudinary.uploader.destroy(oldPublicId).catch((err) => console.warn("Old team logo cleanup failed:", err.message));
+    }
+
+    res.json({ logoUrl: team.logoUrl });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// DELETE /api/teams/:id/logo  (admin only)
+exports.removeTeamLogo = async (req, res) => {
+  try {
+    const team = await Team.findById(req.params.id);
+    if (!team) return res.status(404).json({ message: "Team not found" });
+
+    if (team.logoPublicId) {
+      cloudinary.uploader.destroy(team.logoPublicId).catch((err) => console.warn("Team logo cleanup failed:", err.message));
+    }
+    team.logoUrl = null;
+    team.logoPublicId = null;
+    await team.save();
+
+    res.json({ logoUrl: null });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // POST /api/teams/:id/subscription  (admin only) — records a payment taken
 // outside the app (bank transfer, Wing/ABA, Telegram, cash, ...). Body:
 // { plan: "BASIC"|"PRO"|"PRO_MAX"|"UNLIMITED", billingCycle: "MONTHLY"|

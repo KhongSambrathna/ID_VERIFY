@@ -1,9 +1,30 @@
 import { useEffect, useRef, useState } from "react";
 import html2canvas from "html2canvas";
 import QRCode from "qrcode";
+import api from "../api/axios";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { saveCanvasAsImage } from "../utils/saveCanvasAsImage";
 import { useLanguage } from "../i18n/LanguageContext";
+
+// Shared across every IDCard instance on the page (e.g. dozens of cards on
+// AllCardsPage) so cards for the same team don't each fire their own
+// request for a logo that's already known — a plain module-level cache of
+// in-flight/settled promises, keyed by team name. Cleared on a full page
+// reload, which is fine: a stale-for-one-session logo is harmless.
+const teamLogoCache = new Map();
+function fetchTeamLogo(teamName) {
+  if (!teamName) return Promise.resolve(null);
+  if (!teamLogoCache.has(teamName)) {
+    teamLogoCache.set(
+      teamName,
+      api
+        .get(`/teams/logo/${encodeURIComponent(teamName)}`)
+        .then(({ data }) => data.logoUrl || null)
+        .catch(() => null)
+    );
+  }
+  return teamLogoCache.get(teamName);
+}
 
 function formatDob(dob) {
   if (!dob) return null;
@@ -19,6 +40,7 @@ export default function IDCard({ athlete, hideActions }) {
   const cardRef = useRef(null);
   const [saving, setSaving] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState(null);
+  const [teamLogoUrl, setTeamLogoUrl] = useState(null);
 
   // Generated in the browser, per athlete, from whatever domain the card is
   // actually being viewed on (window.location.origin) — e.g.
@@ -46,6 +68,24 @@ export default function IDCard({ athlete, hideActions }) {
       cancelled = true;
     };
   }, [athlete?.verifyId]);
+
+  // The team crest shown next to the QR code — looked up by team name (the
+  // Team collection is the single source of truth for it, same as the KHQR
+  // payment image), so it stays correct even for athletes created long
+  // before a team ever had a logo on file.
+  useEffect(() => {
+    if (!athlete?.team) {
+      setTeamLogoUrl(null);
+      return;
+    }
+    let cancelled = false;
+    fetchTeamLogo(athlete.team).then((url) => {
+      if (!cancelled) setTeamLogoUrl(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [athlete?.team]);
 
   if (!athlete) return null;
 
@@ -147,18 +187,21 @@ export default function IDCard({ athlete, hideActions }) {
                 <div className="value-kh">{athlete.address}</div>
               </div>
             )}
-
-            <div className="id-card-badges">
-              <span className={`badge ${athlete.status}`}>{athlete.status}</span>
-              <span className={`badge ${athlete.isAvailable ? "verified" : "rejected"}`}>
-                {athlete.isAvailable ? "Available" : "Not available"}
-              </span>
-            </div>
           </div>
 
           <div className="id-card-qr-corner">
-            {qrDataUrl && <img src={qrDataUrl} alt={`Scan to view ${athlete.fullName}`} />}
-            <div className="scan-label">Scan</div>
+            {teamLogoUrl && (
+              <img
+                className="id-card-team-logo"
+                crossOrigin="anonymous"
+                src={resolveFileUrl(teamLogoUrl)}
+                alt={`${athlete.team} logo`}
+              />
+            )}
+            <div className="id-card-qr-block">
+              {qrDataUrl && <img src={qrDataUrl} alt={`Scan to view ${athlete.fullName}`} />}
+              <div className="scan-label">Scan To Verify</div>
+            </div>
           </div>
         </div>
       </div>

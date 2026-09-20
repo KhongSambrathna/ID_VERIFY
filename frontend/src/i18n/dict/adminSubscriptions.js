@@ -2,6 +2,11 @@ export const km = {
   "adminSubscriptions.title": "ការជាវគម្រោងរបស់ក្រុម",
   "adminSubscriptions.intro":
     "ជ្រើសរើសគម្រោង (Basic / Pro / Pro Max / Unlimited) និងរយៈពេលទូទាត់ (ប្រចាំខែ / រៀងរាល់ ៦ ខែ / ប្រចាំឆ្នាំ) ដែលសមស្របនឹងក្រុមនីមួយៗ។ ការទូទាត់ត្រូវធ្វើនៅក្រៅកម្មវិធី (ធនាគារ, Wing, ABA, Telegram, សាច់ប្រាក់ ។ល។) រួចកត់ត្រានៅទីនេះ ដើម្បីដោះសោមុខងារគ្រប់គ្រងក្រុម (បញ្ជីកីឡាករ, ការរៀបចំក្រុម, Starting XI, បន្ថែម/កែសម្រួលកីឡាករ) សម្រាប់ក្រុមនោះឡើងវិញ។",
+  "adminSubscriptions.logoHeader": "Logo ក្រុម",
+  "adminSubscriptions.logoSave": "រក្សាទុក",
+  "adminSubscriptions.logoSaving": "កំពុងបង្ហោះ…",
+  "adminSubscriptions.logoRemove": "លុបចេញ",
+  "adminSubscriptions.confirmRemoveLogo": "លុប logo របស់ក្រុម {team} ឬ?",
   "adminSubscriptions.planHeader": "គម្រោង",
   "adminSubscriptions.maxPlayersHeader": "កំណត់កីឡាករ",
   "adminSubscriptions.unlimitedPlayers": "គ្មានកំណត់",
@@ -39,6 +44,11 @@ export const en = {
   "adminSubscriptions.title": "Team subscriptions",
   "adminSubscriptions.intro":
     "Choose a plan (Basic / Pro / Pro Max / Unlimited) and a billing cycle (Monthly / every 6 months / Yearly) for each team. Payment happens outside the app (bank transfer, Wing, ABA, Telegram, cash, ...) and is recorded here to unlock that team's management tools (Squad list, Formation, Starting XI, add/edit athlete) again.",
+  "adminSubscriptions.logoHeader": "Team logo",
+  "adminSubscriptions.logoSave": "Save",
+  "adminSubscriptions.logoSaving": "Uploading…",
+  "adminSubscriptions.logoRemove": "Remove",
+  "adminSubscriptions.confirmRemoveLogo": "Remove {team}'s logo?",
   "adminSubscriptions.planHeader": "Plan",
   "adminSubscriptions.maxPlayersHeader": "Player cap",
   "adminSubscriptions.unlimitedPlayers": "Unlimited",

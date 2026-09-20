@@ -54,6 +54,18 @@ export const km = {
   "coachDashboard.khqrRemoving": "កំពុងលុប…",
   "coachDashboard.khqrRemoveFailed": "មិនអាចលុបរូប QR បានទេ",
   "coachDashboard.confirmRemoveKhqr": "លុបរូប QR ទូទាត់ ABA របស់ក្រុមនេះឬ?",
+  "coachDashboard.logoCardTitle": "Logo ក្រុម",
+  "coachDashboard.logoHelp":
+    "បង្ហោះ logo ក្រុមរបស់អ្នក — វានឹងបង្ហាញនៅក្បែរ QR លើកាតអត្តសញ្ញាណរបស់កីឡាករគ្រប់រូបក្នុងក្រុមអ្នក។",
+  "coachDashboard.logoUploadLabel": "បង្ហោះ logo",
+  "coachDashboard.logoReplaceLabel": "ប្តូរ logo ថ្មី",
+  "coachDashboard.logoSave": "រក្សាទុក",
+  "coachDashboard.logoUploading": "កំពុងបង្ហោះ…",
+  "coachDashboard.logoUploadFailed": "មិនអាចបង្ហោះ logo បានទេ",
+  "coachDashboard.logoRemove": "លុបចេញ",
+  "coachDashboard.logoRemoving": "កំពុងលុប…",
+  "coachDashboard.logoRemoveFailed": "មិនអាចលុប logo បានទេ",
+  "coachDashboard.confirmRemoveLogo": "លុប logo របស់ក្រុមនេះឬ?",
 };
 
 export const en = {
@@ -112,4 +124,16 @@ export const en = {
   "coachDashboard.khqrRemoving": "Removing…",
   "coachDashboard.khqrRemoveFailed": "Could not remove the QR image",
   "coachDashboard.confirmRemoveKhqr": "Remove this team's ABA payment QR image?",
+  "coachDashboard.logoCardTitle": "Team logo",
+  "coachDashboard.logoHelp":
+    "Upload your team's logo — it will appear next to the QR code on every one of your players' ID cards.",
+  "coachDashboard.logoUploadLabel": "Upload logo",
+  "coachDashboard.logoReplaceLabel": "Replace with a new logo",
+  "coachDashboard.logoSave": "Save",
+  "coachDashboard.logoUploading": "Uploading…",
+  "coachDashboard.logoUploadFailed": "Could not upload the logo",
+  "coachDashboard.logoRemove": "Remove",
+  "coachDashboard.logoRemoving": "Removing…",
+  "coachDashboard.logoRemoveFailed": "Could not remove the logo",
+  "coachDashboard.confirmRemoveLogo": "Remove this team's logo?",
 };
