@@ -1244,6 +1244,78 @@ table.athletes .actions-cell {
   text-transform: none;
   line-height: 1.3;
 }
+
+/* ---------- ID Card back (terms of use) ---------- */
+/* Same width/min-height as the front (.id-card) so the two are physically
+   identical — required for them to line up when the sheet is cut. */
+.id-card-back {
+  padding-bottom: 10px;
+}
+.id-card-back-title {
+  text-align: center;
+  padding: 6px 15px 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.id-card-back-title .kh {
+  font-family: var(--font-khmer-name);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--navy);
+}
+.id-card-back-title .en {
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--gold);
+  text-transform: uppercase;
+  background: var(--navy);
+  border-radius: 3px;
+  padding: 1px 0;
+}
+.id-card-terms {
+  margin: 4px 0 0;
+  padding: 0 15px 0 26px;
+  list-style: none;
+  counter-reset: term;
+}
+.id-card-terms li {
+  position: relative;
+  counter-increment: term;
+  margin-bottom: 6px;
+}
+.id-card-terms li::before {
+  content: counter(term) ".";
+  position: absolute;
+  left: -16px;
+  top: 0;
+  font-family: var(--font-display);
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--gold);
+}
+.id-card-terms li:last-child {
+  margin-bottom: 0;
+}
+.id-card-terms p {
+  margin: 0;
+}
+.id-card-terms p.kh {
+  font-family: var(--font-khmer-body);
+  font-size: 8px;
+  line-height: 1.3;
+  color: var(--ink);
+}
+.id-card-terms p.en {
+  font-family: var(--font-body);
+  font-size: 7.5px;
+  line-height: 1.3;
+  color: #6a6a6a;
+  font-style: italic;
+  margin-top: 1px;
+}
+
 .id-card-print-page {
   margin-bottom: 24px;
 }

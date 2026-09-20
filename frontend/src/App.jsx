@@ -9,6 +9,7 @@ import AddAthlete from "./pages/AddAthlete";
 import EditAthlete from "./pages/EditAthlete";
 import AthleteCardPage from "./pages/AthleteCardPage";
 import AllCardsPage from "./pages/AllCardsPage";
+import PrintCardBacksPage from "./pages/PrintCardBacksPage";
 import VerifyPage from "./pages/VerifyPage";
 import SearchPage from "./pages/SearchPage";
 import AboutUs from "./pages/AboutUs";
@@ -93,6 +94,14 @@ export default function App() {
           element={
             <ProtectedRoute role="ADMIN">
               <AllCardsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/cards/back"
+          element={
+            <ProtectedRoute role="ADMIN">
+              <PrintCardBacksPage />
             </ProtectedRoute>
           }
         />

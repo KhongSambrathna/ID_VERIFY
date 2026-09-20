@@ -134,6 +134,13 @@ export default function AllCardsPage() {
           <button className="btn btn-primary" onClick={() => window.print()}>
             {t("allCardsPage.exportPrintSelected")}
           </button>
+          <Link
+            to="/admin/cards/back"
+            className="btn btn-outline"
+            style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
+          >
+            {t("allCardsPage.printCardBacks")}
+          </Link>
           <button
             className="btn btn-outline"
             style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
