@@ -1010,6 +1010,26 @@ table.athletes .actions-cell {
   flex-direction: column;
   position: relative;
 }
+/* Faint club-logo watermark on the card body — a background layer only,
+   sitting behind every real child (z-index: -1 always paints below normal-
+   flow content, so this needs no z-index changes anywhere else). Low
+   opacity so it never competes with the name/team/DOB text sitting on top
+   of it; the navy header and cream ID-number bar have their own solid
+   backgrounds so the watermark only actually shows through the white body
+   area, which is the intended look. */
+.id-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-image: url("/card-watermark.png");
+  background-repeat: no-repeat;
+  background-position: center 62%;
+  background-size: 68%;
+  opacity: 0.15;
+  pointer-events: none;
+  z-index: -1;
+}
 .id-card-top {
   background: var(--navy);
   color: white;
@@ -1239,7 +1259,8 @@ table.athletes .actions-cell {
     break-inside: avoid;
   }
   .id-card,
-  .id-card * {
+  .id-card *,
+  .id-card::before {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     color-adjust: exact !important;
