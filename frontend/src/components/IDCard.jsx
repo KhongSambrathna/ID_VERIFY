@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import html2canvas from "html2canvas";
+import QRCode from "qrcode";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { saveCanvasAsImage } from "../utils/saveCanvasAsImage";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -17,6 +18,34 @@ export default function IDCard({ athlete, hideActions }) {
   const { t } = useLanguage();
   const cardRef = useRef(null);
   const [saving, setSaving] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState(null);
+
+  // Generated in the browser, per athlete, from whatever domain the card is
+  // actually being viewed on (window.location.origin) — e.g.
+  // https://id-verify-liart.vercel.app/verify/<verifyId>. This replaced a
+  // single shared static QR image that pointed at the generic search page:
+  // that was a stand-in put in because the SERVER-side QR (baked into a
+  // Cloudinary image at register time, from generateAthleteQR.js) depended
+  // on the backend's PUBLIC_BASE_URL env var being set correctly, and broke
+  // silently whenever it wasn't. Building it client-side removes that
+  // dependency entirely — it can never point at the wrong domain, and every
+  // card's QR jumps straight to that one athlete's own verify page.
+  useEffect(() => {
+    if (!athlete?.verifyId) {
+      setQrDataUrl(null);
+      return;
+    }
+    let cancelled = false;
+    const verifyUrl = `${window.location.origin}/verify/${athlete.verifyId}`;
+    QRCode.toDataURL(verifyUrl, { width: 200, margin: 1 })
+      .then((url) => {
+        if (!cancelled) setQrDataUrl(url);
+      })
+      .catch((err) => console.error("Failed to generate QR code:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, [athlete?.verifyId]);
 
   if (!athlete) return null;
 
@@ -127,14 +156,8 @@ export default function IDCard({ athlete, hideActions }) {
             </div>
           </div>
 
-          {/* Every card shares the same QR code — it points to the public
-              search page (id-verify-liart.vercel.app/search) instead of a
-              per-athlete verify link, since the old per-athlete QR depended
-              on PUBLIC_BASE_URL being set correctly and kept breaking.
-              Anyone who scans it can look the player up by name or by the
-              ID number printed above. */}
           <div className="id-card-qr-corner">
-            <img src="/search-qr.png" alt="Scan to search for a player" />
+            {qrDataUrl && <img src={qrDataUrl} alt={`Scan to view ${athlete.fullName}`} />}
             <div className="scan-label">Scan</div>
           </div>
         </div>

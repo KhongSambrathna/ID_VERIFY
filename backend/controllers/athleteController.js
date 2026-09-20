@@ -568,12 +568,15 @@ exports.removeFee = async (req, res) => {
 };
 
 // DELETE /api/athletes/:id/assignments/:assignmentId  — remove one team/role.
-// Admin: removed immediately. Head Coach: only allowed on their own team's
-// assignment, and it's not an immediate delete — it's flagged pendingRemoval
-// and stays visible until an Admin confirms (approve) or declines (reject)
-// it, same as a brand-new assignment needs approval either way. If this
-// was the person's ONLY assignment, removing it (by an Admin, or once an
-// Admin confirms a Head Coach's request) deletes the whole person record —
+// Admin: removed immediately — an optional body { reason } is included in
+// the Head Coach's Telegram notification below, so they know why one of
+// their players disappeared instead of just noticing it's gone. Head
+// Coach: only allowed on their own team's assignment, and it's not an
+// immediate delete — it's flagged pendingRemoval and stays visible until
+// an Admin confirms (approve) or declines (reject) it, same as a
+// brand-new assignment needs approval either way. If this was the
+// person's ONLY assignment, removing it (by an Admin, or once an Admin
+// confirms a Head Coach's request) deletes the whole person record —
 // there's nothing left to keep it around for.
 exports.removeAssignment = async (req, res) => {
   try {
@@ -592,17 +595,25 @@ exports.removeAssignment = async (req, res) => {
       return res.json(athlete);
     }
 
+    const reason = String(req.body?.reason || "").trim();
+    const team = assignment.team;
+    const fullName = athlete.fullName;
     const wasLast = athlete.assignments.length === 1;
     athlete.assignments = athlete.assignments.filter((a) => String(a._id) !== String(assignment._id));
     if (wasLast) {
       cleanupAthleteAssets(athlete);
       await Athlete.findByIdAndDelete(athlete._id);
+      notifyTeamCoaches(
+        team,
+        `🗑️ ${fullName} was removed from ${team} by Admin (their only team, so the whole record was deleted)${reason ? ` — ${reason}` : ""}.`
+      );
       return res.json({
         message: "Assignment removed — it was their only team, so the whole record was deleted",
         deletedAthlete: true,
       });
     }
     await athlete.save();
+    notifyTeamCoaches(team, `🗑️ ${fullName} was removed from ${team} by Admin${reason ? ` — ${reason}` : ""}.`);
     res.json(athlete);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -653,7 +664,9 @@ exports.approveAssignment = async (req, res) => {
 // declines whatever this assignment is waiting on: a pending ADD is removed
 // entirely (it's as if it was never added — cascades to a full delete if it
 // was the person's only assignment); a pending REMOVAL request is declined,
-// which just clears the flag and keeps the assignment as it was.
+// which just clears the flag and keeps the assignment as it was. An
+// optional body { reason } is folded into the Head Coach's Telegram
+// notification either way, so they know why, not just that it happened.
 exports.rejectAssignment = async (req, res) => {
   try {
     const athlete = await Athlete.findById(req.params.id);
@@ -663,11 +676,15 @@ exports.rejectAssignment = async (req, res) => {
 
     const team = assignment.team;
     const fullName = athlete.fullName;
+    const reason = String(req.body?.reason || "").trim();
 
     if (assignment.pendingRemoval) {
       assignment.pendingRemoval = false;
       await athlete.save();
-      notifyTeamCoaches(team, `↩️ Admin declined the removal request for ${fullName} on ${team} — they stay on the team.`);
+      notifyTeamCoaches(
+        team,
+        `↩️ Admin declined the removal request for ${fullName} on ${team} — they stay on the team${reason ? ` (${reason})` : ""}.`
+      );
       return res.json(athlete);
     }
 
@@ -676,14 +693,14 @@ exports.rejectAssignment = async (req, res) => {
     if (wasLast) {
       cleanupAthleteAssets(athlete);
       await Athlete.findByIdAndDelete(athlete._id);
-      notifyTeamCoaches(team, `❌ ${fullName}'s ${team} assignment was rejected by Admin.`);
+      notifyTeamCoaches(team, `❌ ${fullName}'s ${team} assignment was rejected by Admin${reason ? ` — ${reason}` : ""}.`);
       return res.json({
         message: "Rejected — it was their only team, so the whole record was deleted",
         deletedAthlete: true,
       });
     }
     await athlete.save();
-    notifyTeamCoaches(team, `❌ ${fullName}'s ${team} assignment was rejected by Admin.`);
+    notifyTeamCoaches(team, `❌ ${fullName}'s ${team} assignment was rejected by Admin${reason ? ` — ${reason}` : ""}.`);
     res.json(athlete);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -693,14 +710,24 @@ exports.rejectAssignment = async (req, res) => {
 // DELETE /api/athletes/:id  (admin only — a Head Coach removes people
 // through removeAssignment above instead, which always needs Admin
 // confirmation) — deletes the whole person record and its Cloudinary assets
-// outright, regardless of how many teams/roles they had.
+// outright, regardless of how many teams/roles they had. Same optional
+// body { reason } + Head Coach Telegram notification as removeAssignment
+// above — every one of this person's teams gets told, since the whole
+// record (not just one team's assignment) is gone.
 exports.deleteAthlete = async (req, res) => {
   try {
     const athlete = await Athlete.findById(req.params.id);
     if (!athlete) return res.status(404).json({ message: "Athlete not found" });
 
+    const reason = String(req.body?.reason || "").trim();
+    const teams = [...new Set(athlete.assignments.map((a) => a.team))];
+    const fullName = athlete.fullName;
+
     cleanupAthleteAssets(athlete);
     await Athlete.findByIdAndDelete(athlete._id);
+
+    const text = `🗑️ ${fullName}'s whole record was deleted by Admin${reason ? ` — ${reason}` : ""}.`;
+    teams.forEach((team) => notifyTeamCoaches(team, text));
 
     res.json({ message: "Athlete deleted" });
   } catch (err) {

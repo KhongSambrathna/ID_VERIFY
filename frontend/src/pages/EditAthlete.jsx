@@ -239,10 +239,21 @@ export default function EditAthlete() {
       ? t("editAthlete.confirmDeleteWholeRecord")
       : t("editAthlete.confirmRemoveAssignment");
     if (!confirm(msg)) return;
+    // Only Admin's removal here is immediate (Head Coach's just flags a
+    // pending removal request for Admin to review) — so only Admin is
+    // asked for an optional reason, sent along in the Head Coach's
+    // Telegram notification. Cancelling the prompt aborts the whole action.
+    let reason = "";
+    if (isAdmin) {
+      reason = prompt(t("editAthlete.removeReasonPrompt"));
+      if (reason === null) return;
+    }
     setAssignmentError("");
     setBusyAssignmentId(assignmentId);
     try {
-      const { data } = await api.delete(`/athletes/${id}/assignments/${assignmentId}`);
+      const { data } = await api.delete(`/athletes/${id}/assignments/${assignmentId}`, {
+        data: { reason: reason.trim() },
+      });
       afterAssignmentChange(data);
     } catch (err) {
       setAssignmentError(err.response?.data?.message || t("editAthlete.failedToRemoveAssignment"));
@@ -264,11 +275,18 @@ export default function EditAthlete() {
     }
   };
 
+  // Reject is Admin-only server-side either way — an optional reason is
+  // folded into the Head Coach's Telegram notification so they know why.
+  // Cancelling the prompt aborts the whole action.
   const rejectAssignmentAction = async (assignmentId) => {
+    const reason = prompt(t("editAthlete.rejectReasonPrompt"));
+    if (reason === null) return;
     setAssignmentError("");
     setBusyAssignmentId(assignmentId);
     try {
-      const { data } = await api.put(`/athletes/${id}/assignments/${assignmentId}/reject`);
+      const { data } = await api.put(`/athletes/${id}/assignments/${assignmentId}/reject`, {
+        reason: reason.trim(),
+      });
       afterAssignmentChange(data);
     } catch (err) {
       setAssignmentError(err.response?.data?.message || t("editAthlete.failedToReject"));

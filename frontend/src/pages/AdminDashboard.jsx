@@ -100,8 +100,15 @@ export default function AdminDashboard() {
     load();
   };
 
+  // Reason is optional — leaving the prompt blank and pressing OK sends no
+  // reason at all, same as before this existed. Pressing Cancel on the
+  // prompt aborts the whole action (nothing is sent), so it never silently
+  // "skips" the reason. It's included in the Head Coach's Telegram
+  // notification so they know WHY, not just that it happened.
   const rejectAssignment = async (a) => {
-    await api.put(`/athletes/${a._id}/assignments/${a.assignmentId}/reject`);
+    const reason = prompt(t("adminDashboard.rejectReasonPrompt"));
+    if (reason === null) return;
+    await api.put(`/athletes/${a._id}/assignments/${a.assignmentId}/reject`, { reason: reason.trim() });
     load();
   };
 
@@ -111,7 +118,9 @@ export default function AdminDashboard() {
       ? t("adminDashboard.confirmDeleteWholeRecord")
       : t("adminDashboard.confirmRemoveAssignment");
     if (!confirm(msg)) return;
-    await api.delete(`/athletes/${a._id}/assignments/${a.assignmentId}`);
+    const reason = prompt(t("adminDashboard.removeReasonPrompt"));
+    if (reason === null) return;
+    await api.delete(`/athletes/${a._id}/assignments/${a.assignmentId}`, { data: { reason: reason.trim() } });
     load();
   };
 
