@@ -21,7 +21,7 @@ export default function Landing() {
             {isAuthed ? (
               <a
                 href="#"
-                className="btn btn-outline"
+                className="btn btn-outline-invert"
                 onClick={(e) => {
                   e.preventDefault();
                   logout();
@@ -31,11 +31,11 @@ export default function Landing() {
                 {t("landing.logout")}
               </a>
             ) : (
-              <a href="/login" className="btn btn-outline">
+              <a href="/login" className="btn btn-outline-invert">
                 {t("landing.adminSignIn")}
               </a>
             )}
-            <a href="#how" className="btn btn-outline">
+            <a href="#how" className="btn btn-outline-invert">
               {t("landing.howItWorksLink")}
             </a>
           </div>

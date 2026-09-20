@@ -10,6 +10,15 @@ const registrationSchema = new mongoose.Schema(
   {
     athlete: { type: mongoose.Schema.Types.ObjectId, ref: "Athlete", required: true },
     team: { type: String, required: true },
+    // Snapshot of the athlete's assignment role at the moment they
+    // registered (PLAYER, HEAD COACH, ASSISTAN COACH, MEDIC, TECHNICAL —
+    // same values as Athlete.assignments.role). Anyone registered under a
+    // non-PLAYER role is exempt from BOTH the tournament's maxParticipants
+    // cap and its age-limit/overage rule (see buildRegistration/
+    // checkAgeRule in the controller) — a coach or medic tagging along
+    // shouldn't take a player's spot or be blocked by an age rule meant
+    // for players.
+    role: { type: String, default: "PLAYER" },
     fullName: { type: String, required: true }, // snapshot, so CSV export still works if the athlete record later changes
     khmerName: { type: String },
     verifyId: { type: String },

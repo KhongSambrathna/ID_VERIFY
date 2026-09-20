@@ -23,7 +23,13 @@ export default function ProtectedRoute({ children, role }) {
   const allowedRoles = Array.isArray(role) ? role : role ? [role] : null;
   if (allowedRoles && !allowedRoles.includes(userRole)) {
     const ownDashboard =
-      userRole === "HEAD_COACH" ? "/coach" : userRole === "PLAYER" ? "/player" : "/admin";
+      userRole === "HEAD_COACH"
+        ? "/coach"
+        : userRole === "PLAYER"
+        ? "/player"
+        : userRole === "REFEREE"
+        ? "/referee"
+        : "/admin";
     return <Navigate to={ownDashboard} replace />;
   }
 

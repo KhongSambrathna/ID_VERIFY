@@ -13,6 +13,9 @@ export const km = {
   "adminUsers.rolePlayerLabel": "កីឡាករ",
   "adminUsers.playerHelp":
     "គណនីរួមមួយសម្រាប់កីឡាករគ្រប់រូបក្នុងក្រុមនេះ — ពួកគេអាចមើលបញ្ជីក្រុមទាំងមូល និងស្ថានភាពថ្លៃសេវា/បំណុល ប៉ុន្តែមិនអាចបន្ថែម កែសម្រួល ឬលុបអ្វីទាំងអស់។",
+  "adminUsers.roleReferee": "អាជ្ញាកណ្តាល",
+  "adminUsers.refereeHelp":
+    "គណនីឯករាជ្យ មិនចំណុះក្រុមណាមួយ — មើលបានតែកាលវិភាគប្រកួត/ព័ត៌មានប្រកួតរបស់គ្រប់ក្រុមទាំងអស់ប៉ុណ្ណោះ មិនអាចមើលព័ត៌មានថ្លៃសេវា/បំណុល ឬកែសម្រួលអ្វីបានទេ។",
   "adminUsers.telegramChatId": "Telegram chat ID",
   "adminUsers.telegramPlaceholder": "ឧ. 123456789",
   "adminUsers.noUsers": "មិនទាន់មានអ្នកប្រើប្រាស់ទេ។",
@@ -29,6 +32,8 @@ export const km = {
   "adminUsers.resetting": "កំពុងកំណត់ឡើងវិញ…",
   "adminUsers.resetPassword": "កំណត់លេខសម្ងាត់ឡើងវិញ",
   "adminUsers.noPlayerAccounts": "មិនទាន់មានគណនីកីឡាករផ្ទាល់ខ្លួនទេ។",
+  "adminUsers.playerSearchPlaceholder": "ស្វែងរកតាមឈ្មោះ ឈ្មោះអ្នកប្រើ ឬក្រុម…",
+  "adminUsers.noSearchResults": "រកមិនឃើញគណនីដែលត្រូវនឹងការស្វែងរកនេះទេ។",
   "adminUsers.confirmResetPasswordPrefix": "កំណត់លេខសម្ងាត់របស់",
   "adminUsers.confirmResetPasswordSuffix":
     "ត្រឡប់ទៅលំនាំដើមវិញឬ? ពួកគេនឹងត្រូវប្តូរលេខសម្ងាត់ថ្មីនៅពេលចូលលើកក្រោយ។",
@@ -54,6 +59,9 @@ export const en = {
   "adminUsers.rolePlayerLabel": "Player",
   "adminUsers.playerHelp":
     "One shared login for every player on this team — they can see the whole team's roster and fee/debt status, but can never add, edit, or remove anything.",
+  "adminUsers.roleReferee": "Referee",
+  "adminUsers.refereeHelp":
+    "An independent login, not tied to any team — can only view the tournament/match schedule across every team; no fee/debt info, no editing.",
   "adminUsers.telegramChatId": "Telegram chat ID",
   "adminUsers.telegramPlaceholder": "e.g. 123456789",
   "adminUsers.noUsers": "No users yet.",
@@ -70,6 +78,8 @@ export const en = {
   "adminUsers.resetting": "Resetting…",
   "adminUsers.resetPassword": "Reset password",
   "adminUsers.noPlayerAccounts": "No individual player logins yet.",
+  "adminUsers.playerSearchPlaceholder": "Search by name, username, or team…",
+  "adminUsers.noSearchResults": "No accounts match your search.",
   "adminUsers.confirmResetPasswordPrefix": "Reset",
   "adminUsers.confirmResetPasswordSuffix":
     "'s password back to the default? They'll be asked to change it at next sign-in.",

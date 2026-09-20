@@ -12,6 +12,21 @@ function formatDate(d) {
   return date.toISOString().slice(0, 10);
 }
 
+// Reuses the same role labels as EditAthlete's assignment role picker —
+// shown next to a non-PLAYER registration (Head Coach/Assistant Coach/
+// Medic/Technical) so it's obvious at a glance that they're staff tagging
+// along, not counting against maxParticipants or the age rule.
+const STAFF_ROLE_LABEL_KEYS = {
+  "ASSISTAN COACH": "editAthlete.roleAssistantCoach",
+  "HEAD COACH": "editAthlete.roleHeadCoach",
+  TECHNICAL: "editAthlete.roleTechnical",
+  MEDIC: "editAthlete.roleMedic",
+};
+function staffRoleLabel(role, t) {
+  const key = STAFF_ROLE_LABEL_KEYS[role];
+  return key ? t(key) : role;
+}
+
 // One-line summary of a tournament's age rule, for the list table.
 function ageRuleSummary(tour, t) {
   if (!tour.ageLimitYear) return t("adminTournaments.noAgeLimit");
@@ -486,6 +501,11 @@ export default function AdminTournaments() {
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
                                       <span>
                                         <span className="caps-display">{r.fullName} {r.khmerName ? `(${r.khmerName})` : ""} — {r.team}</span>
+                                        {r.role && r.role !== "PLAYER" && (
+                                          <span className="badge pending" style={{ marginLeft: 6 }}>
+                                            {staffRoleLabel(r.role, t)}
+                                          </span>
+                                        )}
                                         {r.jerseyNumber != null ? ` · #${r.jerseyNumber}` : ""}
                                         {r.isOverage ? ` · ${t("adminTournaments.overageSuffix")}` : ""}
                                         {r.registeredBy ? ` · ${t("adminTournaments.registeredByStaffSuffix")}` : ""}
@@ -564,6 +584,11 @@ export default function AdminTournaments() {
                                   <li key={a.assignmentId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                     <span>
                                       <span className="caps-display">{a.fullName} — {a.team}</span>
+                                      {a.role && a.role !== "PLAYER" && (
+                                        <span className="badge pending" style={{ marginLeft: 6 }}>
+                                          {staffRoleLabel(a.role, t)}
+                                        </span>
+                                      )}
                                       {a.feeOwed > 0 ? ` (${t("adminTournaments.owes")} $${a.feeOwed})` : ""}
                                     </span>
                                     <button

@@ -19,7 +19,9 @@ const {
 router.use(requireAuth);
 
 // Bare paths above /:id, same reasoning as athleteRoutes.js.
-router.get("/", requireRole("ADMIN", "HEAD_COACH", "PLAYER"), listTournaments);
+// REFEREE only gets this list (name/dates/rules/spots, no per-player
+// registration or fee detail) — see listTournaments' role-scoping comment.
+router.get("/", requireRole("ADMIN", "HEAD_COACH", "PLAYER", "REFEREE"), listTournaments);
 router.post("/", requireRole("ADMIN", "HEAD_COACH"), createTournament);
 router.get("/:id", requireRole("ADMIN", "HEAD_COACH", "PLAYER"), getTournament);
 router.put("/:id", requireRole("ADMIN", "HEAD_COACH"), updateTournament);

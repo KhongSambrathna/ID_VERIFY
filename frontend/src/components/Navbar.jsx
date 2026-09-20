@@ -38,7 +38,7 @@ function NavDropdown({ label, children }) {
 }
 
 export default function Navbar() {
-  const { isAuthed, isAdmin, isHeadCoach, isPlayer, athleteId, logout } = useAuth();
+  const { isAuthed, isAdmin, isHeadCoach, isPlayer, isReferee, athleteId, logout } = useAuth();
   const { language, toggleLanguage, t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
@@ -93,12 +93,15 @@ export default function Navbar() {
           <Link to="/pricing" onClick={closeMenu}>{t("navbar.pricing")}</Link>
 
           {isAuthed && (
-            <Link to={isAdmin ? "/admin" : isHeadCoach ? "/coach" : "/player"} onClick={closeMenu}>
+            <Link
+              to={isAdmin ? "/admin" : isHeadCoach ? "/coach" : isReferee ? "/referee" : "/player"}
+              onClick={closeMenu}
+            >
               {t("navbar.dashboard")}
             </Link>
           )}
 
-          {isAuthed && !isPlayer && (
+          {isAuthed && !isPlayer && !isReferee && (
             <NavDropdown label={t("navbar.reports")}>
               <Link to="/debt-report" onClick={closeMenu}>{t("navbar.debtReport")}</Link>
               <Link to="/admin/stats" onClick={closeMenu}>{t("navbar.stats")}</Link>
@@ -106,7 +109,7 @@ export default function Navbar() {
             </NavDropdown>
           )}
 
-          {isAuthed && !isPlayer && (
+          {isAuthed && !isPlayer && !isReferee && (
             <NavDropdown label={t("navbar.manage")}>
               <Link to="/admin/renew" onClick={closeMenu}>{t("navbar.idRenewal")}</Link>
               <Link to="/admin/tournaments" onClick={closeMenu}>{t("navbar.tournaments")}</Link>

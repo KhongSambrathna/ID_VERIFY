@@ -92,15 +92,29 @@ exports.listUsers = async (req, res) => {
 
 // GET /api/auth/player-accounts  (Admin: every team; Head Coach: own team
 // only) — the individual per-athlete Player logins used for tournament
-// self-registration, one row per athlete that has one.
+// self-registration, one row per athlete that has one. Pulls the athlete's
+// name in from the linked Athlete record (the username itself is just their
+// verifyId, e.g. "001-100-2991", so the name is what makes this list usable
+// for search/lookup rather than the raw id).
 exports.listPlayerAccounts = async (req, res) => {
   try {
     const filter = { role: "PLAYER", athleteId: { $ne: null } };
     if (req.adminRole === "HEAD_COACH") filter.team = req.adminTeam;
     const accounts = await Admin.find(filter)
       .select("username team athleteId mustChangePassword telegramChatId createdAt")
+      .populate("athleteId", "fullName khmerName")
       .sort({ username: 1 });
-    res.json(accounts);
+    const result = accounts.map((a) => ({
+      _id: a._id,
+      username: a.username,
+      team: a.team,
+      fullName: a.athleteId?.fullName || "",
+      khmerName: a.athleteId?.khmerName || "",
+      mustChangePassword: a.mustChangePassword,
+      telegramChatId: a.telegramChatId,
+      createdAt: a.createdAt,
+    }));
+    res.json(result);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -275,15 +289,17 @@ exports.me = async (req, res) => {
   }
 };
 
-// POST /api/auth/users  (admin only) — create a Head Coach or another Admin login
+// POST /api/auth/users  (admin only) — create a Head Coach, Referee, or
+// another Admin login. REFEREE is team-less (see Admin model comment), so
+// it's simply left out of the "team required" check below.
 exports.createUser = async (req, res) => {
   try {
     const { username, password, role, team } = req.body;
     if (!username || !password) {
       return res.status(400).json({ message: "Username and password required" });
     }
-    if (role && !["ADMIN", "HEAD_COACH", "PLAYER"].includes(role)) {
-      return res.status(400).json({ message: "Role must be ADMIN, HEAD_COACH, or PLAYER" });
+    if (role && !["ADMIN", "HEAD_COACH", "PLAYER", "REFEREE"].includes(role)) {
+      return res.status(400).json({ message: "Role must be ADMIN, HEAD_COACH, PLAYER, or REFEREE" });
     }
     if ((role === "HEAD_COACH" || role === "PLAYER") && !team) {
       return res.status(400).json({ message: "Team is required for a Head Coach or Player account" });

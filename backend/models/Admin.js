@@ -13,8 +13,11 @@ const adminSchema = new mongoose.Schema(
       // — they can see (never edit) every athlete on their own team,
       // including fee/debt info, same as a Head Coach sees, just with no
       // write access at all.
+      // REFEREE is an independent, team-less account — not tied to any
+      // roster. View-only: it can see the tournament/match schedule across
+      // every team, and nothing else (no fee/debt info, no editing).
       type: String,
-      enum: ["ADMIN", "HEAD_COACH", "PLAYER"],
+      enum: ["ADMIN", "HEAD_COACH", "PLAYER", "REFEREE"],
       default: "ADMIN",
     },
     team: {
@@ -24,6 +27,7 @@ const adminSchema = new mongoose.Schema(
       // that athlete's FIRST team assignment — only used for the shared
       // team-roster view; tournament registration looks at the athlete's
       // full assignments list instead, not this single field.
+      // Left unset for REFEREE — a referee doesn't belong to any team.
       type: String,
     },
     // Set only on an individual PLAYER account (one login per athlete, used

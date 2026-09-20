@@ -33,6 +33,7 @@ import PlayerSquadListPage from "./pages/PlayerSquadListPage";
 import PricingPage from "./pages/PricingPage";
 import PosterGenerator from "./pages/PosterGenerator";
 import PaymentReturn from "./pages/PaymentReturn";
+import RefereeSchedulePage from "./pages/RefereeSchedulePage";
 
 export default function App() {
   return (
@@ -228,6 +229,14 @@ export default function App() {
           element={
             <ProtectedRoute role={["ADMIN", "HEAD_COACH", "PLAYER"]}>
               <PaymentReturn />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/referee"
+          element={
+            <ProtectedRoute role="REFEREE">
+              <RefereeSchedulePage />
             </ProtectedRoute>
           }
         />

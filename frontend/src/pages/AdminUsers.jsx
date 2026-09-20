@@ -12,12 +12,14 @@ export default function AdminUsers() {
     { value: "ADMIN", label: t("adminUsers.roleAdmin") },
     { value: "HEAD_COACH", label: t("adminUsers.roleHeadCoach") },
     { value: "PLAYER", label: t("adminUsers.rolePlayer") },
+    { value: "REFEREE", label: t("adminUsers.roleReferee") },
   ];
 
   const ROLE_LABELS = {
     HEAD_COACH: t("adminUsers.roleHeadCoach"),
     PLAYER: t("adminUsers.rolePlayerLabel"),
     ADMIN: t("adminUsers.roleAdmin"),
+    REFEREE: t("adminUsers.roleReferee"),
   };
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,6 +43,7 @@ export default function AdminUsers() {
   const [generating, setGenerating] = useState(false);
   const [generateSummary, setGenerateSummary] = useState(null);
   const [resettingId, setResettingId] = useState(null);
+  const [playerSearch, setPlayerSearch] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -154,6 +157,15 @@ export default function AdminUsers() {
     }
   };
 
+  const pq = playerSearch.trim().toLowerCase();
+  const filteredPlayerAccounts = playerAccounts.filter(
+    (a) =>
+      !pq ||
+      [a.fullName, a.khmerName, a.username, a.team]
+        .filter(Boolean)
+        .some((field) => field.toLowerCase().includes(pq))
+  );
+
   return (
     <div className="container dash-body">
       <div className="dash-header">
@@ -190,6 +202,11 @@ export default function AdminUsers() {
         {form.role === "PLAYER" && (
           <p className="help-text" style={{ marginTop: -8 }}>
             {t("adminUsers.playerHelp")}
+          </p>
+        )}
+        {form.role === "REFEREE" && (
+          <p className="help-text" style={{ marginTop: -8 }}>
+            {t("adminUsers.refereeHelp")}
           </p>
         )}
         {formError && <div className="error-text">{formError}</div>}
@@ -279,6 +296,14 @@ export default function AdminUsers() {
         )}
       </div>
 
+      <div className="field search-field">
+        <input
+          placeholder={t("adminUsers.playerSearchPlaceholder")}
+          value={playerSearch}
+          onChange={(e) => setPlayerSearch(e.target.value)}
+        />
+      </div>
+
       {playerAccountsLoading && <p>{t("common.loading")}</p>}
 
       {!playerAccountsLoading && (
@@ -286,6 +311,7 @@ export default function AdminUsers() {
           <table className="athletes">
             <thead>
               <tr>
+                <th>{t("common.name")}</th>
                 <th>{t("common.username")}</th>
                 <th>{t("common.team")}</th>
                 <th>{t("adminUsers.mustChangePassword")}</th>
@@ -294,8 +320,12 @@ export default function AdminUsers() {
               </tr>
             </thead>
             <tbody>
-              {playerAccounts.map((a) => (
+              {filteredPlayerAccounts.map((a) => (
                 <tr key={a._id}>
+                  <td data-label={t("common.name")} className="caps-display">
+                    {a.fullName || "—"}
+                    {a.khmerName && <div className="help-text" style={{ margin: 0 }}>{a.khmerName}</div>}
+                  </td>
                   <td data-label={t("common.username")}>{a.username}</td>
                   <td data-label={t("common.team")} className="caps-display">{a.team || "—"}</td>
                   <td data-label={t("adminUsers.mustChangePassword")}>
@@ -315,10 +345,10 @@ export default function AdminUsers() {
                   </td>
                 </tr>
               ))}
-              {playerAccounts.length === 0 && (
+              {filteredPlayerAccounts.length === 0 && (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: "center", color: "#777" }}>
-                    {t("adminUsers.noPlayerAccounts")}
+                  <td colSpan={6} style={{ textAlign: "center", color: "#777" }}>
+                    {playerAccounts.length === 0 ? t("adminUsers.noPlayerAccounts") : t("adminUsers.noSearchResults")}
                   </td>
                 </tr>
               )}

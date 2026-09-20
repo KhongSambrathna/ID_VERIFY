@@ -75,7 +75,12 @@ function summarize(t, athleteId) {
     overageUsed: t.registrations.filter((r) => r.isOverage).length,
     maxParticipants: t.maxParticipants ?? null,
     registrationClosed: !!t.registrationClosed,
-    registrationCount: t.registrations.length,
+    // PLAYER-only count — matches what maxParticipants actually caps (see
+    // playerRegistrationCount); staff (Head Coach/Assistant Coach/Medic/
+    // Technical) registrations don't count toward the cap, so they're left
+    // out of this number too, or the "x/max" spots column would look full
+    // when it isn't.
+    registrationCount: playerRegistrationCount(t),
     unpaidCount:
       t.entryFee > 0
         ? t.registrations.filter((r) => !r.convertedToDebt && (r.feePaidAmount || 0) < t.entryFee).length
@@ -204,22 +209,25 @@ exports.createTournament = async (req, res) => {
 // GET /api/tournaments — role-scoped list (summaries only, no per-player
 // registration detail — that's GET /:id).
 // - Admin: everything.
+// - Referee: everything too — a team-less, read-only account meant to see
+//   the whole league's match schedule, not just one team's.
 // - Head Coach / shared team Player login: their own team's tournaments,
 //   plus every open-to-all tournament.
 // - Individual Player login: same as above, scoped to their account's team.
 exports.listTournaments = async (req, res) => {
   try {
     let filter = {};
-    if (req.adminRole !== "ADMIN") {
+    if (req.adminRole !== "ADMIN" && req.adminRole !== "REFEREE") {
       const team = req.adminTeam;
       filter = team ? { $or: [{ team: "" }, { team }] } : { team: "" };
     }
     const tournaments = await Tournament.find(filter).sort({ createdAt: -1 });
 
-    // Best-effort auto-settle on the way past — only staff trigger it (a
-    // Player's own list view shouldn't be the thing that mutates other
-    // athletes' debt), and one tournament's error never blocks the rest.
-    if (req.adminRole !== "PLAYER") {
+    // Best-effort auto-settle on the way past — only Admin/Head Coach
+    // trigger it (a Player's or Referee's own list view shouldn't be the
+    // thing that mutates other athletes' debt), and one tournament's error
+    // never blocks the rest.
+    if (req.adminRole === "ADMIN" || req.adminRole === "HEAD_COACH") {
       for (const t of tournaments) {
         try {
           await settleUnpaidToDebt(t);
@@ -351,6 +359,22 @@ exports.deleteTournament = async (req, res) => {
   }
 };
 
+// Registrations under any assignment role other than PLAYER (Head Coach,
+// Assistant Coach, Medic, Technical) are staff tagging along, not players
+// competing for a roster spot — they never count against maxParticipants
+// and never trigger the age-limit/overage rule. Same convention as
+// checkPlayerCap in athleteController.js for the per-team roster cap.
+function isStaffRole(role) {
+  return !!role && role !== "PLAYER";
+}
+
+// How many PLAYER-role registrations count against maxParticipants — used
+// both for the cap check here and for the "spots" count shown in the list
+// (see summarize) so the two always agree.
+function playerRegistrationCount(tournament) {
+  return tournament.registrations.filter((r) => !isStaffRole(r.role)).length;
+}
+
 // Shared by self-register and register-on-behalf: finds the assignment to
 // register under, checks the debt-on-that-team rule, and pushes the
 // registration row. Throws a {status, message} plain object on any
@@ -361,10 +385,6 @@ async function buildRegistration(tournament, athleteId, requestedTeam) {
 
   if (tournament.registrations.some((r) => String(r.athlete) === String(athlete._id))) {
     throw { status: 409, message: "Already registered for this tournament" };
-  }
-
-  if (tournament.maxParticipants && tournament.registrations.length >= tournament.maxParticipants) {
-    throw { status: 403, message: `Tournament is full (${tournament.maxParticipants} spots taken)` };
   }
 
   const eligible = tournament.team
@@ -386,6 +406,15 @@ async function buildRegistration(tournament, athleteId, requestedTeam) {
   }
 
   const assignment = eligible[0];
+  const role = assignment.role || "PLAYER";
+  const staff = isStaffRole(role);
+
+  // Cap and age rule only ever apply to PLAYER registrations — a coach or
+  // medic registering alongside the squad skips both.
+  if (!staff && tournament.maxParticipants && playerRegistrationCount(tournament) >= tournament.maxParticipants) {
+    throw { status: 403, message: `Tournament is full (${tournament.maxParticipants} spots taken)` };
+  }
+
   const feeOwed = (assignment.fees || []).reduce((sum, f) => sum + (f.amount || 0), 0);
   if (feeOwed > 0) {
     throw {
@@ -394,11 +423,12 @@ async function buildRegistration(tournament, athleteId, requestedTeam) {
     };
   }
 
-  const isOverage = checkAgeRule(tournament, athlete);
+  const isOverage = staff ? false : checkAgeRule(tournament, athlete);
 
   return {
     athlete: athlete._id,
     team: assignment.team,
+    role,
     fullName: athlete.fullName,
     khmerName: athlete.khmerName,
     verifyId: athlete.verifyId,
@@ -669,7 +699,7 @@ exports.exportRegistrationsCsv = async (req, res) => {
       const s = v === null || v === undefined ? "" : String(v);
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const header = ["Verify ID", "Full name", "Khmer name", "Team", "Jersey #", "Over-age", "Registered by", "Fee paid"];
+    const header = ["Verify ID", "Full name", "Khmer name", "Team", "Role", "Jersey #", "Over-age", "Registered by", "Fee paid"];
     const lines = [header.map(escapeCsv).join(",")];
     tournament.registrations.forEach((r) => {
       lines.push(
@@ -678,6 +708,7 @@ exports.exportRegistrationsCsv = async (req, res) => {
           r.fullName,
           r.khmerName || "",
           r.team,
+          r.role && r.role !== "PLAYER" ? r.role : "Player",
           r.jerseyNumber ?? "",
           r.isOverage ? "Yes" : "",
           r.registeredBy ? "Admin/Coach" : "Self",
