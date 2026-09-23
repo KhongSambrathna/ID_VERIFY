@@ -24,6 +24,9 @@ export default function AllCardsPage() {
   const [teamFilter, setTeamFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
   const [exportingPng, setExportingPng] = useState(false);
+  const [autoRenewing, setAutoRenewing] = useState(false);
+  const [printPending, setPrintPending] = useState(false);
+  const [pngPending, setPngPending] = useState(false);
   const gridRef = useRef(null);
 
   useEffect(() => {
@@ -60,6 +63,59 @@ export default function AllCardsPage() {
     if (roleFilter !== "all" && !a.roles.includes(roleFilter)) return false;
     return true;
   });
+
+  // Stamps verification to today for everyone about to be printed/exported
+  // — so a bulk print run never carries a stale VALID date just because a
+  // separate Renew step was forgotten beforehand. One athlete can appear
+  // twice in `filtered` (once per team), so de-dupe by _id before calling
+  // the bulk-renew endpoint. Returns whether it's safe to proceed.
+  const renewFiltered = async () => {
+    const ids = [...new Set(filtered.map((a) => a._id))];
+    if (ids.length === 0) return true;
+    setAutoRenewing(true);
+    try {
+      const { data } = await api.put("/athletes/bulk-renew", { athleteIds: ids });
+      const okIds = new Set((data.results || []).filter((r) => r.ok).map((r) => r.athleteId));
+      const now = new Date().toISOString();
+      setAthletes((prev) => prev.map((a) => (okIds.has(a._id) ? { ...a, lastVerifiedAt: now } : a)));
+      return true;
+    } catch (err) {
+      alert(err.response?.data?.message || t("allCardsPage.failedToRenew"));
+      return false;
+    } finally {
+      setAutoRenewing(false);
+    }
+  };
+
+  const handlePrintClick = async () => {
+    const ok = await renewFiltered();
+    if (ok) setPrintPending(true);
+  };
+
+  const requestExportPng = async () => {
+    if (filtered.length === 0) return;
+    const ok = await renewFiltered();
+    if (ok) setPngPending(true);
+  };
+
+  // Both wait for the effects below so window.print()/exportPng() only
+  // run once React has committed the refreshed `athletes` state (and so
+  // the updated VALID dates) to the DOM.
+  useEffect(() => {
+    if (printPending) {
+      setPrintPending(false);
+      window.print();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [printPending, athletes]);
+
+  useEffect(() => {
+    if (pngPending) {
+      setPngPending(false);
+      exportPng();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pngPending, athletes]);
 
   // Captures every currently-filtered card as its own separate PNG (not one
   // combined image) — a single card downloads directly, multiple cards are
@@ -131,8 +187,8 @@ export default function AllCardsPage() {
           <Link to="/admin" className="link-btn">
             {t("allCardsPage.backToDashboard")}
           </Link>
-          <button className="btn btn-primary" onClick={() => window.print()}>
-            {t("allCardsPage.exportPrintSelected")}
+          <button className="btn btn-primary" onClick={handlePrintClick} disabled={autoRenewing}>
+            {autoRenewing ? t("allCardsPage.renewing") : t("allCardsPage.exportPrintSelected")}
           </button>
           <Link
             to="/admin/cards/back"
@@ -144,10 +200,14 @@ export default function AllCardsPage() {
           <button
             className="btn btn-outline"
             style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
-            onClick={exportPng}
-            disabled={exportingPng || filtered.length === 0}
+            onClick={requestExportPng}
+            disabled={autoRenewing || exportingPng || filtered.length === 0}
           >
-            {exportingPng ? t("allCardsPage.exporting") : t("allCardsPage.exportPng")}
+            {exportingPng
+              ? t("allCardsPage.exporting")
+              : autoRenewing
+              ? t("allCardsPage.renewing")
+              : t("allCardsPage.exportPng")}
           </button>
         </div>
       </div>

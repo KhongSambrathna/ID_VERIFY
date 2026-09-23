@@ -379,7 +379,10 @@ function playerRegistrationCount(tournament) {
 // register under, checks the debt-on-that-team rule, and pushes the
 // registration row. Throws a {status, message} plain object on any
 // rejection so both routes can turn it into the right HTTP response.
-async function buildRegistration(tournament, athleteId, requestedTeam) {
+// `allowDebt` skips the debt-on-that-team rule — set by register-on-behalf
+// only, so an Admin/Head Coach can still register someone who owes a fee,
+// even though that same player is blocked from registering themselves.
+async function buildRegistration(tournament, athleteId, requestedTeam, { allowDebt = false } = {}) {
   const athlete = await Athlete.findById(athleteId);
   if (!athlete) throw { status: 404, message: "Athlete not found" };
 
@@ -416,7 +419,7 @@ async function buildRegistration(tournament, athleteId, requestedTeam) {
   }
 
   const feeOwed = (assignment.fees || []).reduce((sum, f) => sum + (f.amount || 0), 0);
-  if (feeOwed > 0) {
+  if (feeOwed > 0 && !allowDebt) {
     throw {
       status: 403,
       message: `Outstanding fee of $${feeOwed} on ${assignment.team} — settle it before registering for a tournament`,
@@ -518,9 +521,11 @@ exports.registerSelf = async (req, res) => {
 };
 
 // POST /api/tournaments/:id/register-admin  (Admin, Head Coach) — body:
-// { athleteId, team? } — for a player with no phone/login of their own.
-// Same debt rule applies; the only difference from self-register is who's
-// allowed to call it and which athlete id it acts on.
+// { athleteId, team? } — for a player with no phone/login of their own, or
+// for staff registering a player on their behalf. Unlike self-register,
+// this skips the debt-on-that-team block — an Admin/Head Coach can still
+// choose to register someone who owes a fee, even though that same player
+// can't register themselves while they owe it.
 exports.registerOnBehalf = async (req, res) => {
   try {
     const tournament = await Tournament.findById(req.params.id);
@@ -543,7 +548,7 @@ exports.registerOnBehalf = async (req, res) => {
       }
     }
 
-    const row = await buildRegistration(tournament, athleteId, team);
+    const row = await buildRegistration(tournament, athleteId, team, { allowDebt: true });
     row.registeredBy = req.adminId;
     tournament.registrations.push(row);
     const lineup = await ensureTournamentLineup(tournament, row.team);

@@ -41,6 +41,7 @@ function toBool(value) {
 function cleanupAthleteAssets(athlete) {
   const cleanupJobs = [];
   if (athlete.photoPublicId) cleanupJobs.push(cloudinary.uploader.destroy(athlete.photoPublicId));
+  if (athlete.pendingPhotoPublicId) cleanupJobs.push(cloudinary.uploader.destroy(athlete.pendingPhotoPublicId));
   if (athlete.qrCodePublicId) cleanupJobs.push(cloudinary.uploader.destroy(athlete.qrCodePublicId));
   (athlete.supportingDocuments || []).forEach((doc) => {
     if (doc.publicId) {
@@ -54,6 +55,47 @@ function cleanupAthleteAssets(athlete) {
       if (r.status === "rejected") console.warn("Cloudinary cleanup failed:", r.reason?.message);
     });
   });
+}
+
+// Called whenever an assignment gets approved — if this person has a photo
+// staged from a Player/Head Coach edit (see updateAthlete), promotes it to
+// the live photo and deletes the OLD photo's Cloudinary file. Mutates
+// `athlete` in place (caller still needs to .save() it) and does NOT
+// itself delete anything — it only fires off the old file's deletion,
+// since that's only safe to do once the swap above is saved. A no-op when
+// there's nothing staged, so it's safe to call on every approval.
+function promotePendingPhotoIfAny(athlete) {
+  if (!athlete.pendingPhotoUrl) return;
+  const oldPhotoPublicId = athlete.photoPublicId;
+  athlete.photoUrl = athlete.pendingPhotoUrl;
+  athlete.photoPublicId = athlete.pendingPhotoPublicId;
+  athlete.pendingPhotoUrl = null;
+  athlete.pendingPhotoPublicId = null;
+  if (oldPhotoPublicId) {
+    cloudinary.uploader.destroy(oldPhotoPublicId).catch((err) =>
+      console.warn("Old photo cleanup failed:", err.message)
+    );
+  }
+}
+
+// Called after a pending assignment is rejected or a removal request is
+// confirmed, once that's done, if this person has NO other assignment
+// still pending — nothing is left that could ever approve a staged photo
+// edit, so it's discarded: its Cloudinary file is deleted and the fields
+// cleared. A no-op when there's nothing staged, or when another assignment
+// is still pending (that one might still get approved and promote it).
+function discardStalePendingPhotoIfUnreviewable(athlete) {
+  if (!athlete.pendingPhotoUrl) return false;
+  if (athlete.assignments.some((a) => a.approvalStatus === "pending")) return false;
+  const stalePendingId = athlete.pendingPhotoPublicId;
+  athlete.pendingPhotoUrl = null;
+  athlete.pendingPhotoPublicId = null;
+  if (stalePendingId) {
+    cloudinary.uploader.destroy(stalePendingId).catch((err) =>
+      console.warn("Stale pending photo cleanup failed:", err.message)
+    );
+  }
+  return true;
 }
 
 // POST /api/athletes  (admin or head coach, multipart/form-data: photo, documents[])
@@ -95,6 +137,7 @@ exports.createAthlete = async (req, res) => {
               team,
               role: role || "PLAYER",
               approvalStatus: isHeadCoach ? "pending" : "approved",
+              everApproved: !isHeadCoach,
             },
           ]
         : [],
@@ -265,20 +308,56 @@ exports.updateAthlete = async (req, res) => {
       }
     }
 
-    // Optional new photo (multipart edit form) — replaces the old one.
+    // Optional new photo (multipart edit form). An Admin's own edit never
+    // goes through approval, so it replaces the live photo immediately, same
+    // as before. A Head Coach or Player self-edit DOES need Admin approval
+    // first — for that, the upload is staged into pendingPhotoUrl/
+    // pendingPhotoPublicId instead of replacing photoUrl right away, so the
+    // OLD photo (and its Cloudinary file) stays live and untouched unless
+    // and until the edit is approved (see approveAssignment/
+    // bulkApproveAssignments, which promote it and only then delete the old
+    // one) — nothing is lost from Cloudinary if the edit is rejected instead.
     if (req.files?.photo?.[0]) {
-      const oldPhotoPublicId = athlete.photoPublicId;
+      const requiresApproval = isHeadCoach || isPlayerSelf;
       const { url, publicId } = await uploadBufferToCloudinary(req.files.photo[0].buffer, {
         folder: "athlete-verify/photos",
         resourceType: "image",
       });
-      athlete.photoUrl = url;
-      athlete.photoPublicId = publicId;
       changed = true;
-      if (oldPhotoPublicId) {
-        cloudinary.uploader.destroy(oldPhotoPublicId).catch((err) =>
-          console.warn("Old photo cleanup failed:", err.message)
-        );
+      if (requiresApproval) {
+        // Editing again before a previous edit's photo was ever reviewed —
+        // that earlier staged upload is now superseded, so clean it up.
+        const oldPendingPublicId = athlete.pendingPhotoPublicId;
+        athlete.pendingPhotoUrl = url;
+        athlete.pendingPhotoPublicId = publicId;
+        if (oldPendingPublicId) {
+          cloudinary.uploader.destroy(oldPendingPublicId).catch((err) =>
+            console.warn("Superseded pending photo cleanup failed:", err.message)
+          );
+        }
+      } else {
+        const oldPhotoPublicId = athlete.photoPublicId;
+        athlete.photoUrl = url;
+        athlete.photoPublicId = publicId;
+        if (oldPhotoPublicId) {
+          cloudinary.uploader.destroy(oldPhotoPublicId).catch((err) =>
+            console.warn("Old photo cleanup failed:", err.message)
+          );
+        }
+        // An Admin's direct photo change supersedes any earlier staged-but-
+        // unapproved upload from a Player/Head Coach edit — discard it so a
+        // later approval of some other pending change can't silently swap
+        // the photo back to that stale upload.
+        if (athlete.pendingPhotoUrl) {
+          const stalePendingId = athlete.pendingPhotoPublicId;
+          athlete.pendingPhotoUrl = null;
+          athlete.pendingPhotoPublicId = null;
+          if (stalePendingId) {
+            cloudinary.uploader.destroy(stalePendingId).catch((err) =>
+              console.warn("Stale pending photo cleanup failed:", err.message)
+            );
+          }
+        }
       }
     }
 
@@ -399,6 +478,7 @@ exports.addAssignment = async (req, res) => {
       team,
       role,
       approvalStatus: isHeadCoach ? "pending" : "approved",
+      everApproved: !isHeadCoach,
     });
     await athlete.save();
 
@@ -646,12 +726,19 @@ exports.approveAssignment = async (req, res) => {
           deletedAthlete: true,
         });
       }
+      // Not an approval of any edit — but if that was this person's last
+      // PENDING assignment and a photo edit is still staged from an
+      // earlier, now-unreachable review, there's nothing left to approve
+      // it, so clean it up rather than leaving it stranded forever.
+      discardStalePendingPhotoIfUnreviewable(athlete);
       await athlete.save();
       notifyTeamCoaches(team, `✅ ${fullName}'s removal from ${team} was confirmed by Admin.`);
       return res.json(athlete);
     }
 
     assignment.approvalStatus = "approved";
+    assignment.everApproved = true;
+    promotePendingPhotoIfAny(athlete);
     await athlete.save();
     notifyTeamCoaches(team, `✅ ${fullName}'s ${team} assignment was approved by Admin.`);
     res.json(athlete);
@@ -699,6 +786,9 @@ exports.rejectAssignment = async (req, res) => {
         deletedAthlete: true,
       });
     }
+    // If that was this person's last PENDING assignment and a photo edit
+    // is still staged, nothing is left to approve it — discard it.
+    discardStalePendingPhotoIfUnreviewable(athlete);
     await athlete.save();
     notifyTeamCoaches(team, `❌ ${fullName}'s ${team} assignment was rejected by Admin${reason ? ` — ${reason}` : ""}.`);
     res.json(athlete);
@@ -1021,10 +1111,13 @@ exports.bulkApproveAssignments = async (req, res) => {
             cleanupAthleteAssets(athlete);
             await Athlete.findByIdAndDelete(athlete._id);
           } else {
+            discardStalePendingPhotoIfUnreviewable(athlete);
             await athlete.save();
           }
         } else {
           assignment.approvalStatus = "approved";
+          assignment.everApproved = true;
+          promotePendingPhotoIfAny(athlete);
           await athlete.save();
         }
         results.push({ ...item, ok: true });

@@ -33,6 +33,7 @@ function flattenAssignments(athlete, teamFilter) {
         team: a.team,
         role: a.role,
         approvalStatus: a.approvalStatus,
+        everApproved: a.everApproved,
         pendingRemoval: a.pendingRemoval,
         jerseyNumber: a.jerseyNumber ?? null,
         // `feeOwed` stays as the TOTAL across every fee row — every existing

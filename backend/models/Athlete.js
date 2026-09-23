@@ -26,6 +26,16 @@ const assignmentSchema = new mongoose.Schema(
       enum: ["pending", "approved"],
       default: "approved",
     },
+    // Whether this assignment has EVER been approved before, at least
+    // once — distinguishes a first-time submission still waiting on its
+    // very first Admin review (approvalStatus "pending", everApproved
+    // false — "Pending Verify Document" in the Admin dashboard) from an
+    // already-public assignment that was approved once and is now pending
+    // AGAIN because it (or the shared profile) was edited (approvalStatus
+    // "pending", everApproved true — "Editing Approval"). Set true the
+    // moment an assignment is created already-approved (an Admin adding it
+    // directly), and the moment the approve endpoint approves it.
+    everApproved: { type: Boolean, default: false },
     // A Head Coach can request to remove their own team's assignment, but
     // can't delete it outright — this just flags it as "awaiting Admin
     // confirmation" (PUT .../approve actually removes it, PUT .../reject
@@ -87,6 +97,16 @@ const athleteSchema = new mongoose.Schema(
     },
     photoUrl: { type: String }, // Cloudinary secure_url of the uploaded photo
     photoPublicId: { type: String }, // Cloudinary public_id (needed to delete/replace it)
+    // A NEW photo a Player/Head Coach uploaded while editing their record,
+    // staged here instead of overwriting photoUrl/photoPublicId right
+    // away — see updateAthlete. That keeps the OLD photo live (and its
+    // Cloudinary file intact) until an Admin approves the edit, so nothing
+    // is lost if it's rejected instead. Approving promotes this into
+    // photoUrl/photoPublicId and only then deletes the old Cloudinary
+    // file; rejecting (or the record being deleted outright) discards this
+    // staged upload's Cloudinary file instead. Always both-or-neither.
+    pendingPhotoUrl: { type: String, default: null },
+    pendingPhotoPublicId: { type: String, default: null },
     supportingDocuments: [
       {
         label: { type: String }, // e.g. "National ID copy", "Birth certificate"

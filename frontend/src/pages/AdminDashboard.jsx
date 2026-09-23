@@ -11,7 +11,11 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState("all"); // "all" | "pending"
+  // "all" | "approved" | "pendingNew" | "pendingEdit" — pending is split in
+  // two so Admin can tell a first-time submission (never approved before,
+  // still needs its documents checked) apart from an already-public record
+  // that was edited and is waiting on re-approval.
+  const [activeTab, setActiveTab] = useState("all");
   const [selectedPending, setSelectedPending] = useState([]);
   const [bulkApproving, setBulkApproving] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
@@ -131,20 +135,49 @@ export default function AdminDashboard() {
       .filter(Boolean)
       .some((field) => field.toLowerCase().includes(q));
 
+  // "Approved" — publicly visible, nothing waiting on it.
+  const isApproved = (a) => a.approvalStatus === "approved" && !a.pendingRemoval;
+  // "Pending Verify Document" — a first-time submission that has never
+  // been approved before; a brand-new person/assignment still waiting on
+  // its very first Admin check (documents included).
+  const isPendingNew = (a) => a.approvalStatus === "pending" && !a.everApproved && !a.pendingRemoval;
+  // "Editing Approval" — was already approved at least once, and is
+  // pending again either because it (or the shared profile) was edited, or
+  // because a Head Coach requested its removal.
+  const isPendingEdit = (a) => (a.approvalStatus === "pending" && a.everApproved) || a.pendingRemoval;
+
   const all = athletes.filter(matchesSearch);
-  const pending = athletes.filter((a) => (a.approvalStatus === "pending" || a.pendingRemoval) && matchesSearch(a));
-  const pendingCount = athletes.filter((a) => a.approvalStatus === "pending" || a.pendingRemoval).length;
+  const approvedRows = athletes.filter((a) => isApproved(a) && matchesSearch(a));
+  const pendingNewRows = athletes.filter((a) => isPendingNew(a) && matchesSearch(a));
+  const pendingEditRows = athletes.filter((a) => isPendingEdit(a) && matchesSearch(a));
+
+  const approvedCount = athletes.filter(isApproved).length;
+  const pendingNewCount = athletes.filter(isPendingNew).length;
+  const pendingEditCount = athletes.filter(isPendingEdit).length;
+
+  // Whichever pending list the current tab is showing — bulk-select/approve
+  // below always act on this, never on the other pending tab's rows.
+  const visiblePendingRows =
+    activeTab === "pendingNew" ? pendingNewRows : activeTab === "pendingEdit" ? pendingEditRows : [];
+  const pendingEmptyText =
+    activeTab === "pendingNew" ? t("adminDashboard.noNewPending") : t("adminDashboard.noEditPending");
+
+  const switchTab = (tab) => {
+    setActiveTab(tab);
+    setSelectedPending([]); // avoid carrying a selection over from a different tab
+  };
 
   const allPendingSelected =
-    pending.length > 0 && pending.every((a) => selectedPending.some((x) => x.assignmentId === a.assignmentId));
+    visiblePendingRows.length > 0 &&
+    visiblePendingRows.every((a) => selectedPending.some((x) => x.assignmentId === a.assignmentId));
 
   const toggleAllPending = () => {
     if (allPendingSelected) {
-      setSelectedPending((prev) => prev.filter((x) => !pending.some((p) => p.assignmentId === x.assignmentId)));
+      setSelectedPending((prev) => prev.filter((x) => !visiblePendingRows.some((p) => p.assignmentId === x.assignmentId)));
     } else {
       setSelectedPending((prev) => {
         const have = new Set(prev.map((x) => x.assignmentId));
-        const additions = pending
+        const additions = visiblePendingRows
           .filter((p) => !have.has(p.assignmentId))
           .map((p) => ({ athleteId: p._id, assignmentId: p.assignmentId }));
         return [...prev, ...additions];
@@ -214,14 +247,23 @@ export default function AdminDashboard() {
       </div>
 
       <div className="tabs">
-        <button className={`tab-btn ${activeTab === "all" ? "active" : ""}`} onClick={() => setActiveTab("all")}>
+        <button className={`tab-btn ${activeTab === "all" ? "active" : ""}`} onClick={() => switchTab("all")}>
           {t("adminDashboard.allAthletesTab").replace("{count}", all.length)}
         </button>
+        <button className={`tab-btn ${activeTab === "approved" ? "active" : ""}`} onClick={() => switchTab("approved")}>
+          {t("adminDashboard.approvedTab").replace("{count}", approvedCount)}
+        </button>
         <button
-          className={`tab-btn ${activeTab === "pending" ? "active" : ""}`}
-          onClick={() => setActiveTab("pending")}
+          className={`tab-btn ${activeTab === "pendingNew" ? "active" : ""}`}
+          onClick={() => switchTab("pendingNew")}
         >
-          {t("adminDashboard.pendingApprovalTab").replace("{count}", pendingCount)}
+          {t("adminDashboard.pendingNewTab").replace("{count}", pendingNewCount)}
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "pendingEdit" ? "active" : ""}`}
+          onClick={() => switchTab("pendingEdit")}
+        >
+          {t("adminDashboard.pendingEditTab").replace("{count}", pendingEditCount)}
         </button>
       </div>
 
@@ -311,9 +353,82 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* PENDING APPROVAL TAB — the actionable queue: approve/reject,
-          confirm/decline removals, one at a time or in bulk. */}
-      {!loading && !error && activeTab === "pending" && (
+      {/* APPROVED TAB — same columns as All, filtered to only the rows that
+          are already public and have nothing waiting on them. */}
+      {!loading && !error && activeTab === "approved" && (
+        <div className="table-scroll">
+          <table className="athletes">
+            <thead>
+              <tr>
+                <th>{t("adminDashboard.colId")}</th>
+                <th>{t("adminDashboard.colName")}</th>
+                <th>{t("adminDashboard.colRole")}</th>
+                <th>{t("adminDashboard.colTeam")}</th>
+                <th>{t("adminDashboard.colJersey")}</th>
+                <th>{t("adminDashboard.colAvailable")}</th>
+                <th>{t("adminDashboard.colStatus")}</th>
+                <th>{t("adminDashboard.colFee")}</th>
+                <th>{t("adminDashboard.colActions")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {approvedRows.map((a) => (
+                <tr key={a.assignmentId}>
+                  <td data-label={t("adminDashboard.colId")}>{a.verifyId}</td>
+                  <td data-label={t("adminDashboard.colName")} className="caps-display">{a.fullName}</td>
+                  <td data-label={t("adminDashboard.colRole")}>{a.role || "—"}</td>
+                  <td data-label={t("adminDashboard.colTeam")} className="caps-display">{a.team || "—"}</td>
+                  <td data-label={t("adminDashboard.colJersey")}>{a.jerseyNumber ?? "—"}</td>
+                  <td data-label={t("adminDashboard.colAvailable")}>
+                    <span className={`badge ${a.isAvailable ? "verified" : "rejected"}`}>
+                      {a.isAvailable ? t("adminDashboard.available") : t("adminDashboard.notAvailable")}
+                    </span>
+                  </td>
+                  <td data-label={t("adminDashboard.colStatus")}>
+                    <span className={`badge ${a.status}`}>{a.status}</span>
+                  </td>
+                  <td data-label={t("adminDashboard.colFee")}>
+                    {a.feeOwed > 0 ? (
+                      <span
+                        className="badge rejected"
+                        title={(a.fees || []).map((f) => `$${f.amount}${f.note ? ` — ${f.note}` : ""}`).join(", ")}
+                      >
+                        {t("adminDashboard.owes").replace("{amount}", a.feeOwed)}
+                      </span>
+                    ) : (
+                      <span className="badge verified">{t("adminDashboard.paid")}</span>
+                    )}
+                  </td>
+                  <td data-label={t("adminDashboard.colActions")} className="actions-cell">
+                    <Link className="action-btn" to={`/admin/athlete/${a._id}?team=${encodeURIComponent(a.team)}`}>
+                      {t("adminDashboard.view")}
+                    </Link>
+                    <Link className="action-btn" to={`/admin/athlete/${a._id}/edit`}>
+                      {t("adminDashboard.edit")}
+                    </Link>
+                    <button className="action-btn danger" onClick={() => removeAssignment(a)}>
+                      {t("adminDashboard.delete")}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {approvedRows.length === 0 && (
+                <tr>
+                  <td colSpan={9} style={{ textAlign: "center", color: "#777" }}>
+                    {t("adminDashboard.noApproved")}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* PENDING TABS (new-submission / editing-approval) — the actionable
+          queue: approve/reject, confirm/decline removals, one at a time or
+          in bulk. Same table shape for both — only which rows feed it, and
+          the empty-state text, differ by tab. */}
+      {!loading && !error && (activeTab === "pendingNew" || activeTab === "pendingEdit") && (
         <>
           <p className="help-text" style={{ marginTop: 0 }}>
             {t("adminDashboard.hiddenUntilApproved")}
@@ -346,7 +461,7 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {pending.map((a) => (
+                {visiblePendingRows.map((a) => (
                   <tr key={a.assignmentId}>
                     <td data-label="">
                       {!a.pendingRemoval && (
@@ -394,10 +509,10 @@ export default function AdminDashboard() {
                     </td>
                   </tr>
                 ))}
-                {pending.length === 0 && (
+                {visiblePendingRows.length === 0 && (
                   <tr>
                     <td colSpan={7} style={{ textAlign: "center", color: "#777" }}>
-                      {t("adminDashboard.nothingPending")}
+                      {pendingEmptyText}
                     </td>
                   </tr>
                 )}

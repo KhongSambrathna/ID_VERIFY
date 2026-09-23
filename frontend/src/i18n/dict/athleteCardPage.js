@@ -1,6 +1,9 @@
 export const km = {
   "athleteCardPage.failedToLoad": "បរាជ័យក្នុងការផ្ទុកទិន្នន័យ",
   "athleteCardPage.couldNotSaveJpg": "មិនអាចរក្សាទុកកាតជារូបភាពបានទេ។ សូមព្យាយាមម្តងទៀត។",
+  "athleteCardPage.failedToRenew": "មិនអាចផ្ទៀងផ្ទាត់សារជាថ្មីបានទេ។ សូមព្យាយាមម្តងទៀត។",
+  "athleteCardPage.pendingPhotoLabel": "រូបថតថ្មី (រង់ចាំអនុម័ត)",
+  "athleteCardPage.pendingPhotoAlt": "រូបថតថ្មីរង់ចាំអនុម័ត",
   "athleteCardPage.title": "កំណត់ត្រាកីឡាករ",
   "athleteCardPage.backToDashboard": "← ត្រឡប់ទៅផ្ទាំងគ្រប់គ្រង",
   "athleteCardPage.idLabel": "លេខសម្គាល់៖",
@@ -40,6 +43,9 @@ export const km = {
 export const en = {
   "athleteCardPage.failedToLoad": "Failed to load",
   "athleteCardPage.couldNotSaveJpg": "Couldn't save the card as an image. Please try again.",
+  "athleteCardPage.failedToRenew": "Couldn't renew verification. Please try again.",
+  "athleteCardPage.pendingPhotoLabel": "New photo (pending approval)",
+  "athleteCardPage.pendingPhotoAlt": "New photo pending approval",
   "athleteCardPage.title": "Athlete record",
   "athleteCardPage.backToDashboard": "← Back to dashboard",
   "athleteCardPage.idLabel": "ID:",

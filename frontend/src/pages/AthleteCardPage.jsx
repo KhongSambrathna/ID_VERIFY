@@ -31,6 +31,8 @@ export default function AthleteCardPage() {
   const [renewing, setRenewing] = useState(false);
   const [scanLogs, setScanLogs] = useState(null);
   const [scanLogsOpen, setScanLogsOpen] = useState(false);
+  const [autoRenewing, setAutoRenewing] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null); // "print" | "jpg" | null
   const exportWrapRef = useRef(null);
 
   useEffect(() => {
@@ -129,6 +131,35 @@ export default function AthleteCardPage() {
     }
   };
 
+  // Stamps verification to today before every print/export, so the VALID
+  // date on the card is always current without a separate manual Renew
+  // step. Only sets pendingAction — the actual print/capture happens in
+  // the effect below, once React has committed the refreshed athlete (and
+  // so the updated VALID date) to the DOM.
+  const requestExport = async (action) => {
+    setAutoRenewing(true);
+    try {
+      const { data } = await api.put(`/athletes/${id}/renew`);
+      setAthlete(data);
+      setPendingAction(action);
+    } catch (err) {
+      alert(err.response?.data?.message || t("athleteCardPage.failedToRenew"));
+    } finally {
+      setAutoRenewing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!pendingAction) return;
+    setPendingAction(null);
+    if (pendingAction === "print") {
+      window.print();
+    } else if (pendingAction === "jpg") {
+      handleSaveAsJpg();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAction, athlete]);
+
   return (
     <div className="container" style={{ paddingBottom: 60 }}>
       {/* Plain data view — this is what shows on screen. The actual branded
@@ -147,15 +178,30 @@ export default function AthleteCardPage() {
         <>
           <div className="athlete-detail card no-print">
             <div className="athlete-detail-top">
-              <img
-                className="athlete-detail-photo"
-                src={
-                  athlete.photoUrl
-                    ? resolveFileUrl(athlete.photoUrl)
-                    : "https://placehold.co/120x150?text=Photo"
-                }
-                alt={athlete.fullName}
-              />
+              <div>
+                <img
+                  className="athlete-detail-photo"
+                  src={
+                    athlete.photoUrl
+                      ? resolveFileUrl(athlete.photoUrl)
+                      : "https://placehold.co/120x150?text=Photo"
+                  }
+                  alt={athlete.fullName}
+                />
+                {athlete.pendingPhotoUrl && (
+                  <div style={{ marginTop: 6, textAlign: "center" }}>
+                    <img
+                      src={resolveFileUrl(athlete.pendingPhotoUrl)}
+                      alt={t("athleteCardPage.pendingPhotoAlt")}
+                      className="athlete-detail-photo"
+                      style={{ width: 60, height: "auto", opacity: 0.9 }}
+                    />
+                    <p className="help-text" style={{ margin: "2px 0 0", fontSize: 11 }}>
+                      {t("athleteCardPage.pendingPhotoLabel")}
+                    </p>
+                  </div>
+                )}
+              </div>
               <div>
                 <h3 className="caps-display" style={{ margin: "0 0 2px" }}>{athlete.fullName}</h3>
                 {athlete.khmerName && <p className="khmer-name">{athlete.khmerName}</p>}
@@ -328,16 +374,24 @@ export default function AthleteCardPage() {
                   {t("athleteCardPage.edit")}
                 </Link>
               )}
-              <button className="btn btn-primary" onClick={() => window.print()}>
-                {t("athleteCardPage.exportPrint")}
+              <button
+                className="btn btn-primary"
+                onClick={() => requestExport("print")}
+                disabled={autoRenewing}
+              >
+                {autoRenewing ? t("athleteCardPage.renewing") : t("athleteCardPage.exportPrint")}
               </button>
               <button
                 className="btn btn-outline"
                 style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
-                onClick={handleSaveAsJpg}
-                disabled={saving}
+                onClick={() => requestExport("jpg")}
+                disabled={autoRenewing || saving}
               >
-                {saving ? t("athleteCardPage.saving") : t("athleteCardPage.saveAsJpg")}
+                {saving
+                  ? t("athleteCardPage.saving")
+                  : autoRenewing
+                  ? t("athleteCardPage.renewing")
+                  : t("athleteCardPage.saveAsJpg")}
               </button>
             </div>
           </div>
