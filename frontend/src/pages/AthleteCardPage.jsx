@@ -17,6 +17,19 @@ function formatDob(dob) {
   return `${dd}-${mm}-${d.getFullYear()}`;
 }
 
+// Which fields to show, in which order, in the "pending edit" old-vs-new
+// box below — see athlete.pendingChanges (Athlete model / updateAthlete).
+// `format` renders each side the same way the read-only detail-grid below
+// already does, so the comparison reads consistently with the rest of the
+// page.
+const PENDING_FIELD_ORDER = [
+  { key: "fullName", labelKey: "common.fullName" },
+  { key: "khmerName", labelKey: "common.khmerName" },
+  { key: "dateOfBirth", labelKey: "athleteCardPage.dateOfBirth", format: (v) => formatDob(v) || "—" },
+  { key: "gender", labelKey: "athleteCardPage.gender" },
+  { key: "address", labelKey: "athleteCardPage.address" },
+];
+
 export default function AthleteCardPage() {
   const { t } = useLanguage();
   const { id } = useParams();
@@ -214,6 +227,47 @@ export default function AthleteCardPage() {
                 </div>
               </div>
             </div>
+
+            {!isPlayer && athlete.pendingChanges && Object.keys(athlete.pendingChanges).length > 0 && (
+              <div
+                className="no-print"
+                style={{
+                  margin: "12px 0 0",
+                  padding: "8px 10px",
+                  border: "1px solid #f0c36d",
+                  borderRadius: 6,
+                  background: "#fff8e6",
+                }}
+              >
+                <p className="help-text" style={{ margin: "0 0 6px", fontWeight: 600 }}>
+                  {t("athleteCardPage.pendingEditTitle")}
+                </p>
+                <ul className="fee-items" style={{ margin: 0 }}>
+                  {PENDING_FIELD_ORDER.filter((f) => athlete.pendingChanges[f.key] !== undefined).map((f) => (
+                    <li key={f.key}>
+                      <strong>{t(f.labelKey)}:</strong>{" "}
+                      {f.format ? f.format(athlete[f.key]) : athlete[f.key] || "—"}
+                      {" → "}
+                      <span style={{ color: "#b45309" }}>
+                        {f.format ? f.format(athlete.pendingChanges[f.key]) : athlete.pendingChanges[f.key]}
+                      </span>
+                    </li>
+                  ))}
+                  {athlete.pendingChanges.addedDocumentLabels?.length > 0 && (
+                    <li>
+                      <strong>{t("athleteCardPage.pendingAddedDocs")}:</strong>{" "}
+                      {athlete.pendingChanges.addedDocumentLabels.join(", ")}
+                    </li>
+                  )}
+                  {athlete.pendingChanges.removedDocumentLabels?.length > 0 && (
+                    <li>
+                      <strong>{t("athleteCardPage.pendingRemovedDocs")}:</strong>{" "}
+                      {athlete.pendingChanges.removedDocumentLabels.join(", ")}
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
 
             {teams.length > 1 && (
               <div className="field" style={{ maxWidth: 280, margin: "12px 0 0" }}>

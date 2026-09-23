@@ -98,6 +98,33 @@ function discardStalePendingPhotoIfUnreviewable(athlete) {
   return true;
 }
 
+// Same idea as promotePendingPhotoIfAny, but for staged field/document edits
+// (athlete.pendingChanges — see updateAthlete and the Athlete model's
+// comment). Copies each staged field value onto the live field, then clears
+// pendingChanges (the staged document-label lists are purely informational
+// for the diff view, so they're discarded too — the documents themselves
+// were already applied live back when the edit was made). A no-op when
+// nothing is staged.
+function promotePendingProfileChangesIfAny(athlete) {
+  if (!athlete.pendingChanges) return;
+  const staged = athlete.pendingChanges;
+  ["fullName", "khmerName", "dateOfBirth", "gender", "address"].forEach((field) => {
+    if (staged[field] !== undefined) athlete[field] = staged[field];
+  });
+  athlete.pendingChanges = null;
+}
+
+// Same idea as discardStalePendingPhotoIfUnreviewable, but for
+// athlete.pendingChanges — discards the staged edit once no assignment is
+// left pending to ever approve it. A no-op when nothing is staged, or
+// something is still pending.
+function discardStalePendingProfileChangesIfUnreviewable(athlete) {
+  if (!athlete.pendingChanges) return false;
+  if (athlete.assignments.some((a) => a.approvalStatus === "pending")) return false;
+  athlete.pendingChanges = null;
+  return true;
+}
+
 // POST /api/athletes  (admin or head coach, multipart/form-data: photo, documents[])
 // Registers a brand-new person with their first team/role assignment. To
 // add another team/role to a person who's ALREADY in the system, use
@@ -283,11 +310,22 @@ exports.updateAthlete = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
+    // A Head Coach or Player-self edit needs Admin approval before it's
+    // public (see below) — so any field/document change they make here is
+    // HELD BACK (staged) instead of applied live, the same treatment the
+    // photo already gets. An Admin's own edit never needs approval and
+    // applies immediately, same as before.
+    const requiresApproval = isHeadCoach || isPlayerSelf;
+
     // Only apply/save a field, and only count it toward `changed`, if it's
     // actually different from what's already stored — submitting the form
     // unmodified (e.g. just opening Edit and clicking Save) must be a no-op,
-    // not a re-approval trigger.
+    // not a re-approval trigger. For a Head Coach/Player edit the new value
+    // is staged into `stagedChanges` (merged into athlete.pendingChanges
+    // below) instead of written to the live field right away — see the
+    // Athlete model's `pendingChanges` comment for why.
     let changed = false;
+    const stagedChanges = {};
     const editableFields = isHeadCoach
       ? HEAD_COACH_EDITABLE_FIELDS
       : isPlayerSelf
@@ -296,7 +334,19 @@ exports.updateAthlete = async (req, res) => {
     editableFields.forEach((field) => {
       if (req.body[field] === undefined) return;
       if (valuesDiffer(field, athlete[field], req.body[field])) {
-        athlete[field] = req.body[field];
+        if (requiresApproval) {
+          stagedChanges[field] = req.body[field];
+        } else {
+          athlete[field] = req.body[field];
+          // Admin's direct edit supersedes any earlier staged Head Coach/
+          // Player edit to this same field, so approving some OTHER
+          // still-pending assignment later can't silently overwrite Admin's
+          // newer value with the stale staged one.
+          if (athlete.pendingChanges && field in athlete.pendingChanges) {
+            const { [field]: _dropped, ...rest } = athlete.pendingChanges;
+            athlete.pendingChanges = Object.keys(rest).length ? rest : null;
+          }
+        }
         changed = true;
       }
     });
@@ -318,7 +368,6 @@ exports.updateAthlete = async (req, res) => {
     // bulkApproveAssignments, which promote it and only then delete the old
     // one) — nothing is lost from Cloudinary if the edit is rejected instead.
     if (req.files?.photo?.[0]) {
-      const requiresApproval = isHeadCoach || isPlayerSelf;
       const { url, publicId } = await uploadBufferToCloudinary(req.files.photo[0].buffer, {
         folder: "athlete-verify/photos",
         resourceType: "image",
@@ -383,6 +432,12 @@ exports.updateAthlete = async (req, res) => {
             (d) => !removeIds.includes(String(d._id))
           );
           changed = true;
+          if (requiresApproval) {
+            stagedChanges.removedDocumentLabels = [
+              ...(stagedChanges.removedDocumentLabels || []),
+              ...toRemove.map((d) => d.label).filter(Boolean),
+            ];
+          }
           toRemove.forEach((doc) => {
             if (doc.publicId) {
               cloudinary.uploader
@@ -406,6 +461,31 @@ exports.updateAthlete = async (req, res) => {
       );
       athlete.supportingDocuments = [...(athlete.supportingDocuments || []), ...newDocs];
       changed = true;
+      if (requiresApproval) {
+        stagedChanges.addedDocumentLabels = [
+          ...(stagedChanges.addedDocumentLabels || []),
+          ...newDocs.map((d) => d.label).filter(Boolean),
+        ];
+      }
+    }
+
+    // Fold this edit's staged field/document changes into whatever was
+    // already staged (an earlier edit that hasn't been reviewed yet) —
+    // overwriting per-field, but appending onto the document-label lists so
+    // Admin sees every add/remove since the last approval, not just the
+    // latest edit. See promotePendingProfileChangesIfAny and
+    // discardStalePendingProfileChangesIfUnreviewable for what happens to
+    // this on approve/reject.
+    if (requiresApproval && Object.keys(stagedChanges).length) {
+      const merged = { ...(athlete.pendingChanges || {}) };
+      Object.entries(stagedChanges).forEach(([key, value]) => {
+        if (key === "addedDocumentLabels" || key === "removedDocumentLabels") {
+          merged[key] = [...(merged[key] || []), ...value];
+        } else {
+          merged[key] = value;
+        }
+      });
+      athlete.pendingChanges = merged;
     }
 
     // Nothing actually changed (viewed the record, maybe only touched a fee
@@ -727,10 +807,11 @@ exports.approveAssignment = async (req, res) => {
         });
       }
       // Not an approval of any edit — but if that was this person's last
-      // PENDING assignment and a photo edit is still staged from an
+      // PENDING assignment and a photo/field edit is still staged from an
       // earlier, now-unreachable review, there's nothing left to approve
       // it, so clean it up rather than leaving it stranded forever.
       discardStalePendingPhotoIfUnreviewable(athlete);
+      discardStalePendingProfileChangesIfUnreviewable(athlete);
       await athlete.save();
       notifyTeamCoaches(team, `✅ ${fullName}'s removal from ${team} was confirmed by Admin.`);
       return res.json(athlete);
@@ -739,6 +820,7 @@ exports.approveAssignment = async (req, res) => {
     assignment.approvalStatus = "approved";
     assignment.everApproved = true;
     promotePendingPhotoIfAny(athlete);
+    promotePendingProfileChangesIfAny(athlete);
     await athlete.save();
     notifyTeamCoaches(team, `✅ ${fullName}'s ${team} assignment was approved by Admin.`);
     res.json(athlete);
@@ -786,9 +868,10 @@ exports.rejectAssignment = async (req, res) => {
         deletedAthlete: true,
       });
     }
-    // If that was this person's last PENDING assignment and a photo edit
-    // is still staged, nothing is left to approve it — discard it.
+    // If that was this person's last PENDING assignment and a photo/field
+    // edit is still staged, nothing is left to approve it — discard it.
     discardStalePendingPhotoIfUnreviewable(athlete);
+    discardStalePendingProfileChangesIfUnreviewable(athlete);
     await athlete.save();
     notifyTeamCoaches(team, `❌ ${fullName}'s ${team} assignment was rejected by Admin${reason ? ` — ${reason}` : ""}.`);
     res.json(athlete);
@@ -1112,12 +1195,14 @@ exports.bulkApproveAssignments = async (req, res) => {
             await Athlete.findByIdAndDelete(athlete._id);
           } else {
             discardStalePendingPhotoIfUnreviewable(athlete);
+            discardStalePendingProfileChangesIfUnreviewable(athlete);
             await athlete.save();
           }
         } else {
           assignment.approvalStatus = "approved";
           assignment.everApproved = true;
           promotePendingPhotoIfAny(athlete);
+          promotePendingProfileChangesIfAny(athlete);
           await athlete.save();
         }
         results.push({ ...item, ok: true });

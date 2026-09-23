@@ -107,6 +107,20 @@ const athleteSchema = new mongoose.Schema(
     // staged upload's Cloudinary file instead. Always both-or-neither.
     pendingPhotoUrl: { type: String, default: null },
     pendingPhotoPublicId: { type: String, default: null },
+    // Field-level edits from a Player/Head Coach are HELD BACK the same way
+    // a new photo is above — only the fields that actually changed are
+    // present here, as { fieldName: newValue }, plus optional
+    // addedDocumentLabels/removedDocumentLabels arrays (documents themselves
+    // apply immediately since they're never shown publicly — this just
+    // remembers their labels so Admin can see what changed). The live field
+    // (fullName, khmerName, dateOfBirth, gender, address) is left untouched
+    // until an Admin approves, so an already-approved assignment for this
+    // person (e.g. another team) never shows an unreviewed edit. Approving
+    // copies these values onto the live fields and clears this; rejecting
+    // (or nothing left able to review it) just clears it, discarding the
+    // edit. See updateAthlete, promotePendingProfileChangesIfAny and
+    // discardStalePendingProfileChangesIfUnreviewable.
+    pendingChanges: { type: mongoose.Schema.Types.Mixed, default: null },
     supportingDocuments: [
       {
         label: { type: String }, // e.g. "National ID copy", "Birth certificate"
