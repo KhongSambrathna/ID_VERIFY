@@ -1,46 +1,22 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/axios";
-import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
 
 export default function AdminDashboard() {
   const { t } = useLanguage();
-  const { user, login } = useAuth();
   const [athletes, setAthletes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  // "all" | "approved" | "pendingNew" | "pendingEdit" — pending is split in
-  // two so Admin can tell a first-time submission (never approved before,
-  // still needs its documents checked) apart from an already-public record
-  // that was edited and is waiting on re-approval.
+  // "all" | "pendingNew" | "pendingEdit" — pending is split in two so
+  // Admin can tell an item that still needs identity/documents checked
+  // apart from a routine re-approval of someone already verified. See
+  // isPendingNew/isPendingEdit below for exactly what puts a row in each.
   const [activeTab, setActiveTab] = useState("all");
   const [selectedPending, setSelectedPending] = useState([]);
   const [bulkApproving, setBulkApproving] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
-
-  // This Admin's OWN Telegram chat id — needed for the self-service "forgot
-  // password" flow on the sign-in page. (An Admin can also set it from the
-  // Users page for any account, but this is the quick self-service path for
-  // their own login.)
-  const [telegramDraft, setTelegramDraft] = useState(user?.telegramChatId || "");
-  const [savingTelegram, setSavingTelegram] = useState(false);
-  const [telegramSaved, setTelegramSaved] = useState(false);
-
-  const saveTelegram = async () => {
-    setSavingTelegram(true);
-    setTelegramSaved(false);
-    try {
-      const { data } = await api.put("/auth/me/telegram", { telegramChatId: telegramDraft });
-      login(localStorage.getItem("token"), data);
-      setTelegramSaved(true);
-    } catch (err) {
-      alert(err.response?.data?.message || t("common.failedToSave"));
-    } finally {
-      setSavingTelegram(false);
-    }
-  };
 
   const load = async () => {
     setLoading(true);
@@ -135,23 +111,39 @@ export default function AdminDashboard() {
       .filter(Boolean)
       .some((field) => field.toLowerCase().includes(q));
 
-  // "Approved" — publicly visible, nothing waiting on it.
-  const isApproved = (a) => a.approvalStatus === "approved" && !a.pendingRemoval;
-  // "Pending Verify Document" — a first-time submission that has never
-  // been approved before; a brand-new person/assignment still waiting on
-  // its very first Admin check (documents included).
-  const isPendingNew = (a) => a.approvalStatus === "pending" && !a.everApproved && !a.pendingRemoval;
-  // "Editing Approval" — was already approved at least once, and is
-  // pending again either because it (or the shared profile) was edited, or
-  // because a Head Coach requested its removal.
-  const isPendingEdit = (a) => (a.approvalStatus === "pending" && a.everApproved) || a.pendingRemoval;
+  // Whether a pending edit specifically touched this person's reference
+  // documents (added or removed one) — see pendingChanges.addedDocumentLabels
+  // /removedDocumentLabels in the Athlete model and updateAthlete.
+  const hasDocumentEdit = (a) =>
+    !!(
+      a.pendingChanges &&
+      ((a.pendingChanges.addedDocumentLabels || []).length > 0 ||
+        (a.pendingChanges.removedDocumentLabels || []).length > 0)
+    );
+
+  // "Pending Verify Document" — Admin still needs to check this person's
+  // identity/documents: a first-time submission never approved before, an
+  // athlete who's never been verified in person at all (no "Renew" yet, see
+  // lastVerifiedAt), or any pending edit that touched their reference
+  // documents specifically — regardless of whether this team/role was
+  // approved before.
+  const isPendingNew = (a) =>
+    a.approvalStatus === "pending" &&
+    !a.pendingRemoval &&
+    (!a.everApproved || !a.lastVerifiedAt || hasDocumentEdit(a));
+  // "Editing Approval" — a routine re-approval: this team/role was already
+  // approved before, the person has already been verified in person, and
+  // nothing about their documents changed (just a name/DOB/address/photo/
+  // etc. tweak) — or a Head Coach's removal request, which isn't a
+  // document matter at all.
+  const isPendingEdit = (a) =>
+    a.pendingRemoval ||
+    (a.approvalStatus === "pending" && a.everApproved && !!a.lastVerifiedAt && !hasDocumentEdit(a));
 
   const all = athletes.filter(matchesSearch);
-  const approvedRows = athletes.filter((a) => isApproved(a) && matchesSearch(a));
   const pendingNewRows = athletes.filter((a) => isPendingNew(a) && matchesSearch(a));
   const pendingEditRows = athletes.filter((a) => isPendingEdit(a) && matchesSearch(a));
 
-  const approvedCount = athletes.filter(isApproved).length;
   const pendingNewCount = athletes.filter(isPendingNew).length;
   const pendingEditCount = athletes.filter(isPendingEdit).length;
 
@@ -212,32 +204,6 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="card" style={{ maxWidth: 420, marginBottom: 24 }}>
-        <h4 style={{ marginTop: 0 }}>{t("adminDashboard.myTelegramCardTitle")}</h4>
-        <p className="help-text" style={{ marginTop: -6 }}>
-          {t("adminDashboard.myTelegramHelp")}
-        </p>
-        <div className="field">
-          <label>{t("adminDashboard.myTelegramLabel")}</label>
-          <input
-            placeholder={t("adminDashboard.myTelegramPlaceholder")}
-            value={telegramDraft}
-            onChange={(e) => {
-              setTelegramDraft(e.target.value);
-              setTelegramSaved(false);
-            }}
-          />
-        </div>
-        <button
-          className="btn btn-outline"
-          style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
-          onClick={saveTelegram}
-          disabled={savingTelegram}
-        >
-          {savingTelegram ? t("adminDashboard.savingTelegram") : telegramSaved ? t("adminDashboard.telegramSaved") : t("common.save")}
-        </button>
-      </div>
-
       <div className="field search-field">
         <input
           placeholder={t("adminDashboard.searchPlaceholder")}
@@ -249,9 +215,6 @@ export default function AdminDashboard() {
       <div className="tabs">
         <button className={`tab-btn ${activeTab === "all" ? "active" : ""}`} onClick={() => switchTab("all")}>
           {t("adminDashboard.allAthletesTab").replace("{count}", all.length)}
-        </button>
-        <button className={`tab-btn ${activeTab === "approved" ? "active" : ""}`} onClick={() => switchTab("approved")}>
-          {t("adminDashboard.approvedTab").replace("{count}", approvedCount)}
         </button>
         <button
           className={`tab-btn ${activeTab === "pendingNew" ? "active" : ""}`}
@@ -345,77 +308,6 @@ export default function AdminDashboard() {
                     {athletes.length === 0
                       ? t("adminDashboard.noAthletesYet")
                       : t("adminDashboard.noSearchMatches")}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* APPROVED TAB — same columns as All, filtered to only the rows that
-          are already public and have nothing waiting on them. */}
-      {!loading && !error && activeTab === "approved" && (
-        <div className="table-scroll">
-          <table className="athletes">
-            <thead>
-              <tr>
-                <th>{t("adminDashboard.colId")}</th>
-                <th>{t("adminDashboard.colName")}</th>
-                <th>{t("adminDashboard.colRole")}</th>
-                <th>{t("adminDashboard.colTeam")}</th>
-                <th>{t("adminDashboard.colJersey")}</th>
-                <th>{t("adminDashboard.colAvailable")}</th>
-                <th>{t("adminDashboard.colStatus")}</th>
-                <th>{t("adminDashboard.colFee")}</th>
-                <th>{t("adminDashboard.colActions")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {approvedRows.map((a) => (
-                <tr key={a.assignmentId}>
-                  <td data-label={t("adminDashboard.colId")}>{a.verifyId}</td>
-                  <td data-label={t("adminDashboard.colName")} className="caps-display">{a.fullName}</td>
-                  <td data-label={t("adminDashboard.colRole")}>{a.role || "—"}</td>
-                  <td data-label={t("adminDashboard.colTeam")} className="caps-display">{a.team || "—"}</td>
-                  <td data-label={t("adminDashboard.colJersey")}>{a.jerseyNumber ?? "—"}</td>
-                  <td data-label={t("adminDashboard.colAvailable")}>
-                    <span className={`badge ${a.isAvailable ? "verified" : "rejected"}`}>
-                      {a.isAvailable ? t("adminDashboard.available") : t("adminDashboard.notAvailable")}
-                    </span>
-                  </td>
-                  <td data-label={t("adminDashboard.colStatus")}>
-                    <span className={`badge ${a.status}`}>{a.status}</span>
-                  </td>
-                  <td data-label={t("adminDashboard.colFee")}>
-                    {a.feeOwed > 0 ? (
-                      <span
-                        className="badge rejected"
-                        title={(a.fees || []).map((f) => `$${f.amount}${f.note ? ` — ${f.note}` : ""}`).join(", ")}
-                      >
-                        {t("adminDashboard.owes").replace("{amount}", a.feeOwed)}
-                      </span>
-                    ) : (
-                      <span className="badge verified">{t("adminDashboard.paid")}</span>
-                    )}
-                  </td>
-                  <td data-label={t("adminDashboard.colActions")} className="actions-cell">
-                    <Link className="action-btn" to={`/admin/athlete/${a._id}?team=${encodeURIComponent(a.team)}`}>
-                      {t("adminDashboard.view")}
-                    </Link>
-                    <Link className="action-btn" to={`/admin/athlete/${a._id}/edit`}>
-                      {t("adminDashboard.edit")}
-                    </Link>
-                    <button className="action-btn danger" onClick={() => removeAssignment(a)}>
-                      {t("adminDashboard.delete")}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {approvedRows.length === 0 && (
-                <tr>
-                  <td colSpan={9} style={{ textAlign: "center", color: "#777" }}>
-                    {t("adminDashboard.noApproved")}
                   </td>
                 </tr>
               )}

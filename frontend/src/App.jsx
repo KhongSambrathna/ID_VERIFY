@@ -27,6 +27,7 @@ import PlayerDashboard from "./pages/PlayerDashboard";
 import PlayerEditProfile from "./pages/PlayerEditProfile";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import SettingsPage from "./pages/SettingsPage";
 import AdminTournaments from "./pages/AdminTournaments";
 import TournamentsPage from "./pages/TournamentsPage";
 import TournamentSquadPage from "./pages/TournamentSquadPage";
@@ -49,6 +50,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ChangePasswordPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <SettingsPage />
             </ProtectedRoute>
           }
         />

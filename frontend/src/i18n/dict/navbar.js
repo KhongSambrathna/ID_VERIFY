@@ -20,6 +20,7 @@ export const km = {
   "navbar.posterGenerator": "បង្កើត Poster",
   "navbar.squadList": "បញ្ជីកីឡាករ",
   "navbar.editProfile": "កែប្រែពត៌មានរបស់ខ្ញុំ",
+  "navbar.settings": "ការកំណត់",
   "navbar.logout": "ចាកចេញ",
   "navbar.adminLogin": "ចូល Admin",
 };
@@ -46,6 +47,7 @@ export const en = {
   "navbar.posterGenerator": "Poster generator",
   "navbar.squadList": "Squad list",
   "navbar.editProfile": "Edit my profile",
+  "navbar.settings": "Settings",
   "navbar.logout": "Log out",
   "navbar.adminLogin": "Admin login",
 };

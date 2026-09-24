@@ -137,6 +137,10 @@ export default function Navbar() {
             <Link to="/squad-list" onClick={closeMenu}>{t("navbar.squadList")}</Link>
           )}
 
+          {isAuthed && (
+            <Link to="/settings" onClick={closeMenu}>{t("navbar.settings")}</Link>
+          )}
+
           <button type="button" className="lang-switch" onClick={toggleLanguage}>
             {language === "km" ? "EN" : "ខ្មែរ"}
           </button>

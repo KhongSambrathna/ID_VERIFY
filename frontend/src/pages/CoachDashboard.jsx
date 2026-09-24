@@ -20,7 +20,7 @@ function formatDob(dob) {
 
 export default function CoachDashboard() {
   const { t } = useLanguage();
-  const { team, user, login } = useAuth();
+  const { team } = useAuth();
   const [athletes, setAthletes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -39,13 +39,6 @@ export default function CoachDashboard() {
   const [playerAccounts, setPlayerAccounts] = useState([]);
   const [playerAccountsLoading, setPlayerAccountsLoading] = useState(true);
   const [resettingId, setResettingId] = useState(null);
-
-  // This Head Coach's OWN Telegram chat id — needed for the self-service
-  // "forgot password" flow on the sign-in page (own account, not one of the
-  // player accounts managed below).
-  const [telegramDraft, setTelegramDraft] = useState(user?.telegramChatId || "");
-  const [savingTelegram, setSavingTelegram] = useState(false);
-  const [telegramSaved, setTelegramSaved] = useState(false);
 
   // This team's static ABA Merchant KHQR image — the "scan to pay" fallback
   // for a team that only has the ABA Merchant app (no PayWay API access).
@@ -72,20 +65,6 @@ export default function CoachDashboard() {
     loadKhqr();
     loadLogo();
   }, []);
-
-  const saveTelegram = async () => {
-    setSavingTelegram(true);
-    setTelegramSaved(false);
-    try {
-      const { data } = await api.put("/auth/me/telegram", { telegramChatId: telegramDraft });
-      login(localStorage.getItem("token"), data);
-      setTelegramSaved(true);
-    } catch (err) {
-      alert(err.response?.data?.message || t("common.failedToSave"));
-    } finally {
-      setSavingTelegram(false);
-    }
-  };
 
   const loadKhqr = async () => {
     setKhqrLoading(true);
@@ -407,32 +386,6 @@ export default function CoachDashboard() {
       {/* PLAYER ACCOUNTS TAB */}
       {activeTab === "accounts" && (
         <div className="tab-content">
-          <div className="card" style={{ maxWidth: 420, marginBottom: 24 }}>
-            <h4 style={{ marginTop: 0 }}>{t("coachDashboard.myTelegramCardTitle")}</h4>
-            <p className="help-text" style={{ marginTop: -6 }}>
-              {t("coachDashboard.myTelegramHelp")}
-            </p>
-            <div className="field">
-              <label>{t("coachDashboard.myTelegramLabel")}</label>
-              <input
-                placeholder={t("coachDashboard.myTelegramPlaceholder")}
-                value={telegramDraft}
-                onChange={(e) => {
-                  setTelegramDraft(e.target.value);
-                  setTelegramSaved(false);
-                }}
-              />
-            </div>
-            <button
-              className="btn btn-outline"
-              style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
-              onClick={saveTelegram}
-              disabled={savingTelegram}
-            >
-              {savingTelegram ? t("coachDashboard.savingTelegram") : telegramSaved ? t("coachDashboard.telegramSaved") : t("common.save")}
-            </button>
-          </div>
-
           <div className="card" style={{ maxWidth: 420, marginBottom: 24 }}>
             <h4 style={{ marginTop: 0 }}>{t("coachDashboard.khqrCardTitle")}</h4>
             <p className="help-text" style={{ marginTop: -6 }}>

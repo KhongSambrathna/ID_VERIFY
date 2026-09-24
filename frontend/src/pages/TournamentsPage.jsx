@@ -24,20 +24,14 @@ function ageRuleSummary(tour, t) {
 
 // Individual Player account only — browse open tournaments and register
 // yourself (blocked if you owe a fee on the team you'd be playing under).
-// Also where you link your own Telegram chat id, needed for the
-// self-service "forgot password" flow on the sign-in page.
 export default function TournamentsPage() {
   const { t } = useLanguage();
-  const { user, team, athleteId, login } = useAuth();
+  const { team, athleteId } = useAuth();
   const navigate = useNavigate();
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [registeringId, setRegisteringId] = useState(null);
-
-  const [telegramDraft, setTelegramDraft] = useState(user?.telegramChatId || "");
-  const [savingTelegram, setSavingTelegram] = useState(false);
-  const [telegramSaved, setTelegramSaved] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -80,20 +74,6 @@ export default function TournamentsPage() {
     }
   };
 
-  const saveTelegram = async () => {
-    setSavingTelegram(true);
-    setTelegramSaved(false);
-    try {
-      const { data } = await api.put("/auth/me/telegram", { telegramChatId: telegramDraft });
-      login(localStorage.getItem("token"), data);
-      setTelegramSaved(true);
-    } catch (err) {
-      alert(err.response?.data?.message || t("common.failedToSave"));
-    } finally {
-      setSavingTelegram(false);
-    }
-  };
-
   if (!athleteId) {
     return (
       <div className="container dash-body">
@@ -107,27 +87,6 @@ export default function TournamentsPage() {
       <div className="dash-header">
         <h2>{t("tournamentsPage.title")}</h2>
         <p>{t("tournamentsPage.subtitle")}</p>
-      </div>
-
-      <div className="card" style={{ maxWidth: 420, marginBottom: 24 }}>
-        <h4 style={{ marginTop: 0 }}>{t("tournamentsPage.telegramCardTitle")}</h4>
-        <p className="help-text" style={{ marginTop: -6 }}>
-          {t("tournamentsPage.telegramHelp")}
-        </p>
-        <div className="field">
-          <label>{t("tournamentsPage.telegramLabel")}</label>
-          <input
-            placeholder={t("tournamentsPage.telegramPlaceholder")}
-            value={telegramDraft}
-            onChange={(e) => {
-              setTelegramDraft(e.target.value);
-              setTelegramSaved(false);
-            }}
-          />
-        </div>
-        <button className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }} onClick={saveTelegram} disabled={savingTelegram}>
-          {savingTelegram ? t("tournamentsPage.saving") : telegramSaved ? t("tournamentsPage.saved") : t("common.save")}
-        </button>
       </div>
 
       {loading && <p>{t("common.loading")}</p>}

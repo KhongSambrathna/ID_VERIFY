@@ -22,6 +22,11 @@ function flattenAssignments(athlete, teamFilter) {
     qrCodeUrl: athlete.qrCodeUrl,
     lastVerifiedAt: athlete.lastVerifiedAt,
     createdAt: athlete.createdAt,
+    // Staged Head Coach/Player edit awaiting Admin approval (see the
+    // Athlete model and updateAthlete) — the Admin Dashboard uses this to
+    // tell a document-related edit apart from a routine field tweak when
+    // deciding which "pending" tab a row belongs in.
+    pendingChanges: athlete.pendingChanges || null,
   };
   return (athlete.assignments || [])
     .filter((a) => !teamFilter || a.team === teamFilter)

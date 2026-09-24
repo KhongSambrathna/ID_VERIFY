@@ -35,13 +35,6 @@ export const km = {
   "coachDashboard.confirmResetPasswordSuffix": " ទៅជា 12345 ឡើងវិញឬ? កីឡាករនឹងត្រូវប្តូរវានៅពេលចូលលើកក្រោយ។",
   "coachDashboard.failedToResetPassword": "មិនអាចកំណត់ពាក្យសម្ងាត់ឡើងវិញបានទេ",
   "coachDashboard.noPlayerAccounts": "គ្មានគណនីកីឡាករចូលបុគ្គលនៅក្នុងក្រុមរបស់អ្នកនៅឡើយទេ។",
-  "coachDashboard.myTelegramCardTitle": "តភ្ជាប់ Telegram របស់ខ្ញុំ",
-  "coachDashboard.myTelegramHelp":
-    "ត្រូវការសម្រាប់មុខងារ \"ភ្លេចលេខសម្ងាត់\" ដោយខ្លួនឯង — សម្រាប់គណនីគ្រូបង្វឹករបស់អ្នកផ្ទាល់ (មិនមែនគណនីកីឡាករទេ)។",
-  "coachDashboard.myTelegramLabel": "Telegram Chat ID",
-  "coachDashboard.myTelegramPlaceholder": "បញ្ចូល Chat ID របស់អ្នក…",
-  "coachDashboard.savingTelegram": "កំពុងរក្សាទុក…",
-  "coachDashboard.telegramSaved": "បានរក្សាទុក",
   "coachDashboard.khqrCardTitle": "QR ទូទាត់ ABA របស់ក្រុម",
   "coachDashboard.khqrHelp":
     "ដាក់រូប QR ពី App ABA Merchant របស់អ្នក (Save Image ពី App រួចបង្ហោះទីនេះ) ដើម្បីអោយកីឡាករស្កេនទូទាត់ថ្លៃសេវា។ QR នេះមិនកំណត់ចំនួនទឹកប្រាក់ដោយស្វ័យប្រវត្តិទេ — កីឡាករត្រូវវាយបញ្ចូលចំនួនដោយខ្លួនឯង ហើយអ្នក ឬគ្រូបង្វឹកត្រូវចុចបញ្ជាក់ថាបានទទួលទឹកប្រាក់នៅក្នុងទំព័រ \"ជំពាក់ថ្លៃ\"។",
@@ -105,13 +98,6 @@ export const en = {
   "coachDashboard.confirmResetPasswordSuffix": " back to 12345? They'll be required to change it next time they sign in.",
   "coachDashboard.failedToResetPassword": "Could not reset the password",
   "coachDashboard.noPlayerAccounts": "No individual player accounts on your team yet.",
-  "coachDashboard.myTelegramCardTitle": "Link my Telegram",
-  "coachDashboard.myTelegramHelp":
-    "Needed for the self-service \"forgot password\" flow — for your own Head Coach account (not a player account).",
-  "coachDashboard.myTelegramLabel": "Telegram Chat ID",
-  "coachDashboard.myTelegramPlaceholder": "Enter your chat ID…",
-  "coachDashboard.savingTelegram": "Saving…",
-  "coachDashboard.telegramSaved": "Saved",
   "coachDashboard.khqrCardTitle": "Team's ABA payment QR",
   "coachDashboard.khqrHelp":
     "Upload the QR code from your ABA Merchant app (save the image from the app, then upload it here) so players can scan it to pay fees. This QR doesn't carry an amount automatically — the player has to type it in themselves, and you or a coach then confirm the payment was received on the \"Debt report\" page.",
