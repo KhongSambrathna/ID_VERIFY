@@ -61,6 +61,9 @@ export default function TournamentsPage() {
     }
   };
 
+  // Doesn't remove the registration outright — it just requests it. See
+  // registrationSchema.pendingRemoval: an Admin/Head Coach has to confirm
+  // (or decline) it before the player actually comes off the roster.
   const unregister = async (tour) => {
     if (!confirm(t("tournamentsPage.confirmCancel").replace("{name}", tour.name))) return;
     setRegisteringId(tour._id);
@@ -127,13 +130,19 @@ export default function TournamentsPage() {
                   <td data-label={t("common.actions")} className="actions-cell">
                     {tour.myRegistrationId ? (
                       <>
-                        <span className="badge verified" style={{ marginRight: 6 }}>
-                          {t("tournamentsPage.registeredBadge")}
-                        </span>
+                        {tour.myRegistrationPendingRemoval ? (
+                          <span className="badge pending" style={{ marginRight: 6 }}>
+                            {t("tournamentsPage.withdrawalPendingBadge")}
+                          </span>
+                        ) : (
+                          <span className="badge verified" style={{ marginRight: 6 }}>
+                            {t("tournamentsPage.registeredBadge")}
+                          </span>
+                        )}
                         <button className="link-btn" onClick={() => navigate(`/tournaments/${tour._id}/squad`)}>
                           {t("tournamentsPage.viewSquad")}
                         </button>
-                        {!tour.registrationClosed && (
+                        {!tour.registrationClosed && !tour.myRegistrationPendingRemoval && (
                           <button className="action-btn danger" disabled={registeringId === tour._id} onClick={() => unregister(tour)}>
                             {t("common.cancel")}
                           </button>

@@ -10,6 +10,7 @@ const {
   registerSelf,
   registerOnBehalf,
   unregister,
+  keepRegistration,
   setRegistrationPaid,
   settleTournamentNow,
   setRegistrationClosed,
@@ -33,6 +34,8 @@ router.get("/:id/export.csv", requireRole("ADMIN", "HEAD_COACH"), exportRegistra
 // error instead of a 403 with no explanation).
 router.post("/:id/register", requireRole("PLAYER"), registerSelf);
 router.delete("/:id/registrations/:registrationId", requireRole("ADMIN", "HEAD_COACH", "PLAYER"), unregister);
+// Decline a player's own pending withdrawal request — keeps them registered.
+router.patch("/:id/registrations/:registrationId/keep", requireRole("ADMIN", "HEAD_COACH"), keepRegistration);
 
 // Admin/Head Coach registering someone who has no login of their own.
 router.post("/:id/register-admin", requireRole("ADMIN", "HEAD_COACH"), registerOnBehalf);

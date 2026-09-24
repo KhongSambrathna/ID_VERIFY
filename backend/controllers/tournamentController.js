@@ -87,6 +87,11 @@ function summarize(t, athleteId) {
         : 0,
     debtSettledAt: t.debtSettledAt || null,
     myRegistrationId: mine ? mine._id : null,
+    // Whether MY OWN withdrawal request (if any) is still waiting on
+    // Admin/Head Coach confirmation — see registrationSchema.pendingRemoval.
+    // Lets the tournament list show "Withdrawal requested" instead of a
+    // Cancel button, without a separate detail fetch.
+    myRegistrationPendingRemoval: mine ? !!mine.pendingRemoval : false,
     createdAt: t.createdAt,
   };
 }
@@ -562,9 +567,14 @@ exports.registerOnBehalf = async (req, res) => {
   }
 };
 
-// DELETE /api/tournaments/:id/registrations/:registrationId — the player
-// themself (individual login, their own row only), or Admin/Head Coach
-// (their own team's tournament).
+// DELETE /api/tournaments/:id/registrations/:registrationId — Admin/Head
+// Coach (their own team's tournament) removes anyone immediately, same as
+// always. A PLAYER hitting this on their OWN row is different: it doesn't
+// remove them outright, it just flags the row pendingRemoval and leaves
+// them fully registered — actually taking them off the roster needs an
+// Admin/Head Coach to call this same endpoint themselves (confirming it),
+// or PATCH .../keep to decline it and clear the flag instead (see
+// keepRegistration below).
 exports.unregister = async (req, res) => {
   try {
     const tournament = await Tournament.findById(req.params.id);
@@ -578,16 +588,27 @@ exports.unregister = async (req, res) => {
     // an open (not team-scoped) tournament — the same reach they already
     // have to register that player in via register-admin.
     const isOwnTeamsRegistration = req.adminRole === "HEAD_COACH" && row.team === req.adminTeam;
-    if (!isOwnRow && !isOwnTeamsRegistration && !canManage(req, tournament)) {
+    const isStaff = isOwnTeamsRegistration || canManage(req, tournament);
+    if (!isOwnRow && !isStaff) {
       return res.status(403).json({ message: "Access denied" });
     }
-    // Staff (isOwnTeamsRegistration / canManage) can still remove anyone at
-    // any time — this only blocks a PLAYER cancelling their own row once
+    // Staff can still remove (or confirm the removal of) anyone at any
+    // time — this only blocks a PLAYER requesting their own withdrawal once
     // registration has been closed.
-    if (isOwnRow && tournament.registrationClosed) {
+    if (isOwnRow && !isStaff && tournament.registrationClosed) {
       return res.status(403).json({
         message: "Registration is closed for this tournament — ask your Admin/Head Coach to remove you.",
       });
+    }
+
+    if (isOwnRow && !isStaff) {
+      if (row.pendingRemoval) return res.json(tournament); // already requested — no-op
+      row.pendingRemoval = true;
+      await tournament.save();
+      const text = `🚪 ${row.fullName} asked to withdraw from "${tournament.name}" (${row.team}) — needs Admin/Head Coach confirmation.`;
+      notifyAdmins(text);
+      notifyTeamCoaches(row.team, text);
+      return res.json(tournament);
     }
 
     const removedAthleteId = row.athlete;
@@ -604,6 +625,33 @@ exports.unregister = async (req, res) => {
     }
 
     res.json({ message: "Removed from tournament" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PATCH /api/tournaments/:id/registrations/:registrationId/keep  (Admin, or
+// Head Coach for their own team) — declines a player's own pending
+// withdrawal request: clears pendingRemoval and leaves the registration
+// exactly as it was, same "keep" idea as an assignment removal request's
+// decline path in athleteController.js.
+exports.keepRegistration = async (req, res) => {
+  try {
+    const tournament = await Tournament.findById(req.params.id);
+    if (!tournament) return res.status(404).json({ message: "Tournament not found" });
+
+    const row = tournament.registrations.id(req.params.registrationId);
+    if (!row) return res.status(404).json({ message: "Registration not found" });
+
+    const isOwnTeamsRegistration = req.adminRole === "HEAD_COACH" && row.team === req.adminTeam;
+    if (!isOwnTeamsRegistration && !canManage(req, tournament)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    row.pendingRemoval = false;
+    await tournament.save();
+    notifyTeamCoaches(row.team, `↩️ ${row.fullName}'s withdrawal request from "${tournament.name}" was declined — they stay registered.`);
+    res.json(tournament);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

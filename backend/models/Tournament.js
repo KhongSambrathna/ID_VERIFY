@@ -48,6 +48,16 @@ const registrationSchema = new mongoose.Schema(
     // the athlete's regular owed-fee list (see Tournament.debtSettledAt) —
     // from that point on it's tracked as ordinary debt, not here.
     convertedToDebt: { type: Boolean, default: false },
+    // A Player withdrawing THEMSELF (their own individual login) can't
+    // remove their registration outright — this just flags it as "awaiting
+    // Admin/Head Coach confirmation," same idea as Athlete.assignments'
+    // pendingRemoval. The registration stays fully in place (still counts
+    // toward the roster/squad list/cap) until staff either confirms it
+    // (DELETE .../registrations/:id — actually removes it) or declines it
+    // (PATCH .../registrations/:id/keep — clears this flag). An Admin/Head
+    // Coach removing someone by hand never goes through this flag; it's
+    // always immediate, exactly like before.
+    pendingRemoval: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

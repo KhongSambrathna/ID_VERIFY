@@ -143,14 +143,39 @@ export default function TournamentSquadPage() {
     }
   };
 
+  // Same DELETE endpoint for three different situations, so the confirm
+  // wording has to match which one this actually is: a Player requesting
+  // their OWN withdrawal (needs Admin/Head Coach approval — doesn't remove
+  // them yet), staff confirming a request that's already pending, or staff
+  // removing someone outright (immediate, as always).
   const removeRegistration = async (r) => {
-    if (!confirm(t("tournamentSquadPage.confirmRemove").replace("{name}", r.fullName))) return;
+    const isMine = isPlayer && athleteId && String(r.athlete) === String(athleteId);
+    const confirmMsg = isMine
+      ? t("tournamentSquadPage.confirmWithdrawRequest")
+      : r.pendingRemoval
+      ? t("tournamentSquadPage.confirmConfirmWithdrawal").replace("{name}", r.fullName)
+      : t("tournamentSquadPage.confirmRemove").replace("{name}", r.fullName);
+    if (!confirm(confirmMsg)) return;
     setActingId(r._id);
     try {
       await api.delete(`/tournaments/${id}/registrations/${r._id}`);
       load();
     } catch (err) {
       alert(err.response?.data?.message || t("tournamentSquadPage.failedToRemove"));
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  // Declines a player's own pending withdrawal request — they stay
+  // registered, same "keep" idea as the athlete-assignment removal flow.
+  const keepRegistration = async (r) => {
+    setActingId(r._id);
+    try {
+      await api.patch(`/tournaments/${id}/registrations/${r._id}/keep`);
+      load();
+    } catch (err) {
+      alert(err.response?.data?.message || t("tournamentSquadPage.failedToKeep"));
     } finally {
       setActingId(null);
     }
@@ -409,15 +434,29 @@ export default function TournamentSquadPage() {
                       {t("tournamentSquadPage.setAmountButton")}
                     </button>
                   )}
+                  {!isPlayer && r.pendingRemoval && (
+                    <span className="badge pending" style={{ marginRight: 6 }}>
+                      {t("tournamentSquadPage.withdrawalRequestedBadge")}
+                    </span>
+                  )}
+                  {!isPlayer && r.pendingRemoval && (
+                    <button className="action-btn positive" disabled={actingId === r._id} onClick={() => keepRegistration(r)}>
+                      {t("tournamentSquadPage.keepButton")}
+                    </button>
+                  )}
                   {!isPlayer && (
                     <button className="link-btn" disabled={actingId === r._id} onClick={() => removeRegistration(r)}>
-                      {t("common.remove")}
+                      {r.pendingRemoval ? t("tournamentSquadPage.confirmWithdrawalButton") : t("common.remove")}
                     </button>
                   )}
                   {isPlayer && isMine && !tournament.registrationClosed && (
-                    <button className="link-btn" disabled={actingId === r._id} onClick={() => removeRegistration(r)}>
-                      {t("common.cancel")}
-                    </button>
+                    r.pendingRemoval ? (
+                      <span className="badge pending">{t("tournamentSquadPage.withdrawalRequestedBadge")}</span>
+                    ) : (
+                      <button className="link-btn" disabled={actingId === r._id} onClick={() => removeRegistration(r)}>
+                        {t("common.cancel")}
+                      </button>
+                    )
                   )}
                 </div>
                 {payOpenId === r._id && (
