@@ -6,6 +6,7 @@ import { resolveFileUrl } from "../utils/fileUrl";
 import SquadListManager from "../components/SquadListManager";
 import FormationManager from "../components/FormationManager";
 import StartingXIManager from "../components/StartingXIManager";
+import JerseyOrderManager from "../components/JerseyOrderManager";
 import RequireActiveSubscription from "../components/RequireActiveSubscription";
 import { useLanguage } from "../i18n/LanguageContext";
 
@@ -27,7 +28,7 @@ export default function CoachDashboard() {
   const [searchParams] = useSearchParams();
   // Lets a link from elsewhere (e.g. a tournament's squad page) land
   // directly on a specific tab, e.g. /coach?tab=lineups.
-  const validTabs = ["athletes", "lineups", "formations", "startingxi", "accounts"];
+  const validTabs = ["athletes", "lineups", "formations", "startingxi", "jerseyorders", "accounts"];
   const tabFromUrl = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState(validTabs.includes(tabFromUrl) ? tabFromUrl : "athletes");
 
@@ -269,6 +270,12 @@ export default function CoachDashboard() {
           {t("coachDashboard.tabStartingXI")}
         </button>
         <button
+          className={`tab-btn ${activeTab === "jerseyorders" ? "active" : ""}`}
+          onClick={() => setActiveTab("jerseyorders")}
+        >
+          {t("coachDashboard.tabJerseyOrders")}
+        </button>
+        <button
           className={`tab-btn ${activeTab === "accounts" ? "active" : ""}`}
           onClick={() => setActiveTab("accounts")}
         >
@@ -380,6 +387,13 @@ export default function CoachDashboard() {
       {activeTab === "startingxi" && (
         <div className="tab-content">
           <StartingXIManager team={team} />
+        </div>
+      )}
+
+      {/* JERSEY ORDERS TAB */}
+      {activeTab === "jerseyorders" && (
+        <div className="tab-content">
+          <JerseyOrderManager team={team} basePath="/teams/mine/jersey-orders" athletes={athletes} />
         </div>
       )}
 

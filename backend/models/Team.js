@@ -1,5 +1,46 @@
 const mongoose = require("mongoose");
 
+// One "jersey order" = one player's request to have a shirt printed with a
+// given name/number for this team — self-registered from an individual
+// Player login, or entered by an Admin/Head Coach on their behalf (no
+// phone / couldn't self-serve), same idea as Tournament registrations.
+// `fullName`/`photoUrl` are snapshots (same reasoning as
+// Tournament.registrationSchema's) so this keeps making sense even if the
+// athlete's profile is edited later.
+const jerseyOrderSchema = new mongoose.Schema(
+  {
+    athlete: { type: mongoose.Schema.Types.ObjectId, ref: "Athlete", required: true },
+    fullName: { type: String, required: true },
+    photoUrl: { type: String, default: null },
+    // What actually gets printed on the shirt — doesn't have to match
+    // fullName (a nickname/short name is common).
+    jerseyName: { type: String, required: true, trim: true },
+    jerseyNumber: { type: Number, required: true, min: 0, max: 99 },
+    // null = the player ordered it themselves; set = which Admin/Head Coach
+    // account registered it on their behalf.
+    registeredBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
+    // Cash amount collected so far — a simple note in the list, same as
+    // Tournament registrations' entry-fee tracking. There's no single fixed
+    // jersey price configured anywhere in this app (unlike a tournament's
+    // entryFee), so `feePaid` is a plain yes/no an Admin/Head Coach sets
+    // themselves once it's been fully settled, rather than a computed
+    // amount-vs-price comparison.
+    feePaidAmount: { type: Number, default: 0, min: 0 },
+    feePaid: { type: Boolean, default: false },
+    feePaidAt: { type: Date, default: null },
+    feePaidBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
+    // A Player can freely change their own jersey name/number, but can't
+    // remove the order outright — this just flags it as "awaiting Admin/
+    // Head Coach confirmation," same pattern as Athlete.assignments'
+    // pendingRemoval and Tournament.registrationSchema's pendingRemoval.
+    // The order stays fully in place until staff either confirms the
+    // removal or declines it (keeping the order as-is). An Admin/Head
+    // Coach removing an order by hand never goes through this flag.
+    pendingRemoval: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
+
 const teamSchema = new mongoose.Schema(
   {
     // canonical team name — chosen from a dropdown everywhere in the app so
@@ -77,6 +118,11 @@ const teamSchema = new mongoose.Schema(
       ],
       default: [],
     },
+
+    // This team's jersey/kit print orders — see jerseyOrderSchema above.
+    // One combined list (not split per season/event) since a shirt order is
+    // an ongoing thing, not scoped to any one tournament.
+    jerseyOrders: { type: [jerseyOrderSchema], default: [] },
   },
   { timestamps: true }
 );

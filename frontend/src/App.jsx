@@ -32,6 +32,8 @@ import AdminTournaments from "./pages/AdminTournaments";
 import TournamentsPage from "./pages/TournamentsPage";
 import TournamentSquadPage from "./pages/TournamentSquadPage";
 import PlayerSquadListPage from "./pages/PlayerSquadListPage";
+import PlayerJerseyOrderPage from "./pages/PlayerJerseyOrderPage";
+import AdminJerseyOrders from "./pages/AdminJerseyOrders";
 import PricingPage from "./pages/PricingPage";
 import PosterGenerator from "./pages/PosterGenerator";
 import PaymentReturn from "./pages/PaymentReturn";
@@ -239,6 +241,22 @@ export default function App() {
           element={
             <ProtectedRoute role="PLAYER">
               <PlayerSquadListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/jersey-orders"
+          element={
+            <ProtectedRoute role="PLAYER">
+              <PlayerJerseyOrderPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/jersey-orders"
+          element={
+            <ProtectedRoute role="ADMIN">
+              <AdminJerseyOrders />
             </ProtectedRoute>
           }
         />

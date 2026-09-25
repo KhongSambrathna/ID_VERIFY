@@ -116,6 +116,7 @@ export default function Navbar() {
               {isAdmin && <Link to="/admin/matchday" onClick={closeMenu}>{t("navbar.matchDay")}</Link>}
               {isAdmin && <Link to="/admin/users" onClick={closeMenu}>{t("navbar.users")}</Link>}
               {isAdmin && <Link to="/admin/subscriptions" onClick={closeMenu}>{t("navbar.subscriptions")}</Link>}
+              {isAdmin && <Link to="/admin/jersey-orders" onClick={closeMenu}>{t("navbar.jerseyOrders")}</Link>}
             </NavDropdown>
           )}
 
@@ -135,6 +136,9 @@ export default function Navbar() {
           )}
           {isAuthed && isPlayer && (
             <Link to="/squad-list" onClick={closeMenu}>{t("navbar.squadList")}</Link>
+          )}
+          {isAuthed && isPlayer && (
+            <Link to="/jersey-orders" onClick={closeMenu}>{t("navbar.jerseyOrders")}</Link>
           )}
 
           {isAuthed && (

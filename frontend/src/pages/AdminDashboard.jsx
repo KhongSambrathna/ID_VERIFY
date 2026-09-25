@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/axios";
+import { resolveFileUrl } from "../utils/fileUrl";
 import { useLanguage } from "../i18n/LanguageContext";
 
 export default function AdminDashboard() {
@@ -240,6 +241,7 @@ export default function AdminDashboard() {
           <table className="athletes">
             <thead>
               <tr>
+                <th>{t("common.photo")}</th>
                 <th>{t("adminDashboard.colId")}</th>
                 <th>{t("adminDashboard.colName")}</th>
                 <th>{t("adminDashboard.colRole")}</th>
@@ -255,6 +257,13 @@ export default function AdminDashboard() {
             <tbody>
               {all.map((a) => (
                 <tr key={a.assignmentId}>
+                  <td data-label={t("common.photo")}>
+                    <img
+                      src={a.photoUrl ? resolveFileUrl(a.photoUrl) : "https://placehold.co/50x50?text=Photo"}
+                      alt={a.fullName}
+                      className="small-photo"
+                    />
+                  </td>
                   <td data-label={t("adminDashboard.colId")}>{a.verifyId}</td>
                   <td data-label={t("adminDashboard.colName")} className="caps-display">{a.fullName}</td>
                   <td data-label={t("adminDashboard.colRole")}>{a.role || "—"}</td>
@@ -304,7 +313,7 @@ export default function AdminDashboard() {
               ))}
               {all.length === 0 && (
                 <tr>
-                  <td colSpan={10} style={{ textAlign: "center", color: "#777" }}>
+                  <td colSpan={11} style={{ textAlign: "center", color: "#777" }}>
                     {athletes.length === 0
                       ? t("adminDashboard.noAthletesYet")
                       : t("adminDashboard.noSearchMatches")}
@@ -344,6 +353,7 @@ export default function AdminDashboard() {
                   <th>
                     <input type="checkbox" checked={allPendingSelected} onChange={toggleAllPending} />
                   </th>
+                  <th>{t("common.photo")}</th>
                   <th>{t("adminDashboard.colId")}</th>
                   <th>{t("adminDashboard.colName")}</th>
                   <th>{t("adminDashboard.colRole")}</th>
@@ -363,6 +373,13 @@ export default function AdminDashboard() {
                           onChange={() => togglePendingSelected(a)}
                         />
                       )}
+                    </td>
+                    <td data-label={t("common.photo")}>
+                      <img
+                        src={a.photoUrl ? resolveFileUrl(a.photoUrl) : "https://placehold.co/50x50?text=Photo"}
+                        alt={a.fullName}
+                        className="small-photo"
+                      />
                     </td>
                     <td data-label={t("adminDashboard.colId")}>{a.verifyId}</td>
                     <td data-label={t("adminDashboard.colName")} className="caps-display">{a.fullName}</td>
@@ -403,7 +420,7 @@ export default function AdminDashboard() {
                 ))}
                 {visiblePendingRows.length === 0 && (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: "center", color: "#777" }}>
+                    <td colSpan={8} style={{ textAlign: "center", color: "#777" }}>
                       {pendingEmptyText}
                     </td>
                   </tr>
