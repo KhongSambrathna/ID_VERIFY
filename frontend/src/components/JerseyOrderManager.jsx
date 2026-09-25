@@ -40,6 +40,7 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
   const [selfNumber, setSelfNumber] = useState("");
   const [selfSize, setSelfSize] = useState("");
   const [selfNote, setSelfNote] = useState("");
+  const [selfIsFan, setSelfIsFan] = useState(false);
   const [selfSaving, setSelfSaving] = useState(false);
   const [selfError, setSelfError] = useState("");
 
@@ -49,16 +50,18 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
   const [pickNumber, setPickNumber] = useState("");
   const [pickSize, setPickSize] = useState("");
   const [pickNote, setPickNote] = useState("");
+  const [pickIsFan, setPickIsFan] = useState(false);
   const [pickSaving, setPickSaving] = useState(false);
   const [pickError, setPickError] = useState("");
 
-  // Inline edit (jersey name/number/size/note) — self's own row or any row
-  // for staff.
+  // Inline edit (jersey name/number/size/note/isFan) — self's own row or
+  // any row for staff.
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState("");
   const [editNumber, setEditNumber] = useState("");
   const [editSize, setEditSize] = useState("");
   const [editNote, setEditNote] = useState("");
+  const [editIsFan, setEditIsFan] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Staff-only payment editor.
@@ -85,9 +88,16 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [basePath]);
 
-  const myOrder = athleteId ? orders.find((o) => String(o.athlete) === String(athleteId)) : null;
-  const registeredAthleteIds = new Set(orders.map((o) => String(o.athlete)));
-  const pickableAthletes = athletes.filter((a) => !registeredAthleteIds.has(String(a._id)));
+  // An athlete can have any number of Fan orders but only one non-Fan
+  // (their own) order — this is what actually gates the self-register
+  // form's "own jersey" slot; a Fan order never counts here.
+  const myNonFanOrder = athleteId
+    ? orders.find((o) => String(o.athlete) === String(athleteId) && !o.isFan)
+    : null;
+  // Every athlete stays pickable for staff — being already registered
+  // doesn't rule an athlete out, since they may still need another Fan
+  // order; the backend is what enforces the one-non-Fan-order rule.
+  const pickableAthletes = athletes;
 
   const submitSelf = async (e) => {
     e.preventDefault();
@@ -112,11 +122,13 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
         jerseyNumber: number,
         jerseySize: selfSize,
         note: selfNote.trim(),
+        isFan: myNonFanOrder ? true : selfIsFan,
       });
       setSelfName("");
       setSelfNumber("");
       setSelfSize("");
       setSelfNote("");
+      setSelfIsFan(false);
       load();
     } catch (err) {
       setSelfError(err.response?.data?.message || t("jerseyOrderManager.failedToRegister"));
@@ -153,12 +165,14 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
         jerseyNumber: number,
         jerseySize: pickSize,
         note: pickNote.trim(),
+        isFan: pickIsFan,
       });
       setPickAthleteId("");
       setPickName("");
       setPickNumber("");
       setPickSize("");
       setPickNote("");
+      setPickIsFan(false);
       load();
     } catch (err) {
       setPickError(err.response?.data?.message || t("jerseyOrderManager.failedToRegister"));
@@ -173,6 +187,7 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
     setEditNumber(String(order.jerseyNumber));
     setEditSize(order.jerseySize || "");
     setEditNote(order.note || "");
+    setEditIsFan(!!order.isFan);
   };
 
   const cancelEdit = () => {
@@ -181,6 +196,7 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
     setEditNumber("");
     setEditSize("");
     setEditNote("");
+    setEditIsFan(false);
   };
 
   const saveEdit = async (order) => {
@@ -204,6 +220,7 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
         jerseyNumber: number,
         jerseySize: editSize,
         note: editNote.trim(),
+        isFan: editIsFan,
       });
       cancelEdit();
       load();
@@ -295,10 +312,18 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
         {t("jerseyOrderManager.intro")}
       </p>
 
-      {/* Self-service register form — individual Player login, no order yet */}
-      {isPlayer && athleteId && !myOrder && (
+      {/* Self-service register form — individual Player login. Stays visible
+          even after they already have their own (non-Fan) order, so they
+          can keep adding Fan orders; in that case the Fan checkbox below
+          is forced on. */}
+      {isPlayer && athleteId && (
         <form className="card" style={{ maxWidth: 420, marginBottom: 24 }} onSubmit={submitSelf}>
           <h4 style={{ marginTop: 0 }}>{t("jerseyOrderManager.registerMine")}</h4>
+          {myNonFanOrder && (
+            <p className="help-text" style={{ marginTop: -6 }}>
+              {t("jerseyOrderManager.alreadyHaveOwnOrderHint")}
+            </p>
+          )}
           <div className="field">
             <label>{t("jerseyOrderManager.jerseyNameLabel")}</label>
             <input value={selfName} onChange={(e) => setSelfName(e.target.value)} required />
@@ -325,6 +350,17 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
               onChange={(e) => setSelfNote(e.target.value)}
               placeholder={t("jerseyOrderManager.notePlaceholder")}
             />
+          </div>
+          <div className="field">
+            <label style={{ fontWeight: "normal" }}>
+              <input
+                type="checkbox"
+                checked={myNonFanOrder ? true : selfIsFan}
+                disabled={!!myNonFanOrder}
+                onChange={(e) => setSelfIsFan(e.target.checked)}
+              />{" "}
+              {t("jerseyOrderManager.fanCheckboxLabel")}
+            </label>
           </div>
           {selfError && <div className="error-text">{selfError}</div>}
           <button className="btn btn-primary" disabled={selfSaving}>
@@ -378,6 +414,12 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
               placeholder={t("jerseyOrderManager.notePlaceholder")}
             />
           </div>
+          <div className="field">
+            <label style={{ fontWeight: "normal" }}>
+              <input type="checkbox" checked={pickIsFan} onChange={(e) => setPickIsFan(e.target.checked)} />{" "}
+              {t("jerseyOrderManager.fanCheckboxLabel")}
+            </label>
+          </div>
           {pickError && <div className="error-text">{pickError}</div>}
           <button className="btn btn-primary" disabled={pickSaving} style={{ marginTop: 8 }}>
             {pickSaving ? t("jerseyOrderManager.registering") : t("jerseyOrderManager.registerButton")}
@@ -393,6 +435,7 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
               <th>{t("common.name")}</th>
               <th>{t("jerseyOrderManager.colJerseyName")}</th>
               <th>{t("jerseyOrderManager.colJerseyNumber")}</th>
+              <th>{t("jerseyOrderManager.colType")}</th>
               <th>{t("jerseyOrderManager.colSize")}</th>
               <th>{t("jerseyOrderManager.colNote")}</th>
               <th>{t("jerseyOrderManager.colPaid")}</th>
@@ -441,6 +484,18 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
                       />
                     ) : (
                       `#${order.jerseyNumber}`
+                    )}
+                  </td>
+                  <td data-label={t("jerseyOrderManager.colType")}>
+                    {isEditing ? (
+                      <label style={{ fontWeight: "normal", whiteSpace: "nowrap" }}>
+                        <input type="checkbox" checked={editIsFan} onChange={(e) => setEditIsFan(e.target.checked)} />{" "}
+                        {t("jerseyOrderManager.fanCheckboxLabel")}
+                      </label>
+                    ) : order.isFan ? (
+                      <span className="badge pending">{t("jerseyOrderManager.typeFan")}</span>
+                    ) : (
+                      t("jerseyOrderManager.typePlayer")
                     )}
                   </td>
                   <td data-label={t("jerseyOrderManager.colSize")}>
@@ -564,7 +619,7 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
             })}
             {orders.length === 0 && (
               <tr>
-                <td colSpan={8} style={{ textAlign: "center", color: "#777" }}>
+                <td colSpan={9} style={{ textAlign: "center", color: "#777" }}>
                   {t("jerseyOrderManager.noneYet")}
                 </td>
               </tr>

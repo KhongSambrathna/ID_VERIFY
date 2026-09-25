@@ -38,6 +38,7 @@ function shapeOrder(o) {
     jerseyName: o.jerseyName,
     jerseyNumber: o.jerseyNumber,
     jerseySize: o.jerseySize,
+    isFan: !!o.isFan,
     note: o.note || "",
     registeredBy: o.registeredBy,
     feePaidAmount: o.feePaidAmount,
@@ -72,6 +73,17 @@ function validateNewOrderFields(body) {
     return { error: `Jersey size must be one of: ${JERSEY_SIZES.join(", ")}` };
   }
   return { name, number, size, note: (body.note || "").trim() };
+}
+
+// A non-Fan (the athlete's own official) order's jerseyNumber must be
+// unique among the team's other non-Fan orders — Fan/supporter orders
+// (see Team.js's isFan comment) are exempt both ways: a Fan order can
+// reuse any number, and never blocks anyone else from using it either.
+// `excludeId` leaves the order currently being edited out of the check.
+function isNumberTaken(team, number, excludeId) {
+  return team.jerseyOrders.some(
+    (o) => !o.isFan && o.jerseyNumber === number && String(o._id) !== String(excludeId)
+  );
 }
 
 // ---- list ----------------------------------------------------------------
@@ -117,12 +129,24 @@ exports.registerMyJerseyOrder = async (req, res) => {
     const assignment = athlete.assignments.find((a) => a.team === team.name);
     if (!assignment) return res.status(403).json({ message: "You're not on this team" });
 
-    if (team.jerseyOrders.some((o) => String(o.athlete) === String(athlete._id))) {
-      return res.status(409).json({ message: "You've already registered a jersey order — edit it instead." });
+    const isFan = !!req.body.isFan;
+    // An athlete may have any number of Fan orders, but still only one
+    // non-Fan order of their own — the check below only looks at their
+    // OTHER non-Fan orders, so it never blocks a Fan-marked submission.
+    if (!isFan && team.jerseyOrders.some((o) => String(o.athlete) === String(athlete._id) && !o.isFan)) {
+      return res.status(409).json({
+        message: "You've already registered your own jersey order — edit it instead, or tick Fan jersey to add another.",
+      });
     }
 
     const result = validateNewOrderFields(req.body);
     if (result.error) return res.status(400).json({ message: result.error });
+
+    if (!isFan && isNumberTaken(team, result.number)) {
+      return res.status(409).json({
+        message: `Jersey number ${result.number} is already taken by another player on this team — pick a different number, or tick Fan jersey.`,
+      });
+    }
 
     team.jerseyOrders.push({
       athlete: athlete._id,
@@ -131,6 +155,7 @@ exports.registerMyJerseyOrder = async (req, res) => {
       jerseyName: result.name,
       jerseyNumber: result.number,
       jerseySize: result.size,
+      isFan,
       note: result.note,
       registeredBy: null,
     });
@@ -145,7 +170,7 @@ exports.registerMyJerseyOrder = async (req, res) => {
 
 // POST .../jersey-orders/register-admin  (Head Coach, own team via "mine";
 // Admin, any team via :id) — body: { athleteId, jerseyName, jerseyNumber,
-// jerseySize, note? }.
+// jerseySize, note?, isFan? }.
 async function registerOnBehalf(req, res, team) {
   const { athleteId } = req.body;
   const athlete = await Athlete.findById(athleteId);
@@ -153,12 +178,21 @@ async function registerOnBehalf(req, res, team) {
   const assignment = athlete.assignments.find((a) => a.team === team.name);
   if (!assignment) return res.status(403).json({ message: "That athlete isn't on this team" });
 
-  if (team.jerseyOrders.some((o) => String(o.athlete) === String(athlete._id))) {
-    return res.status(409).json({ message: "This athlete already has a jersey order — edit it instead." });
+  const isFan = !!req.body.isFan;
+  if (!isFan && team.jerseyOrders.some((o) => String(o.athlete) === String(athlete._id) && !o.isFan)) {
+    return res.status(409).json({
+      message: "This athlete already has their own jersey order — edit it instead, or tick Fan jersey to add another.",
+    });
   }
 
   const result = validateNewOrderFields(req.body);
   if (result.error) return res.status(400).json({ message: result.error });
+
+  if (!isFan && isNumberTaken(team, result.number)) {
+    return res.status(409).json({
+      message: `Jersey number ${result.number} is already taken by another player on this team — pick a different number, or tick Fan jersey.`,
+    });
+  }
 
   team.jerseyOrders.push({
     athlete: athlete._id,
@@ -167,6 +201,7 @@ async function registerOnBehalf(req, res, team) {
     jerseyName: result.name,
     jerseyNumber: result.number,
     jerseySize: result.size,
+    isFan,
     note: result.note,
     registeredBy: req.adminId,
   });
@@ -194,13 +229,15 @@ exports.registerJerseyOrderOnBehalfAdmin = async (req, res) => {
   }
 };
 
-// ---- edit (name/number/size/note) -------------------------------------------
+// ---- edit (name/number/size/note/isFan) -------------------------------------------
 
 // PATCH .../jersey-orders/:orderId — free to edit any time (none of these
 // fields ever gate approval, same reasoning as Athlete.assignments.
 // jerseyNumber being pure squad-list bookkeeping). A Player may only edit
 // their OWN order; Head Coach/Admin may edit any order on the team they're
 // scoped to. Every field is optional here — only what's sent gets changed.
+// isFan can be toggled too, subject to the same uniqueness/one-non-Fan-
+// order rules enforced on registration (see below).
 async function updateOrder(req, res, team) {
   const order = team.jerseyOrders.id(req.params.orderId);
   if (!order) return res.status(404).json({ message: "Jersey order not found" });
@@ -209,28 +246,57 @@ async function updateOrder(req, res, team) {
   const isStaff = req.adminRole === "HEAD_COACH" || req.adminRole === "ADMIN";
   if (!isOwnRow && !isStaff) return res.status(403).json({ message: "Access denied" });
 
-  const { jerseyName, jerseyNumber, jerseySize, note } = req.body;
+  const { jerseyName, jerseyNumber, jerseySize, note, isFan } = req.body;
+
+  let nextName = order.jerseyName;
   if (jerseyName !== undefined) {
-    const name = (jerseyName || "").trim();
-    if (!name) return res.status(400).json({ message: "A jersey name is required" });
-    order.jerseyName = name;
+    nextName = (jerseyName || "").trim();
+    if (!nextName) return res.status(400).json({ message: "A jersey name is required" });
   }
+
+  let nextNumber = order.jerseyNumber;
   if (jerseyNumber !== undefined) {
-    const number = Number(jerseyNumber);
-    if (!Number.isFinite(number) || number < 0 || number > 99) {
+    nextNumber = Number(jerseyNumber);
+    if (!Number.isFinite(nextNumber) || nextNumber < 0 || nextNumber > 99) {
       return res.status(400).json({ message: "Jersey number must be between 0 and 99" });
     }
-    order.jerseyNumber = number;
   }
+
+  let nextSize = order.jerseySize;
   if (jerseySize !== undefined) {
     if (!JERSEY_SIZES.includes(jerseySize)) {
       return res.status(400).json({ message: `Jersey size must be one of: ${JERSEY_SIZES.join(", ")}` });
     }
-    order.jerseySize = jerseySize;
+    nextSize = jerseySize;
   }
-  if (note !== undefined) {
-    order.note = (note || "").trim();
+
+  const nextIsFan = isFan !== undefined ? !!isFan : order.isFan;
+
+  // Re-validate both Fan-dependent rules against the FINAL state (not just
+  // whatever field actually changed) — switching isFan off can newly
+  // collide with a number that was fine while this was still a Fan order,
+  // and switching it off can newly collide with the athlete's other
+  // non-Fan order even if the number itself didn't change.
+  if (!nextIsFan && isNumberTaken(team, nextNumber, order._id)) {
+    return res.status(409).json({
+      message: `Jersey number ${nextNumber} is already taken by another player on this team.`,
+    });
   }
+  if (!nextIsFan) {
+    const hasOtherNonFanOrder = team.jerseyOrders.some(
+      (o) => String(o._id) !== String(order._id) && String(o.athlete) === String(order.athlete) && !o.isFan
+    );
+    if (hasOtherNonFanOrder) {
+      return res.status(409).json({ message: "This player already has their own (non-Fan) jersey order." });
+    }
+  }
+
+  order.jerseyName = nextName;
+  order.jerseyNumber = nextNumber;
+  order.jerseySize = nextSize;
+  if (note !== undefined) order.note = (note || "").trim();
+  if (isFan !== undefined) order.isFan = nextIsFan;
+
   await team.save();
   res.json(shapeTeamOrders(team));
 }

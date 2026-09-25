@@ -19,6 +19,16 @@ const jerseyOrderSchema = new mongoose.Schema(
     jerseyNumber: { type: Number, required: true, min: 0, max: 99 },
     // Kids/Adult size — see utils/jerseySizes.js for the fixed option list.
     jerseySize: { type: String, required: true, enum: JERSEY_SIZES },
+    // A "Fan"/supporter jersey — not the athlete's own official kit, just
+    // an extra shirt they (or staff on their behalf) ordered for
+    // themselves as a fan/for a supporter, distinct from their one
+    // official player jersey. Fan orders are exempt from the two rules
+    // that apply to an athlete's own (non-Fan) order: jerseyNumber only
+    // has to be unique among the team's other non-Fan orders (see
+    // jerseyOrderController's isNumberTaken), and an athlete may have any
+    // number of Fan orders even though they can still only have one
+    // non-Fan order of their own.
+    isFan: { type: Boolean, default: false },
     // Free-text note from whoever placed the order — e.g. a special request
     // or a detail that doesn't fit any other field. Optional, never gates
     // anything.
