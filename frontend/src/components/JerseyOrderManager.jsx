@@ -9,6 +9,11 @@ function money(n) {
   return Number.isFinite(num) ? `$${num.toFixed(2)}` : "$0.00";
 }
 
+// Kids (age-based numbering) then Adult (standard S–3XL) — mirrors
+// backend/utils/jerseySizes.js exactly; kept as a separate constant here
+// since the frontend has no shared module with the backend.
+const JERSEY_SIZES = ["20", "22", "24", "26", "28", "S", "M", "L", "XL", "XXL", "3XL"];
+
 // Shared by three places: the Head Coach's own-team tab (CoachDashboard,
 // basePath "/teams/mine/jersey-orders"), an individual Player's own page
 // (PlayerJerseyOrderPage, same "mine" basePath), and the Admin's per-team
@@ -33,6 +38,8 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
   // Self-service register form (individual Player login only).
   const [selfName, setSelfName] = useState("");
   const [selfNumber, setSelfNumber] = useState("");
+  const [selfSize, setSelfSize] = useState("");
+  const [selfNote, setSelfNote] = useState("");
   const [selfSaving, setSelfSaving] = useState(false);
   const [selfError, setSelfError] = useState("");
 
@@ -40,13 +47,18 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
   const [pickAthleteId, setPickAthleteId] = useState("");
   const [pickName, setPickName] = useState("");
   const [pickNumber, setPickNumber] = useState("");
+  const [pickSize, setPickSize] = useState("");
+  const [pickNote, setPickNote] = useState("");
   const [pickSaving, setPickSaving] = useState(false);
   const [pickError, setPickError] = useState("");
 
-  // Inline edit (jersey name/number) — self's own row or any row for staff.
+  // Inline edit (jersey name/number/size/note) — self's own row or any row
+  // for staff.
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState("");
   const [editNumber, setEditNumber] = useState("");
+  const [editSize, setEditSize] = useState("");
+  const [editNote, setEditNote] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Staff-only payment editor.
@@ -89,11 +101,22 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
       setSelfError(t("jerseyOrderManager.jerseyNumberInvalid"));
       return;
     }
+    if (!selfSize) {
+      setSelfError(t("jerseyOrderManager.sizeRequired"));
+      return;
+    }
     setSelfSaving(true);
     try {
-      await api.post(basePath, { jerseyName: selfName.trim(), jerseyNumber: number });
+      await api.post(basePath, {
+        jerseyName: selfName.trim(),
+        jerseyNumber: number,
+        jerseySize: selfSize,
+        note: selfNote.trim(),
+      });
       setSelfName("");
       setSelfNumber("");
+      setSelfSize("");
+      setSelfNote("");
       load();
     } catch (err) {
       setSelfError(err.response?.data?.message || t("jerseyOrderManager.failedToRegister"));
@@ -118,16 +141,24 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
       setPickError(t("jerseyOrderManager.jerseyNumberInvalid"));
       return;
     }
+    if (!pickSize) {
+      setPickError(t("jerseyOrderManager.sizeRequired"));
+      return;
+    }
     setPickSaving(true);
     try {
       await api.post(`${basePath}/register-admin`, {
         athleteId: pickAthleteId,
         jerseyName: pickName.trim(),
         jerseyNumber: number,
+        jerseySize: pickSize,
+        note: pickNote.trim(),
       });
       setPickAthleteId("");
       setPickName("");
       setPickNumber("");
+      setPickSize("");
+      setPickNote("");
       load();
     } catch (err) {
       setPickError(err.response?.data?.message || t("jerseyOrderManager.failedToRegister"));
@@ -140,12 +171,16 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
     setEditingId(order._id);
     setEditName(order.jerseyName);
     setEditNumber(String(order.jerseyNumber));
+    setEditSize(order.jerseySize || "");
+    setEditNote(order.note || "");
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditName("");
     setEditNumber("");
+    setEditSize("");
+    setEditNote("");
   };
 
   const saveEdit = async (order) => {
@@ -158,9 +193,18 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
       alert(t("jerseyOrderManager.jerseyNumberInvalid"));
       return;
     }
+    if (!editSize) {
+      alert(t("jerseyOrderManager.sizeRequired"));
+      return;
+    }
     setSavingEdit(true);
     try {
-      await api.patch(`${basePath}/${order._id}`, { jerseyName: editName.trim(), jerseyNumber: number });
+      await api.patch(`${basePath}/${order._id}`, {
+        jerseyName: editName.trim(),
+        jerseyNumber: number,
+        jerseySize: editSize,
+        note: editNote.trim(),
+      });
       cancelEdit();
       load();
     } catch (err) {
@@ -263,6 +307,25 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
             <label>{t("jerseyOrderManager.jerseyNumberLabel")}</label>
             <input type="number" min="0" max="99" value={selfNumber} onChange={(e) => setSelfNumber(e.target.value)} required />
           </div>
+          <div className="field">
+            <label>{t("jerseyOrderManager.sizeLabel")}</label>
+            <select value={selfSize} onChange={(e) => setSelfSize(e.target.value)} required>
+              <option value="">{t("jerseyOrderManager.sizeChoosePlaceholder")}</option>
+              {JERSEY_SIZES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label>{t("jerseyOrderManager.noteLabel")}</label>
+            <input
+              value={selfNote}
+              onChange={(e) => setSelfNote(e.target.value)}
+              placeholder={t("jerseyOrderManager.notePlaceholder")}
+            />
+          </div>
           {selfError && <div className="error-text">{selfError}</div>}
           <button className="btn btn-primary" disabled={selfSaving}>
             {selfSaving ? t("jerseyOrderManager.registering") : t("jerseyOrderManager.registerButton")}
@@ -295,6 +358,25 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
               <label>{t("jerseyOrderManager.jerseyNumberLabel")}</label>
               <input type="number" min="0" max="99" value={pickNumber} onChange={(e) => setPickNumber(e.target.value)} required />
             </div>
+            <div className="field" style={{ flex: 1, minWidth: 100 }}>
+              <label>{t("jerseyOrderManager.sizeLabel")}</label>
+              <select value={pickSize} onChange={(e) => setPickSize(e.target.value)} required>
+                <option value="">{t("jerseyOrderManager.sizeChoosePlaceholder")}</option>
+                {JERSEY_SIZES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="field">
+            <label>{t("jerseyOrderManager.noteLabel")}</label>
+            <input
+              value={pickNote}
+              onChange={(e) => setPickNote(e.target.value)}
+              placeholder={t("jerseyOrderManager.notePlaceholder")}
+            />
           </div>
           {pickError && <div className="error-text">{pickError}</div>}
           <button className="btn btn-primary" disabled={pickSaving} style={{ marginTop: 8 }}>
@@ -311,6 +393,8 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
               <th>{t("common.name")}</th>
               <th>{t("jerseyOrderManager.colJerseyName")}</th>
               <th>{t("jerseyOrderManager.colJerseyNumber")}</th>
+              <th>{t("jerseyOrderManager.colSize")}</th>
+              <th>{t("jerseyOrderManager.colNote")}</th>
               <th>{t("jerseyOrderManager.colPaid")}</th>
               <th>{t("common.actions")}</th>
             </tr>
@@ -357,6 +441,27 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
                       />
                     ) : (
                       `#${order.jerseyNumber}`
+                    )}
+                  </td>
+                  <td data-label={t("jerseyOrderManager.colSize")}>
+                    {isEditing ? (
+                      <select value={editSize} onChange={(e) => setEditSize(e.target.value)} style={{ maxWidth: 80 }}>
+                        <option value="">{t("jerseyOrderManager.sizeChoosePlaceholder")}</option>
+                        {JERSEY_SIZES.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      order.jerseySize
+                    )}
+                  </td>
+                  <td data-label={t("jerseyOrderManager.colNote")}>
+                    {isEditing ? (
+                      <input value={editNote} onChange={(e) => setEditNote(e.target.value)} style={{ maxWidth: 140 }} />
+                    ) : (
+                      order.note || "—"
                     )}
                   </td>
                   <td data-label={t("jerseyOrderManager.colPaid")}>
@@ -459,7 +564,7 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
             })}
             {orders.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ textAlign: "center", color: "#777" }}>
+                <td colSpan={8} style={{ textAlign: "center", color: "#777" }}>
                   {t("jerseyOrderManager.noneYet")}
                 </td>
               </tr>

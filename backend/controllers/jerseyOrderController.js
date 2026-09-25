@@ -1,6 +1,7 @@
 const Team = require("../models/Team");
 const Athlete = require("../models/Athlete");
 const { notifyAdmins, notifyTeamCoaches } = require("../utils/notify");
+const { JERSEY_SIZES } = require("../utils/jerseySizes");
 
 // Every handler below comes in a "mine" flavor (Head Coach/Player acting on
 // THEIR OWN team, taken from the verified JWT's req.adminTeam — never a
@@ -36,6 +37,8 @@ function shapeOrder(o) {
     photoUrl: o.photoUrl,
     jerseyName: o.jerseyName,
     jerseyNumber: o.jerseyNumber,
+    jerseySize: o.jerseySize,
+    note: o.note || "",
     registeredBy: o.registeredBy,
     feePaidAmount: o.feePaidAmount,
     feePaid: o.feePaid,
@@ -52,6 +55,23 @@ function shapeTeamOrders(team) {
       .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
       .map(shapeOrder),
   };
+}
+
+// Shared validation for jerseyName/jerseyNumber/jerseySize on a brand-new
+// order — all three required (note is always optional). Returns
+// { error: "..." } or the cleaned { name, number, size, note }.
+function validateNewOrderFields(body) {
+  const name = (body.jerseyName || "").trim();
+  const number = Number(body.jerseyNumber);
+  const size = body.jerseySize;
+  if (!name) return { error: "A jersey name is required" };
+  if (!Number.isFinite(number) || number < 0 || number > 99) {
+    return { error: "Jersey number must be between 0 and 99" };
+  }
+  if (!JERSEY_SIZES.includes(size)) {
+    return { error: `Jersey size must be one of: ${JERSEY_SIZES.join(", ")}` };
+  }
+  return { name, number, size, note: (body.note || "").trim() };
 }
 
 // ---- list ----------------------------------------------------------------
@@ -101,20 +121,17 @@ exports.registerMyJerseyOrder = async (req, res) => {
       return res.status(409).json({ message: "You've already registered a jersey order — edit it instead." });
     }
 
-    const { jerseyName, jerseyNumber } = req.body;
-    const name = (jerseyName || "").trim();
-    const number = Number(jerseyNumber);
-    if (!name) return res.status(400).json({ message: "A jersey name is required" });
-    if (!Number.isFinite(number) || number < 0 || number > 99) {
-      return res.status(400).json({ message: "Jersey number must be between 0 and 99" });
-    }
+    const result = validateNewOrderFields(req.body);
+    if (result.error) return res.status(400).json({ message: result.error });
 
     team.jerseyOrders.push({
       athlete: athlete._id,
       fullName: athlete.fullName,
       photoUrl: athlete.photoUrl || null,
-      jerseyName: name,
-      jerseyNumber: number,
+      jerseyName: result.name,
+      jerseyNumber: result.number,
+      jerseySize: result.size,
+      note: result.note,
       registeredBy: null,
     });
     await team.save();
@@ -127,9 +144,10 @@ exports.registerMyJerseyOrder = async (req, res) => {
 // ---- register (on behalf) --------------------------------------------------
 
 // POST .../jersey-orders/register-admin  (Head Coach, own team via "mine";
-// Admin, any team via :id) — body: { athleteId, jerseyName, jerseyNumber }.
+// Admin, any team via :id) — body: { athleteId, jerseyName, jerseyNumber,
+// jerseySize, note? }.
 async function registerOnBehalf(req, res, team) {
-  const { athleteId, jerseyName, jerseyNumber } = req.body;
+  const { athleteId } = req.body;
   const athlete = await Athlete.findById(athleteId);
   if (!athlete) return res.status(404).json({ message: "Athlete not found" });
   const assignment = athlete.assignments.find((a) => a.team === team.name);
@@ -139,19 +157,17 @@ async function registerOnBehalf(req, res, team) {
     return res.status(409).json({ message: "This athlete already has a jersey order — edit it instead." });
   }
 
-  const name = (jerseyName || "").trim();
-  const number = Number(jerseyNumber);
-  if (!name) return res.status(400).json({ message: "A jersey name is required" });
-  if (!Number.isFinite(number) || number < 0 || number > 99) {
-    return res.status(400).json({ message: "Jersey number must be between 0 and 99" });
-  }
+  const result = validateNewOrderFields(req.body);
+  if (result.error) return res.status(400).json({ message: result.error });
 
   team.jerseyOrders.push({
     athlete: athlete._id,
     fullName: athlete.fullName,
     photoUrl: athlete.photoUrl || null,
-    jerseyName: name,
-    jerseyNumber: number,
+    jerseyName: result.name,
+    jerseyNumber: result.number,
+    jerseySize: result.size,
+    note: result.note,
     registeredBy: req.adminId,
   });
   await team.save();
@@ -178,12 +194,13 @@ exports.registerJerseyOrderOnBehalfAdmin = async (req, res) => {
   }
 };
 
-// ---- edit (name/number) -----------------------------------------------------
+// ---- edit (name/number/size/note) -------------------------------------------
 
-// PATCH .../jersey-orders/:orderId — free to edit any time (name/number
-// never gates approval, same reasoning as Athlete.assignments.jerseyNumber
-// being pure squad-list bookkeeping). A Player may only edit their OWN
-// order; Head Coach/Admin may edit any order on the team they're scoped to.
+// PATCH .../jersey-orders/:orderId — free to edit any time (none of these
+// fields ever gate approval, same reasoning as Athlete.assignments.
+// jerseyNumber being pure squad-list bookkeeping). A Player may only edit
+// their OWN order; Head Coach/Admin may edit any order on the team they're
+// scoped to. Every field is optional here — only what's sent gets changed.
 async function updateOrder(req, res, team) {
   const order = team.jerseyOrders.id(req.params.orderId);
   if (!order) return res.status(404).json({ message: "Jersey order not found" });
@@ -192,7 +209,7 @@ async function updateOrder(req, res, team) {
   const isStaff = req.adminRole === "HEAD_COACH" || req.adminRole === "ADMIN";
   if (!isOwnRow && !isStaff) return res.status(403).json({ message: "Access denied" });
 
-  const { jerseyName, jerseyNumber } = req.body;
+  const { jerseyName, jerseyNumber, jerseySize, note } = req.body;
   if (jerseyName !== undefined) {
     const name = (jerseyName || "").trim();
     if (!name) return res.status(400).json({ message: "A jersey name is required" });
@@ -204,6 +221,15 @@ async function updateOrder(req, res, team) {
       return res.status(400).json({ message: "Jersey number must be between 0 and 99" });
     }
     order.jerseyNumber = number;
+  }
+  if (jerseySize !== undefined) {
+    if (!JERSEY_SIZES.includes(jerseySize)) {
+      return res.status(400).json({ message: `Jersey size must be one of: ${JERSEY_SIZES.join(", ")}` });
+    }
+    order.jerseySize = jerseySize;
+  }
+  if (note !== undefined) {
+    order.note = (note || "").trim();
   }
   await team.save();
   res.json(shapeTeamOrders(team));

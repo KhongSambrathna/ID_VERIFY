@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { JERSEY_SIZES } = require("../utils/jerseySizes");
 
 // One "jersey order" = one player's request to have a shirt printed with a
 // given name/number for this team — self-registered from an individual
@@ -16,6 +17,12 @@ const jerseyOrderSchema = new mongoose.Schema(
     // fullName (a nickname/short name is common).
     jerseyName: { type: String, required: true, trim: true },
     jerseyNumber: { type: Number, required: true, min: 0, max: 99 },
+    // Kids/Adult size — see utils/jerseySizes.js for the fixed option list.
+    jerseySize: { type: String, required: true, enum: JERSEY_SIZES },
+    // Free-text note from whoever placed the order — e.g. a special request
+    // or a detail that doesn't fit any other field. Optional, never gates
+    // anything.
+    note: { type: String, default: "", trim: true },
     // null = the player ordered it themselves; set = which Admin/Head Coach
     // account registered it on their behalf.
     registeredBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
@@ -29,8 +36,8 @@ const jerseyOrderSchema = new mongoose.Schema(
     feePaid: { type: Boolean, default: false },
     feePaidAt: { type: Date, default: null },
     feePaidBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
-    // A Player can freely change their own jersey name/number, but can't
-    // remove the order outright — this just flags it as "awaiting Admin/
+    // A Player can freely change their own jersey name/number/size/note,
+    // but can't remove the order outright — this just flags it as "awaiting Admin/
     // Head Coach confirmation," same pattern as Athlete.assignments'
     // pendingRemoval and Tournament.registrationSchema's pendingRemoval.
     // The order stays fully in place until staff either confirms the
