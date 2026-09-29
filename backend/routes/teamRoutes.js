@@ -30,6 +30,8 @@ const {
   updateTeamJerseyOrderAdmin,
   setMyTeamJerseyOrderPaid,
   setTeamJerseyOrderPaidAdmin,
+  syncMyTeamJerseyOrder,
+  syncTeamJerseyOrderAdmin,
   removeMyTeamJerseyOrder,
   removeTeamJerseyOrderAdmin,
   keepMyTeamJerseyOrder,
@@ -88,6 +90,12 @@ router.patch(
   requireRole("HEAD_COACH"),
   setMyTeamJerseyOrderPaid
 );
+router.patch(
+  "/mine/jersey-orders/:orderId/sync",
+  requireAuth,
+  requireRole("HEAD_COACH"),
+  syncMyTeamJerseyOrder
+);
 router.delete(
   "/mine/jersey-orders/:orderId",
   requireAuth,
@@ -116,6 +124,7 @@ router.get("/:id/jersey-orders", listTeamJerseyOrders);
 router.post("/:id/jersey-orders/register-admin", registerJerseyOrderOnBehalfAdmin);
 router.patch("/:id/jersey-orders/:orderId", updateTeamJerseyOrderAdmin);
 router.patch("/:id/jersey-orders/:orderId/paid", setTeamJerseyOrderPaidAdmin);
+router.patch("/:id/jersey-orders/:orderId/sync", syncTeamJerseyOrderAdmin);
 router.delete("/:id/jersey-orders/:orderId", removeTeamJerseyOrderAdmin);
 router.patch("/:id/jersey-orders/:orderId/keep", keepTeamJerseyOrderAdmin);
 

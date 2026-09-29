@@ -28,7 +28,7 @@ export default function CoachDashboard() {
   const [searchParams] = useSearchParams();
   // Lets a link from elsewhere (e.g. a tournament's squad page) land
   // directly on a specific tab, e.g. /coach?tab=lineups.
-  const validTabs = ["athletes", "lineups", "formations", "startingxi", "jerseyorders", "accounts"];
+  const validTabs = ["athletes", "owing", "lineups", "formations", "startingxi", "jerseyorders", "accounts"];
   const tabFromUrl = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState(validTabs.includes(tabFromUrl) ? tabFromUrl : "athletes");
 
@@ -59,6 +59,20 @@ export default function CoachDashboard() {
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoRemoving, setLogoRemoving] = useState(false);
   const [logoError, setLogoError] = useState("");
+
+  // OWING TAB — a quick, dedicated place to find who on this team currently
+  // owes a fee, instead of scrolling the whole "My Team" grid looking for
+  // debt badges. Reuses `athletes` (already fetched below) rather than a
+  // separate call, and reuses the Debt Report's own cash-recording/
+  // Messenger/copy-message text keys and behavior for consistency.
+  const [owingSearch, setOwingSearch] = useState("");
+  const [cashOpenId, setCashOpenId] = useState(null);
+  const [cashAmount, setCashAmount] = useState("");
+  const [cashMethod, setCashMethod] = useState("CASH");
+  const [cashNote, setCashNote] = useState("");
+  const [cashSaving, setCashSaving] = useState(false);
+  const [cashError, setCashError] = useState("");
+  const [copiedId, setCopiedId] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -214,6 +228,82 @@ export default function CoachDashboard() {
 
   const pendingCount = athletes.filter((a) => a.approvalStatus === "pending" || a.pendingRemoval).length;
 
+  // --- Owing tab helpers (same shape as DebtReportPage's, scoped to this
+  // team's already-fetched `athletes`) ---
+  const owingQ = owingSearch.trim().toLowerCase();
+  const owingRows = athletes
+    .filter((a) => a.feeOwed > 0)
+    .filter(
+      (a) =>
+        !owingQ ||
+        [a.fullName, a.khmerName, a.role, a.verifyId].filter(Boolean).some((f) => f.toLowerCase().includes(owingQ))
+    )
+    .sort((a, b) => b.feeOwed - a.feeOwed);
+  const owingTotal = owingRows.reduce((sum, a) => sum + (a.feeOwed || 0), 0);
+  const owingCount = athletes.filter((a) => a.feeOwed > 0).length;
+
+  const openCashForm = (a) => {
+    setCashOpenId(a.assignmentId);
+    setCashAmount(String(a.feeOwed));
+    setCashMethod("CASH");
+    setCashNote("");
+    setCashError("");
+  };
+
+  const closeCashForm = () => {
+    setCashOpenId(null);
+    setCashError("");
+  };
+
+  const saveCashPayment = async (a) => {
+    const amount = Number(cashAmount);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > a.feeOwed) {
+      setCashError(t("debtReport.cashAmountInvalid"));
+      return;
+    }
+    setCashSaving(true);
+    setCashError("");
+    try {
+      await api.post("/payments/cash", {
+        athleteId: a._id,
+        assignmentId: a.assignmentId,
+        amount,
+        method: cashMethod,
+        note: cashNote,
+      });
+      setCashOpenId(null);
+      await loadData();
+    } catch (err) {
+      setCashError(err.response?.data?.message || t("debtReport.cashSaveFailed"));
+    } finally {
+      setCashSaving(false);
+    }
+  };
+
+  const feeBreakdownText = (a) =>
+    (a.fees || []).length
+      ? a.fees.map((f) => `$${f.amount}${f.note ? ` — ${f.note}` : ""}`).join(", ")
+      : t("debtReport.noFeeBreakdown");
+
+  // Pre-composes a ready-to-send debt reminder (name, team, total owed, and
+  // the itemized breakdown) and copies it to the clipboard — see
+  // DebtReportPage's copyDebtMessage for why this is always a manual
+  // paste + send, never automated.
+  const copyDebtMessage = async (a) => {
+    const msg = t("debtReport.messageTemplate")
+      .replace("{name}", a.fullName)
+      .replace("{amount}", a.feeOwed)
+      .replace("{team}", a.team || team || "—")
+      .replace("{details}", feeBreakdownText(a));
+    try {
+      await navigator.clipboard.writeText(msg);
+      setCopiedId(a.assignmentId);
+      setTimeout(() => setCopiedId((prev) => (prev === a.assignmentId ? null : prev)), 2000);
+    } catch {
+      window.prompt(t("debtReport.copyFallbackPrompt"), msg);
+    }
+  };
+
   // loading/error are checked INSIDE RequireActiveSubscription, not as an
   // early return before it. This dashboard's own data fetch
   // (GET /coach/my-team) is gated by the exact same subscription check as
@@ -250,6 +340,13 @@ export default function CoachDashboard() {
           onClick={() => setActiveTab("athletes")}
         >
           {t("coachDashboard.tabMyTeam")} ({athletes.length})
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "owing" ? "active" : ""}`}
+          onClick={() => setActiveTab("owing")}
+        >
+          {t("coachDashboard.tabOwing")}
+          {owingCount > 0 ? ` (${owingCount})` : ""}
         </button>
         <button
           className={`tab-btn ${activeTab === "lineups" ? "active" : ""}`}
@@ -364,6 +461,129 @@ export default function CoachDashboard() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* OWING TAB — everyone on this team who currently owes a fee, with
+          the same record-payment / Open Messenger / copy-message actions
+          as the Admin's full Debt Report, scoped to just this team. */}
+      {activeTab === "owing" && (
+        <div className="tab-content">
+          <div className="dash-header" style={{ marginBottom: 12 }}>
+            <h3 style={{ margin: 0 }}>{t("coachDashboard.tabOwing")}</h3>
+          </div>
+          <div className="field search-field" style={{ maxWidth: 260, marginBottom: 12 }}>
+            <input
+              placeholder={t("debtReport.searchPlaceholder")}
+              value={owingSearch}
+              onChange={(e) => setOwingSearch(e.target.value)}
+            />
+          </div>
+          <p className="help-text" style={{ fontWeight: 600 }}>
+            {owingRows.length === 0
+              ? t("debtReport.noOneOwes")
+              : `${owingRows.length} ${
+                  owingRows.length === 1
+                    ? t("debtReport.owingCountLabelSingular")
+                    : t("debtReport.owingCountLabelPlural")
+                } — $${owingTotal} ${t("debtReport.totalLabel")}`}
+          </p>
+
+          {owingRows.length > 0 && (
+            <div className="table-scroll">
+              <table className="athletes">
+                <thead>
+                  <tr>
+                    <th>{t("common.photo")}</th>
+                    <th>{t("debtReport.id")}</th>
+                    <th>{t("common.name")}</th>
+                    <th>{t("common.role")}</th>
+                    <th>{t("debtReport.owes")}</th>
+                    <th>{t("debtReport.note")}</th>
+                    <th>{t("common.actions")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {owingRows.map((a) => (
+                    <tr key={a.assignmentId}>
+                      <td data-label={t("common.photo")}>
+                        <img
+                          className="small-photo"
+                          src={a.photoUrl ? resolveFileUrl(a.photoUrl) : "https://placehold.co/50x50?text=Photo"}
+                          alt={a.fullName}
+                        />
+                      </td>
+                      <td data-label={t("debtReport.id")}>{a.verifyId}</td>
+                      <td data-label={t("common.name")} className="caps-display">{a.fullName}</td>
+                      <td data-label={t("common.role")}>{a.role || "—"}</td>
+                      <td data-label={t("debtReport.owes")}>
+                        <span className="badge rejected">${a.feeOwed}</span>
+                      </td>
+                      <td data-label={t("debtReport.note")}>{feeBreakdownText(a)}</td>
+                      <td data-label={t("common.actions")} className="actions-cell">
+                        <Link className="action-btn" to={`/admin/athlete/${a._id}/edit`}>
+                          {t("common.edit")}
+                        </Link>
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={() => (cashOpenId === a.assignmentId ? closeCashForm() : openCashForm(a))}
+                        >
+                          {t("debtReport.recordCash")}
+                        </button>
+                        {a.facebookProfileUrl && (
+                          <a className="action-btn" href={a.facebookProfileUrl} target="_blank" rel="noreferrer">
+                            {t("debtReport.openMessenger")}
+                          </a>
+                        )}
+                        <button type="button" className="action-btn" onClick={() => copyDebtMessage(a)}>
+                          {copiedId === a.assignmentId ? t("debtReport.copied") : t("debtReport.copyMessage")}
+                        </button>
+                        {cashOpenId === a.assignmentId && (
+                          <div className="field" style={{ width: "100%", marginTop: 8, maxWidth: 260 }}>
+                            <label>{t("debtReport.cashMethodLabel")}</label>
+                            <select value={cashMethod} onChange={(e) => setCashMethod(e.target.value)}>
+                              <option value="CASH">{t("debtReport.methodCash")}</option>
+                              <option value="ABA_QR">{t("debtReport.methodAbaQr")}</option>
+                            </select>
+                            <label style={{ marginTop: 6 }}>{t("debtReport.cashAmountLabel")}</label>
+                            <input
+                              type="number"
+                              min="0.01"
+                              max={a.feeOwed}
+                              step="0.01"
+                              value={cashAmount}
+                              onChange={(e) => setCashAmount(e.target.value)}
+                            />
+                            <label style={{ marginTop: 6 }}>{t("debtReport.cashNoteLabel")}</label>
+                            <input type="text" value={cashNote} onChange={(e) => setCashNote(e.target.value)} />
+                            {cashError && (
+                              <p className="error-text" style={{ margin: "4px 0" }}>
+                                {cashError}
+                              </p>
+                            )}
+                            <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                              <button
+                                type="button"
+                                className="btn btn-primary"
+                                disabled={cashSaving}
+                                onClick={() => saveCashPayment(a)}
+                              >
+                                {cashSaving ? t("debtReport.cashSavingBtn") : t("debtReport.cashSaveBtn")}
+                              </button>
+                              <button type="button" className="btn btn-outline" onClick={closeCashForm}>
+                                {t("debtReport.cashCancelBtn")}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

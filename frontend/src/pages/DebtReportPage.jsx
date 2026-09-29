@@ -29,6 +29,9 @@ export default function DebtReportPage() {
   const [cashNote, setCashNote] = useState("");
   const [cashSaving, setCashSaving] = useState(false);
   const [cashError, setCashError] = useState("");
+  // "Copy debt message" — briefly shows a "Copied!" state on whichever row's
+  // button was just clicked, per assignmentId.
+  const [copiedId, setCopiedId] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -85,6 +88,39 @@ export default function DebtReportPage() {
     }
   };
 
+  // Same "$10 — Uniform fee" breakdown already shown in the table's Note
+  // column, reused here so the copied message spells out exactly what the
+  // debt is FOR, not just the total.
+  const feeBreakdownText = (a) =>
+    (a.fees || []).length
+      ? a.fees.map((f) => `$${f.amount}${f.note ? ` — ${f.note}` : ""}`).join(", ")
+      : t("debtReport.noFeeBreakdown");
+
+  // Pre-composes a ready-to-send debt reminder for one person and copies it
+  // to the clipboard, so staff can open Messenger (see the "Open Messenger"
+  // link below) and just paste + send — no automated/bulk sending, this is
+  // always a human pressing Send themselves (see the Athlete model's
+  // facebookProfileUrl comment for why). Names the person, the team, the
+  // total owed, AND the itemized breakdown, so the message stands on its
+  // own without staff needing to add anything.
+  const copyDebtMessage = async (a) => {
+    const msg = t("debtReport.messageTemplate")
+      .replace("{name}", a.fullName)
+      .replace("{amount}", a.feeOwed)
+      .replace("{team}", a.team || "—")
+      .replace("{details}", feeBreakdownText(a));
+    try {
+      await navigator.clipboard.writeText(msg);
+      setCopiedId(a.assignmentId);
+      setTimeout(() => setCopiedId((prev) => (prev === a.assignmentId ? null : prev)), 2000);
+    } catch {
+      // Clipboard API blocked/unavailable (older browser, insecure context,
+      // permission denied) — fall back to a prompt so staff can still
+      // select-all + copy manually instead of the action silently failing.
+      window.prompt(t("debtReport.copyFallbackPrompt"), msg);
+    }
+  };
+
   const teams = useMemo(
     () => [...new Set(athletes.map((a) => a.team).filter(Boolean))].sort(),
     [athletes]
@@ -112,9 +148,27 @@ export default function DebtReportPage() {
       <div className="dash-header">
         <h2>{t("debtReport.title")}</h2>
         <p>{t("debtReport.intro")}</p>
+        <div className="dash-actions no-print">
+          <button type="button" className="btn btn-primary" onClick={() => window.print()}>
+            {t("debtReport.printButton")}
+          </button>
+        </div>
+        <p className="help-text no-print" style={{ marginTop: 4 }}>
+          {t("debtReport.printHint")}
+        </p>
       </div>
 
-      <div className="filter-row" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+      {/* .dash-header (above) is always hidden on print — this stands in
+          as the report's title/date on the printed page/PDF. */}
+      <div className="print-only" style={{ marginBottom: 16 }}>
+        <h2 style={{ margin: 0 }}>{t("debtReport.title")}</h2>
+        <p style={{ margin: "4px 0" }}>
+          {new Date().toLocaleDateString()}
+          {teamFilter ? ` — ${teamFilter}` : ""}
+        </p>
+      </div>
+
+      <div className="no-print filter-row" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <div className="field search-field" style={{ maxWidth: 260 }}>
           <input
             placeholder={t("debtReport.searchPlaceholder")}
@@ -163,7 +217,7 @@ export default function DebtReportPage() {
                     <th>{t("common.role")}</th>
                     <th>{t("debtReport.owes")}</th>
                     <th>{t("debtReport.note")}</th>
-                    <th>{t("common.actions")}</th>
+                    <th className="no-print">{t("common.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -188,7 +242,7 @@ export default function DebtReportPage() {
                           ? a.fees.map((f) => `$${f.amount}${f.note ? ` — ${f.note}` : ""}`).join(", ")
                           : "—"}
                       </td>
-                      <td data-label={t("common.actions")} className="actions-cell">
+                      <td data-label={t("common.actions")} className="actions-cell no-print">
                         <Link className="action-btn" to={`/admin/athlete/${a._id}/edit`}>
                           {t("common.edit")}
                         </Link>
@@ -198,6 +252,19 @@ export default function DebtReportPage() {
                           onClick={() => (cashOpenId === a.assignmentId ? closeCashForm() : openCashForm(a))}
                         >
                           {t("debtReport.recordCash")}
+                        </button>
+                        {a.facebookProfileUrl && (
+                          <a
+                            className="action-btn"
+                            href={a.facebookProfileUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {t("debtReport.openMessenger")}
+                          </a>
+                        )}
+                        <button type="button" className="action-btn" onClick={() => copyDebtMessage(a)}>
+                          {copiedId === a.assignmentId ? t("debtReport.copied") : t("debtReport.copyMessage")}
                         </button>
                         {cashOpenId === a.assignmentId && (
                           <div

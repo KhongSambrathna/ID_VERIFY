@@ -17,6 +17,10 @@ function flattenAssignments(athlete, teamFilter) {
     isAvailable: athlete.isAvailable,
     photoUrl: athlete.photoUrl,
     photoPublicId: athlete.photoPublicId,
+    // Admin/Head Coach only (see the Athlete model's comment) — the caller
+    // (athleteController.getAllAthletes / coachRoutes' /my-team) is
+    // responsible for stripping this back out when the caller is a Player.
+    facebookProfileUrl: athlete.facebookProfileUrl || null,
     status: athlete.status,
     verifyId: athlete.verifyId,
     qrCodeUrl: athlete.qrCodeUrl,

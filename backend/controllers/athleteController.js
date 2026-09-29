@@ -216,14 +216,71 @@ exports.createAthlete = async (req, res) => {
 // endpoint) Returns one row PER team/role assignment (see flattenAssignments)
 // — a person on 2 teams appears as 2 rows, each carrying that team's own
 // role and approval state.
+//
+// Optional query params (all opt-in — a caller that passes none of them
+// gets the exact same bare-array response as before, unchanged):
+//   ?q=...            free-text match on name/ID/team/role, same fields the
+//                      Admin Dashboard's search box used to match client-side.
+//   ?pendingOnly=true  only people with an assignment still awaiting Admin
+//                      action (pending approval or a pending removal) — used
+//                      by the Admin Dashboard's two Pending tabs so that
+//                      fetch stays small no matter how big the roster gets
+//                      (most people are already approved).
+//   ?page=&?limit=     paginates the (optionally filtered) result — used by
+//                      the Admin Dashboard's "All athletes" tab so it only
+//                      ever fetches one page (default 15 rows) at a time
+//                      instead of the whole roster. Response shape changes
+//                      to { rows, total, page, limit, totalPages } when
+//                      either is passed.
 exports.getAllAthletes = async (req, res) => {
   try {
     const isTeamScoped = req.adminRole === "HEAD_COACH" || req.adminRole === "PLAYER";
     const team = isTeamScoped ? req.adminTeam : req.query.team || null;
-    const filter = team ? { "assignments.team": team } : {};
+
+    const filter = {};
+    if (String(req.query.pendingOnly) === "true") {
+      // $elemMatch so "on this team" and "still pending" are required on
+      // the SAME assignment, not just anywhere in the person's array.
+      const pendingCond = { $or: [{ approvalStatus: "pending" }, { pendingRemoval: true }] };
+      filter.assignments = { $elemMatch: team ? { team, ...pendingCond } : pendingCond };
+    } else if (team) {
+      filter["assignments.team"] = team;
+    }
+
+    const q = (req.query.q || "").trim();
+    if (q) {
+      const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const pattern = new RegExp(escaped, "i");
+      filter.$or = [
+        { fullName: pattern },
+        { khmerName: pattern },
+        { verifyId: pattern },
+        { "assignments.team": pattern },
+        { "assignments.role": pattern },
+      ];
+    }
+
     const athletes = await Athlete.find(filter).sort({ createdAt: -1 });
     const rows = athletes.flatMap((a) => flattenAssignments(a, team));
-    res.json(rows);
+    // facebookProfileUrl is Admin/Head Coach only (see the Athlete model's
+    // comment) — a Player calling this same endpoint for their own team's
+    // roster must never receive it in the payload, not just have it hidden
+    // in the UI.
+    if (req.adminRole === "PLAYER") {
+      rows.forEach((r) => {
+        delete r.facebookProfileUrl;
+      });
+    }
+
+    if (req.query.page === undefined && req.query.limit === undefined) {
+      return res.json(rows);
+    }
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 15));
+    const total = rows.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const start = (page - 1) * limit;
+    res.json({ rows: rows.slice(start, start + limit), total, page, limit, totalPages });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -253,9 +310,13 @@ exports.getAthleteById = async (req, res) => {
     // documents — that's the whole point of the "verify document" self-edit
     // flow below, so it stays exempt from the strip.
     const isOwnRecord = req.adminRole === "PLAYER" && req.athleteId && String(req.athleteId) === String(athlete._id);
-    if (req.adminRole === "PLAYER" && !isOwnRecord) {
+    if (req.adminRole === "PLAYER") {
       const obj = athlete.toObject();
-      delete obj.supportingDocuments;
+      // facebookProfileUrl is Admin/Head Coach only — stripped even from a
+      // Player's OWN record, unlike supportingDocuments below which a
+      // Player can see (and manage) for themselves.
+      delete obj.facebookProfileUrl;
+      if (!isOwnRecord) delete obj.supportingDocuments;
       return res.json(obj);
     }
 
@@ -524,6 +585,34 @@ exports.updateAthlete = async (req, res) => {
       const teams = [...new Set(athlete.assignments.map((a) => a.team))];
       teams.forEach((team) => notifyTeamCoaches(team, text));
     }
+
+    res.json(athlete);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PUT /api/athletes/:id/facebook-link  (Admin any record; Head Coach only
+// their own team) — sets or clears this person's stored Facebook profile
+// link, used for the "Open Messenger" quick-link on the Debt Report and
+// Squad list pages (see the Athlete model's facebookProfileUrl comment).
+// Applies immediately and never touches approvalStatus — like fees and
+// jerseyNumber, this is pure staff bookkeeping, not an identity field, so a
+// Head Coach setting it never sends their assignment back to "pending". A
+// Player can never reach this route (see athleteRoutes.js).
+exports.updateFacebookProfileUrl = async (req, res) => {
+  try {
+    const athlete = await Athlete.findById(req.params.id);
+    if (!athlete) return res.status(404).json({ message: "Athlete not found" });
+
+    const isHeadCoach = req.adminRole === "HEAD_COACH";
+    if (isHeadCoach && !athlete.assignments.some((a) => a.team === req.adminTeam)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const url = String(req.body.facebookProfileUrl || "").trim();
+    athlete.facebookProfileUrl = url || null;
+    await athlete.save();
 
     res.json(athlete);
   } catch (err) {

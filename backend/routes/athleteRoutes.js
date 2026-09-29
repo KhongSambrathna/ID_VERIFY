@@ -8,6 +8,7 @@ const {
   getAllAthletes,
   getAthleteById,
   updateAthlete,
+  updateFacebookProfileUrl,
   addAssignment,
   updateAssignment,
   removeAssignment,
@@ -88,6 +89,16 @@ router.put(
   updateAthlete
 );
 router.put("/:id/renew", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, renewVerification);
+// Admin/Head Coach only — sets/clears the stored Facebook profile link used
+// for the "Open Messenger" quick-link (Debt Report, Squad list). Never
+// reachable by PLAYER, matching the controller stripping this field out of
+// every response a Player can see (see updateFacebookProfileUrl).
+router.put(
+  "/:id/facebook-link",
+  requireRole("ADMIN", "HEAD_COACH"),
+  requireActiveSubscription,
+  updateFacebookProfileUrl
+);
 
 // Team/role assignments — a person can have several, one per team (or even
 // several on the same team, e.g. Player + Assistant Coach). Add/edit/remove

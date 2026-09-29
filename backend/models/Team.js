@@ -29,6 +29,15 @@ const jerseyOrderSchema = new mongoose.Schema(
     // number of Fan orders even though they can still only have one
     // non-Fan order of their own.
     isFan: { type: Boolean, default: false },
+    // Whether this order's jerseyNumber has been manually pushed onto the
+    // athlete's own profile/squad-list record (see jerseyOrderController's
+    // syncOrder/syncAthleteJerseyNumber) — a staff-clicked "Synchronize"
+    // button, not automatic, since being paid isn't the same as the shirt
+    // actually being printed. Resets to false whenever jerseyNumber
+    // changes after a sync, as a reminder it may need re-syncing.
+    // Deleting/removing this order never un-syncs it — the athlete's
+    // profile simply keeps whatever number was last pushed to it.
+    syncedToProfile: { type: Boolean, default: false },
     // Free-text note from whoever placed the order — e.g. a special request
     // or a detail that doesn't fit any other field. Optional, never gates
     // anything.

@@ -69,7 +69,12 @@ const assignmentSchema = new mongoose.Schema(
     // different number on each, so this lives on the assignment, not the
     // shared profile. Purely a squad-list/lineup convenience: it never
     // gates approval (a Head Coach setting it doesn't send anything back to
-    // "pending"), same reasoning as fees being pure bookkeeping.
+    // "pending"), same reasoning as fees being pure bookkeeping. Also kept
+    // in sync automatically once this athlete's own (non-Fan) jersey PRINT
+    // order (see Team.jerseyOrderSchema) is marked fully paid — see
+    // jerseyOrderController's syncAthleteJerseyNumber — so this always
+    // reflects what actually got printed once that's confirmed, without
+    // overwriting it while the order's still being decided/paid.
     jerseyNumber: { type: Number, min: 0, max: 99, default: null },
   },
   { timestamps: true }
@@ -88,6 +93,21 @@ const athleteSchema = new mongoose.Schema(
     dateOfBirth: { type: Date },
     gender: { type: String, enum: ["male", "female", "other"] },
     address: { type: String },
+    // Link to this person's own Facebook profile — stored purely so
+    // Admin/Head Coach can quickly open a Messenger chat with them (e.g. to
+    // remind about an upcoming match or an unpaid fee) and paste a
+    // pre-composed message to send themselves. There is no automated or
+    // bulk send from here — Facebook has no safe/official way to message
+    // from a personal account like that, only from a Page — so this is
+    // just a quick-open link + copy-ready text, sent one at a time by a
+    // human. Set via PUT /:id/facebook-link (not the general profile-edit
+    // flow), so changing it never sends a Head Coach's assignment back to
+    // "pending" the way editing fullName/address does — same reasoning as
+    // fees/jerseyNumber being pure staff bookkeeping. Admin/Head Coach
+    // only: never shown to a Player (their own profile or anyone else's),
+    // never in a public API response (search/verify/share), and never on a
+    // printed/exported card.
+    facebookProfileUrl: { type: String, default: null, trim: true },
     assignments: { type: [assignmentSchema], default: [] },
     isAvailable: {
       // whether the athlete is currently available to play (not injured/suspended/etc.)

@@ -170,6 +170,10 @@ export default function SquadListManager({ team, athletes, readOnly = false }) {
   const [exportingId, setExportingId] = useState(null);
   const exportRef = useRef(null);
   const [exportTarget, setExportTarget] = useState(null); // lineup being rendered off-screen for export
+  // "Copy match notification" — briefly shows a "Copied!" state on whichever
+  // athlete's button was just clicked. Admin/Head Coach only (never shown
+  // when readOnly, i.e. a Player viewing their own team's squad lists).
+  const [copiedAthleteId, setCopiedAthleteId] = useState(null);
 
   useEffect(() => {
     if (team) load();
@@ -318,6 +322,26 @@ export default function SquadListManager({ team, athletes, readOnly = false }) {
       alert(t("squadListManager.failedExportPdf"));
     } finally {
       setExportingId(null);
+    }
+  };
+
+  // Pre-composes a ready-to-send match notification for one squad member and
+  // copies it to the clipboard, so staff can open Messenger (see the "Open
+  // Messenger" link) and just paste + send. Same safe, human-in-the-loop
+  // pattern as the Debt Report's copy-message button — never automated or
+  // bulk-sent (see the Athlete model's facebookProfileUrl comment).
+  const copyMatchMessage = async (athlete, lineup) => {
+    if (!athlete) return;
+    const msg = t("squadListManager.messageTemplate")
+      .replace("{name}", athlete.fullName || "")
+      .replace("{squadName}", lineup?.name || "")
+      .replace("{team}", lineup?.team || team || "");
+    try {
+      await navigator.clipboard.writeText(msg);
+      setCopiedAthleteId(athlete._id);
+      setTimeout(() => setCopiedAthleteId((prev) => (prev === athlete._id ? null : prev)), 2000);
+    } catch {
+      window.prompt(t("squadListManager.copyFallbackPrompt"), msg);
     }
   };
 
@@ -474,6 +498,29 @@ export default function SquadListManager({ team, athletes, readOnly = false }) {
                               {item.athleteId?.gender || "—"}
                             </p>
                           </div>
+                          {!readOnly && (
+                            <div className="lineup-athlete-actions">
+                              {item.athleteId?.facebookProfileUrl && (
+                                <a
+                                  className="link-btn"
+                                  href={item.athleteId.facebookProfileUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  {t("squadListManager.openMessenger")}
+                                </a>
+                              )}
+                              <button
+                                type="button"
+                                className="link-btn"
+                                onClick={() => copyMatchMessage(item.athleteId, lineup)}
+                              >
+                                {copiedAthleteId === item.athleteId?._id
+                                  ? t("squadListManager.copied")
+                                  : t("squadListManager.copyMessage")}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

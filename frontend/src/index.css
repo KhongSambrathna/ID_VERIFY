@@ -860,6 +860,13 @@ a {
   gap: 10px;
   flex-wrap: wrap;
 }
+.pagination-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
 .filter-row {
   display: flex;
   gap: 16px;
@@ -903,8 +910,18 @@ table.athletes th {
 table.athletes tr:last-child td {
   border-bottom: none;
 }
+/* Wraps into 2-3 neat rows once there are several buttons (View, Edit,
+   Record payment, Open Messenger, Copy message, ...) instead of forcing
+   them onto one long line that pushes the whole table into a horizontal
+   scroll. max-width caps how wide this column gets so it actually wraps
+   rather than just growing sideways (table columns otherwise size to fit
+   their content). The mobile card-view breakpoint below resets max-width
+   back to full width, since that layout already stacks the row. */
 table.athletes .actions-cell {
-  white-space: nowrap;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  max-width: 210px;
 }
 
 .badge {
@@ -1380,6 +1397,14 @@ table.athletes .actions-cell {
   top: 0;
 }
 
+/* Hidden on-screen, shown only for print — the reverse of .no-print, for
+   content (a report's own title/date) that should appear on the printed
+   page even though it sits outside — or instead of — a .dash-header,
+   which is always hidden on print (see below). */
+.print-only {
+  display: none;
+}
+
 @media print {
   @page {
     size: A4;
@@ -1389,6 +1414,9 @@ table.athletes .actions-cell {
   .dash-header,
   .no-print {
     display: none !important;
+  }
+  .print-only {
+    display: block !important;
   }
   .container {
     padding: 0;
@@ -1651,6 +1679,9 @@ table.athletes .actions-cell {
     text-align: center;
     width: 100%;
   }
+  .pagination-row {
+    justify-content: center;
+  }
   .search-field {
     max-width: 100%;
   }
@@ -1711,6 +1742,7 @@ table.athletes .actions-cell {
     justify-content: flex-start;
     gap: 6px 14px;
     padding-top: 10px;
+    max-width: none;
   }
   table.athletes td.actions-cell::before {
     content: none;
@@ -1919,6 +1951,12 @@ table.athletes .actions-cell {
   color: var(--gold);
   width: 20px;
   text-align: right;
+  flex-shrink: 0;
+}
+.lineup-athlete-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
 }
 .tiny-photo {

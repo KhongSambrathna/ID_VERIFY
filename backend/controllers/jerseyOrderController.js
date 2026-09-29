@@ -39,6 +39,7 @@ function shapeOrder(o) {
     jerseyNumber: o.jerseyNumber,
     jerseySize: o.jerseySize,
     isFan: !!o.isFan,
+    syncedToProfile: !!o.syncedToProfile,
     note: o.note || "",
     registeredBy: o.registeredBy,
     feePaidAmount: o.feePaidAmount,
@@ -84,6 +85,24 @@ function isNumberTaken(team, number, excludeId) {
   return team.jerseyOrders.some(
     (o) => !o.isFan && o.jerseyNumber === number && String(o._id) !== String(excludeId)
   );
+}
+
+// Pushes this order's jerseyNumber onto the athlete's own profile/squad-
+// list record (see Athlete.js's assignments.jerseyNumber). Deliberately
+// NOT automatic off payment status — being paid isn't the same as the
+// shirt actually being printed, so this only runs when staff click the
+// "Synchronize" button (see syncOrder below) once the real jersey is
+// done. Never called for a Fan/supporter order — that's not the
+// athlete's own jersey, so it never touches their profile. Best-effort:
+// if the athlete/assignment can't be found, this just no-ops rather than
+// failing the jersey-order request itself.
+async function syncAthleteJerseyNumber(teamName, athleteId, jerseyNumber) {
+  const athlete = await Athlete.findById(athleteId);
+  if (!athlete) return;
+  const assignment = athlete.assignments.find((a) => a.team === teamName);
+  if (!assignment) return;
+  assignment.jerseyNumber = jerseyNumber;
+  await athlete.save();
 }
 
 // ---- list ----------------------------------------------------------------
@@ -291,6 +310,13 @@ async function updateOrder(req, res, team) {
     }
   }
 
+  // A changed number invalidates any earlier sync to the athlete's
+  // profile — flip the flag back off as a reminder to re-sync, rather
+  // than silently leaving a stale number on their profile.
+  if (jerseyNumber !== undefined && nextNumber !== order.jerseyNumber) {
+    order.syncedToProfile = false;
+  }
+
   order.jerseyName = nextName;
   order.jerseyNumber = nextNumber;
   order.jerseySize = nextSize;
@@ -362,6 +388,49 @@ exports.setTeamJerseyOrderPaidAdmin = async (req, res) => {
     const team = await resolveTeamById(req, res);
     if (!team) return;
     await setPaid(req, res, team);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ---- sync to athlete profile --------------------------------------------
+
+// PATCH .../jersey-orders/:orderId/sync  (Admin, or Head Coach for their
+// own team — staff only, same as setPaid). Manually pushes this order's
+// jerseyNumber onto the athlete's own profile (see
+// syncAthleteJerseyNumber above) and marks it synced. A deliberate staff
+// button rather than something automatic off payment status — click it
+// once the real jersey has actually been printed. Removing/deleting this
+// order afterward never un-syncs it; the athlete's profile just keeps
+// whatever number was last pushed to it.
+async function syncOrder(req, res, team) {
+  const order = team.jerseyOrders.id(req.params.orderId);
+  if (!order) return res.status(404).json({ message: "Jersey order not found" });
+  if (order.isFan) {
+    return res.status(400).json({ message: "Fan/supporter orders don't sync to the athlete's profile." });
+  }
+
+  await syncAthleteJerseyNumber(team.name, order.athlete, order.jerseyNumber);
+  order.syncedToProfile = true;
+  await team.save();
+  res.json(shapeTeamOrders(team));
+}
+
+exports.syncMyTeamJerseyOrder = async (req, res) => {
+  try {
+    const team = await resolveMyTeam(req, res);
+    if (!team) return;
+    await syncOrder(req, res, team);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.syncTeamJerseyOrderAdmin = async (req, res) => {
+  try {
+    const team = await resolveTeamById(req, res);
+    if (!team) return;
+    await syncOrder(req, res, team);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

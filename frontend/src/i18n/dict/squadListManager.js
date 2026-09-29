@@ -23,6 +23,12 @@ export const km = {
   "squadListManager.failedExportPdf": "មិនអាចនាំចេញបញ្ជីកីឡាករជា PDF បានទេ។ សូមសាកល្បងម្តងទៀត។",
   "squadListManager.unknownAthlete": "មិនស្គាល់ឈ្មោះ",
   "squadListManager.dobDash": "ថ្ងៃខែឆ្នាំកំណើត —",
+  "squadListManager.openMessenger": "បើក Messenger",
+  "squadListManager.copyMessage": "ចម្លងសារ",
+  "squadListManager.copied": "បានចម្លង!",
+  "squadListManager.messageTemplate":
+    "សួស្ដី {name}, សូមជូនដំណឹងថាអ្នកត្រូវចូលរួមប្រកួតតាមបញ្ជី \"{squadName}\" របស់ក្រុម {team}។ សូមត្រៀមខ្លួនអោយបានទាន់ពេល។ អរគុណ!",
+  "squadListManager.copyFallbackPrompt": "ចម្លងសារនេះ (Ctrl+C ឬ Cmd+C) រួចបិទភ្ជាប់ទៅក្នុង Messenger៖",
 };
 
 export const en = {
@@ -50,4 +56,10 @@ export const en = {
   "squadListManager.failedExportPdf": "Couldn't export the squad list as a PDF. Please try again.",
   "squadListManager.unknownAthlete": "Unknown",
   "squadListManager.dobDash": "DOB —",
+  "squadListManager.openMessenger": "Open Messenger",
+  "squadListManager.copyMessage": "Copy message",
+  "squadListManager.copied": "Copied!",
+  "squadListManager.messageTemplate":
+    "Hi {name}, you're on the \"{squadName}\" squad list for {team} — please be ready in time. Thanks!",
+  "squadListManager.copyFallbackPrompt": "Copy this message (Ctrl+C or Cmd+C), then paste it into Messenger:",
 };

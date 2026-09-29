@@ -50,6 +50,9 @@ export const km = {
   "adminDashboard.confirmRemoveAssignment": "ដកក្រុម/តួនាទីនេះចេញ?",
   "adminDashboard.rejectReasonPrompt": "មូលហេតុ (មិនចាំបាច់ — ទុកទទេ ហើយចុច OK បើគ្មានមូលហេតុ, ចុច Cancel ដើម្បីបោះបង់)៖ ក្រុមគ្រូបង្វឹកនឹងឃើញអត្ថបទនេះតាម Telegram",
   "adminDashboard.removeReasonPrompt": "មូលហេតុ (មិនចាំបាច់ — ទុកទទេ ហើយចុច OK បើគ្មានមូលហេតុ, ចុច Cancel ដើម្បីបោះបង់)៖ ក្រុមគ្រូបង្វឹកនឹងឃើញអត្ថបទនេះតាម Telegram",
+  "adminDashboard.prevPage": "← មុន",
+  "adminDashboard.nextPage": "បន្ទាប់ →",
+  "adminDashboard.pageOf": "ទំព័រ {page} / {totalPages}",
 };
 
 export const en = {
@@ -104,4 +107,7 @@ export const en = {
   "adminDashboard.confirmRemoveAssignment": "Remove this team/role?",
   "adminDashboard.rejectReasonPrompt": "Reason (optional — leave blank and press OK if none, press Cancel to abort): the Head Coach will see this in their Telegram notification",
   "adminDashboard.removeReasonPrompt": "Reason (optional — leave blank and press OK if none, press Cancel to abort): the Head Coach will see this in their Telegram notification",
+  "adminDashboard.prevPage": "← Prev",
+  "adminDashboard.nextPage": "Next →",
+  "adminDashboard.pageOf": "Page {page} / {totalPages}",
 };

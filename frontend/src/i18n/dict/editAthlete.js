@@ -75,6 +75,12 @@ export const km = {
   "editAthlete.roleHeadCoach": "គ្រូបង្វឹកប្រធាន",
   "editAthlete.roleTechnical": "បច្ចេកទេស",
   "editAthlete.roleMedic": "គ្រូពេទ្យ",
+  "editAthlete.facebookTitle": "តំណភ្ជាប់ Facebook Profile",
+  "editAthlete.facebookHelp":
+    "សម្រាប់តែ Admin និងគ្រូបង្វឹកប្រធានប៉ុណ្ណោះ — ប្រើសម្រាប់បើក Messenger ដើម្បីផ្ញើសារទៅកីឡាករនេះដោយផ្ទាល់ (ឧ. ជូនដំណឹងការប្រកួត ឬការជំពាក់លុយ)។ មិនដែលបង្ហាញដល់កីឡាករ ឬលើទំព័រសាធារណៈណាមួយឡើយ។",
+  "editAthlete.facebookLabel": "តំណភ្ជាប់ Facebook Profile",
+  "editAthlete.openMessenger": "បើក Messenger",
+  "editAthlete.failedToSaveFacebook": "បរាជ័យក្នុងការរក្សាទុកតំណភ្ជាប់ Facebook",
 };
 
 export const en = {
@@ -154,4 +160,10 @@ export const en = {
   "editAthlete.roleHeadCoach": "Head Coach",
   "editAthlete.roleTechnical": "Technical",
   "editAthlete.roleMedic": "Medic",
+  "editAthlete.facebookTitle": "Facebook profile link",
+  "editAthlete.facebookHelp":
+    "Admin and Head Coach only — used to open Messenger and message this player directly (e.g. a match reminder or a debt reminder). Never shown to the player themselves, or on any public page.",
+  "editAthlete.facebookLabel": "Facebook profile link",
+  "editAthlete.openMessenger": "Open Messenger",
+  "editAthlete.failedToSaveFacebook": "Failed to save the Facebook link",
 };

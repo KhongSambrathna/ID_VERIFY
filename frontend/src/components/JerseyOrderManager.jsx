@@ -70,6 +70,10 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
   const [payPaid, setPayPaid] = useState(false);
   const [savingPay, setSavingPay] = useState(false);
 
+  // Staff-only "Synchronize" action (pushes jerseyNumber onto the
+  // athlete's own profile — see backend's syncOrder).
+  const [syncingId, setSyncingId] = useState(null);
+
   const load = async () => {
     setLoading(true);
     try {
@@ -258,6 +262,25 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
       alert(err.response?.data?.message || t("common.failedToSave"));
     } finally {
       setSavingPay(false);
+    }
+  };
+
+  // Manually pushes this order's jerseyNumber onto the athlete's own
+  // profile/squad-list record — a deliberate staff action (not tied to
+  // payment status), meant to be clicked once the jersey has actually
+  // been printed. Removing this order afterward never undoes it.
+  const syncOrder = async (order) => {
+    if (!confirm(t("jerseyOrderManager.confirmSync").replace("{number}", order.jerseyNumber).replace("{name}", order.fullName))) {
+      return;
+    }
+    setSyncingId(order._id);
+    try {
+      await api.patch(`${basePath}/${order._id}/sync`);
+      load();
+    } catch (err) {
+      alert(err.response?.data?.message || t("jerseyOrderManager.failedToSync"));
+    } finally {
+      setSyncingId(null);
     }
   };
 
@@ -577,6 +600,26 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
                           <button className="link-btn" onClick={() => startPay(order)}>
                             {t("jerseyOrderManager.setPaid")}
                           </button>
+                        )}
+                        {isStaff && !order.isFan && (
+                          <>
+                            {order.syncedToProfile && (
+                              <span className="badge verified" style={{ marginRight: 6 }}>
+                                {t("jerseyOrderManager.syncedBadge")}
+                              </span>
+                            )}
+                            <button
+                              className="link-btn"
+                              disabled={syncingId === order._id}
+                              onClick={() => syncOrder(order)}
+                            >
+                              {syncingId === order._id
+                                ? t("jerseyOrderManager.syncing")
+                                : order.syncedToProfile
+                                ? t("jerseyOrderManager.resyncButton")
+                                : t("jerseyOrderManager.syncButton")}
+                            </button>
+                          </>
                         )}
                         {order.pendingRemoval && (
                           <span className="badge pending" style={{ marginRight: 6 }}>

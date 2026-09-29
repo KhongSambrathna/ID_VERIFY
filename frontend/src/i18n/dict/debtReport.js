@@ -2,6 +2,8 @@ export const km = {
   "debtReport.title": "របាយការណ៍បំណុល",
   "debtReport.intro":
     "អ្នកគ្រប់គ្នាដែលបច្ចុប្បន្នជំពាក់ថ្លៃសេវាលេង។ មើលបានតែអ្នកគ្រប់គ្រង និងគ្រូបង្វឹកប្រធានប៉ុណ្ណោះ — មិនដែលបង្ហាញនៅលើកាត ការនាំចេញ ឬទំព័រសាធារណៈណាមួយឡើយ។",
+  "debtReport.printButton": "បោះពុម្ព / PDF",
+  "debtReport.printHint": "ចុច \"បោះពុម្ព / PDF\" រួចជ្រើសរើស \"Save as PDF\" ក្នុងប្រអប់បោះពុម្ពរបស់ browser ដើម្បីរក្សាទុកជា PDF",
   "debtReport.allTeams": "ក្រុមទាំងអស់",
   "debtReport.searchPlaceholder": "ស្វែងរកតាមឈ្មោះ ក្រុម តួនាទី ឬលេខសម្គាល់…",
   "debtReport.noOneOwes": "មិនមាននរណាម្នាក់ជំពាក់ថ្លៃសេវាទេ។",
@@ -23,12 +25,20 @@ export const km = {
   "debtReport.cashCancelBtn": "បោះបង់",
   "debtReport.cashAmountInvalid": "ចំនួនទឹកប្រាក់មិនត្រឹមត្រូវ",
   "debtReport.cashSaveFailed": "មិនអាចរក្សាទុកការទូទាត់នេះបានទេ",
+  "debtReport.openMessenger": "បើក Messenger",
+  "debtReport.copyMessage": "ចម្លងសារ",
+  "debtReport.copied": "បានចម្លង!",
+  "debtReport.messageTemplate": "សួស្ដី {name}, នេះជាការរំលឹកអំពីថ្លៃសេវាលេងជាមួយក្រុម {team}។ បច្ចុប្បន្នអ្នកជំពាក់សរុប ${amount} សម្រាប់៖ {details}។ សូមមេត្តាទូទាត់មកវិញ។ អរគុណ!",
+  "debtReport.noFeeBreakdown": "មិនមានកំណត់ចំណាំលម្អិតទេ",
+  "debtReport.copyFallbackPrompt": "ចម្លងសារនេះ (Ctrl+C ឬ Cmd+C) រួចបិទភ្ជាប់ទៅក្នុង Messenger៖",
 };
 
 export const en = {
   "debtReport.title": "Debt report",
   "debtReport.intro":
     "Everyone who currently owes a playing fee. Visible only to Admin and Head Coach — never shown on a card, export, or public page.",
+  "debtReport.printButton": "Print / PDF",
+  "debtReport.printHint": "Click \"Print / PDF\", then choose \"Save as PDF\" in your browser's print dialog to save it as a PDF",
   "debtReport.allTeams": "All teams",
   "debtReport.searchPlaceholder": "Search by name, team, role, or ID…",
   "debtReport.noOneOwes": "No one currently owes a fee.",
@@ -50,4 +60,10 @@ export const en = {
   "debtReport.cashCancelBtn": "Cancel",
   "debtReport.cashAmountInvalid": "Invalid amount",
   "debtReport.cashSaveFailed": "Could not save this payment",
+  "debtReport.openMessenger": "Open Messenger",
+  "debtReport.copyMessage": "Copy message",
+  "debtReport.copied": "Copied!",
+  "debtReport.messageTemplate": "Hi {name}, this is a reminder about your playing fees on {team}. You currently owe ${amount} in total, for: {details}. Please send payment when you can. Thank you!",
+  "debtReport.noFeeBreakdown": "no breakdown noted",
+  "debtReport.copyFallbackPrompt": "Copy this message (Ctrl+C or Cmd+C), then paste it into Messenger:",
 };

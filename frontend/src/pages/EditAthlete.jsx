@@ -56,6 +56,13 @@ export default function EditAthlete() {
   const [newFeeDrafts, setNewFeeDrafts] = useState({});
   const [busyAssignmentId, setBusyAssignmentId] = useState(null);
   const [renewing, setRenewing] = useState(false);
+  // Admin/Head Coach-only "Open Messenger" quick-link — stored on the whole
+  // person, edited via its own dedicated save (not the big form below), so
+  // changing it never triggers a Head Coach re-approval the way fullName/
+  // address do. See the Athlete model's facebookProfileUrl comment.
+  const [facebookUrl, setFacebookUrl] = useState("");
+  const [facebookSaving, setFacebookSaving] = useState(false);
+  const [facebookError, setFacebookError] = useState("");
   const [newTeam, setNewTeam] = useState(isHeadCoach ? coachTeam || "" : "");
   const [newRole, setNewRole] = useState("PLAYER");
   const [addingAssignment, setAddingAssignment] = useState(false);
@@ -82,6 +89,8 @@ export default function EditAthlete() {
         setRoleDrafts({});
         setJerseyDrafts({});
         setNewFeeDrafts({});
+        setFacebookUrl(data.facebookProfileUrl || "");
+        setFacebookError("");
       })
       .catch((err) => setError(err.response?.data?.message || t("editAthlete.failedToLoad")));
   };
@@ -189,6 +198,25 @@ export default function EditAthlete() {
       setError(err.response?.data?.message || t("editAthlete.failedToRenew"));
     } finally {
       setRenewing(false);
+    }
+  };
+
+  // Saves the "Open Messenger" link on its own — a whole-person field, not
+  // per-assignment, and (like fees/jerseyNumber) it applies immediately and
+  // never sends anything back to "pending" for re-approval.
+  const saveFacebookUrl = async () => {
+    setFacebookSaving(true);
+    setFacebookError("");
+    try {
+      const { data } = await api.put(`/athletes/${id}/facebook-link`, {
+        facebookProfileUrl: facebookUrl.trim(),
+      });
+      setAthlete(data);
+      setFacebookUrl(data.facebookProfileUrl || "");
+    } catch (err) {
+      setFacebookError(err.response?.data?.message || t("editAthlete.failedToSaveFacebook"));
+    } finally {
+      setFacebookSaving(false);
     }
   };
 
@@ -578,6 +606,39 @@ export default function EditAthlete() {
           )}
 
           {assignmentError && <div className="error-text" style={{ marginTop: 8 }}>{assignmentError}</div>}
+        </div>
+      )}
+
+      {(isAdmin || isHeadCoach) && (
+        <div className="card" style={{ maxWidth: 640 }}>
+          <h3 style={{ marginTop: 0 }}>{t("editAthlete.facebookTitle")}</h3>
+          <p className="help-text" style={{ marginTop: -8, marginBottom: 14 }}>
+            {t("editAthlete.facebookHelp")}
+          </p>
+          <div className="field">
+            <label>{t("editAthlete.facebookLabel")}</label>
+            <input
+              type="url"
+              placeholder="https://facebook.com/..."
+              value={facebookUrl}
+              onChange={(e) => setFacebookUrl(e.target.value)}
+            />
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <button type="button" className="btn btn-primary" disabled={facebookSaving} onClick={saveFacebookUrl}>
+              {facebookSaving ? t("editAthlete.saving") : t("common.save")}
+            </button>
+            {athlete?.facebookProfileUrl && (
+              <a className="link-btn" href={athlete.facebookProfileUrl} target="_blank" rel="noreferrer">
+                {t("editAthlete.openMessenger")}
+              </a>
+            )}
+          </div>
+          {facebookError && (
+            <p className="error-text" style={{ marginTop: 8 }}>
+              {facebookError}
+            </p>
+          )}
         </div>
       )}
 
