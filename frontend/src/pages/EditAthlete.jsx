@@ -54,6 +54,9 @@ export default function EditAthlete() {
   const [roleDrafts, setRoleDrafts] = useState({});
   const [jerseyDrafts, setJerseyDrafts] = useState({});
   const [newFeeDrafts, setNewFeeDrafts] = useState({});
+  // Draft for a new conduct/behavior note per assignment (text + status,
+  // before it's added) — see the Athlete model's conductNotes comment.
+  const [newConductDrafts, setNewConductDrafts] = useState({});
   const [busyAssignmentId, setBusyAssignmentId] = useState(null);
   const [renewing, setRenewing] = useState(false);
   // Admin/Head Coach-only "Open Messenger" quick-link — stored on the whole
@@ -89,6 +92,7 @@ export default function EditAthlete() {
         setRoleDrafts({});
         setJerseyDrafts({});
         setNewFeeDrafts({});
+        setNewConductDrafts({});
         setFacebookUrl(data.facebookProfileUrl || "");
         setFacebookError("");
       })
@@ -257,6 +261,47 @@ export default function EditAthlete() {
       afterAssignmentChange(data);
     } catch (err) {
       setAssignmentError(err.response?.data?.message || t("editAthlete.failedToRemoveFee"));
+    } finally {
+      setBusyAssignmentId(null);
+    }
+  };
+
+  // Conduct/behavior notes are internal record-keeping only — adding or
+  // removing one never touches approvalStatus/everApproved, same reasoning
+  // as fees. A note's `status` ("note"/"warning"/"banned"/"normal") drives
+  // the assignment's overall conductStatus badge on the server side.
+  const addConductNoteAction = async (assignmentId) => {
+    const draft = newConductDrafts[assignmentId] || {};
+    const text = (draft.text || "").trim();
+    if (!text) {
+      setAssignmentError(t("editAthlete.enterConductNote"));
+      return;
+    }
+    setAssignmentError("");
+    setBusyAssignmentId(assignmentId);
+    try {
+      const { data } = await api.post(`/athletes/${id}/assignments/${assignmentId}/conduct-notes`, {
+        text,
+        status: draft.status || "note",
+      });
+      afterAssignmentChange(data);
+      setNewConductDrafts({ ...newConductDrafts, [assignmentId]: { text: "", status: "note" } });
+    } catch (err) {
+      setAssignmentError(err.response?.data?.message || t("editAthlete.failedToAddConductNote"));
+    } finally {
+      setBusyAssignmentId(null);
+    }
+  };
+
+  const removeConductNoteAction = async (assignmentId, noteId) => {
+    if (!confirm(t("editAthlete.confirmRemoveConductNote"))) return;
+    setAssignmentError("");
+    setBusyAssignmentId(assignmentId);
+    try {
+      const { data } = await api.delete(`/athletes/${id}/assignments/${assignmentId}/conduct-notes/${noteId}`);
+      afterAssignmentChange(data);
+    } catch (err) {
+      setAssignmentError(err.response?.data?.message || t("editAthlete.failedToRemoveConductNote"));
     } finally {
       setBusyAssignmentId(null);
     }
@@ -457,6 +502,12 @@ export default function EditAthlete() {
                       )}
                     </span>
                   )}
+                  {a.conductStatus === "banned" && (
+                    <span className="badge rejected">{t("editAthlete.conductBanned")}</span>
+                  )}
+                  {a.conductStatus === "warning" && (
+                    <span className="badge rejected">{t("editAthlete.conductWarning")}</span>
+                  )}
                 </div>
 
                 <div className="assignment-row-fee">
@@ -518,6 +569,72 @@ export default function EditAthlete() {
                         onClick={() => addFeeAction(a._id)}
                       >
                         {t("editAthlete.addFee")}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="assignment-row-conduct">
+                  {(a.conductNotes || []).length > 0 && (
+                    <ul className="fee-items">
+                      {a.conductNotes.map((n) => (
+                        <li key={n._id}>
+                          <span>
+                            {n.status === "warning" && <strong>{t("editAthlete.conductWarning")}: </strong>}
+                            {n.status === "banned" && <strong>{t("editAthlete.conductBanned")}: </strong>}
+                            {n.text}
+                          </span>
+                          {canManage && (
+                            <button
+                              type="button"
+                              className="link-btn"
+                              disabled={isBusy}
+                              onClick={() => removeConductNoteAction(a._id, n._id)}
+                            >
+                              {t("editAthlete.remove")}
+                            </button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {canManage && (
+                    <div className="fee-add-row">
+                      <input
+                        type="text"
+                        placeholder={t("editAthlete.conductNotePlaceholder")}
+                        maxLength={500}
+                        value={newConductDrafts[a._id]?.text ?? ""}
+                        onChange={(e) =>
+                          setNewConductDrafts({
+                            ...newConductDrafts,
+                            [a._id]: { ...newConductDrafts[a._id], text: e.target.value },
+                          })
+                        }
+                        disabled={isBusy}
+                      />
+                      <select
+                        value={newConductDrafts[a._id]?.status ?? "note"}
+                        onChange={(e) =>
+                          setNewConductDrafts({
+                            ...newConductDrafts,
+                            [a._id]: { ...newConductDrafts[a._id], status: e.target.value },
+                          })
+                        }
+                        disabled={isBusy}
+                      >
+                        <option value="note">{t("editAthlete.conductStatusNote")}</option>
+                        <option value="warning">{t("editAthlete.conductStatusWarning")}</option>
+                        <option value="banned">{t("editAthlete.conductStatusBanned")}</option>
+                        <option value="normal">{t("editAthlete.conductStatusNormal")}</option>
+                      </select>
+                      <button
+                        type="button"
+                        className="link-btn"
+                        disabled={isBusy || !newConductDrafts[a._id]?.text}
+                        onClick={() => addConductNoteAction(a._id)}
+                      >
+                        {t("editAthlete.addConductNote")}
                       </button>
                     </div>
                   )}

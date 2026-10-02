@@ -93,15 +93,22 @@ router.get("/lineups", requireRole("HEAD_COACH", "ADMIN", "PLAYER"), async (req,
     if (!canAccessTeam(req, team)) return res.status(403).json({ message: "Access denied" });
 
     const lineups = await Lineup.find({ team }).populate("athletes.athleteId").sort({ createdAt: -1 });
-    // facebookProfileUrl is Admin/Head Coach only (see the Athlete model's
-    // comment) — populate() above pulls the full Athlete doc, so a Player
-    // (allowed to view squad lists read-only) must have it stripped back
-    // out here rather than just hidden in the UI.
+    // facebookProfileUrl/conductStatus/conductNotes are Admin/Head Coach
+    // only (see the Athlete model's comments) — populate() above pulls the
+    // full Athlete doc, so a Player (allowed to view squad lists read-only)
+    // must have them stripped back out here rather than just hidden in the
+    // UI.
     if (req.adminRole === "PLAYER") {
       const stripped = lineups.map((l) => {
         const obj = l.toObject();
         obj.athletes.forEach((item) => {
-          if (item.athleteId) delete item.athleteId.facebookProfileUrl;
+          if (item.athleteId) {
+            delete item.athleteId.facebookProfileUrl;
+            (item.athleteId.assignments || []).forEach((a) => {
+              delete a.conductStatus;
+              delete a.conductNotes;
+            });
+          }
         });
         return obj;
       });
@@ -122,7 +129,13 @@ router.get("/lineup/:id", requireRole("HEAD_COACH", "ADMIN", "PLAYER"), async (r
     if (req.adminRole === "PLAYER") {
       const obj = lineup.toObject();
       obj.athletes.forEach((item) => {
-        if (item.athleteId) delete item.athleteId.facebookProfileUrl;
+        if (item.athleteId) {
+          delete item.athleteId.facebookProfileUrl;
+          (item.athleteId.assignments || []).forEach((a) => {
+            delete a.conductStatus;
+            delete a.conductNotes;
+          });
+        }
       });
       return res.json(obj);
     }

@@ -262,13 +262,15 @@ exports.getAllAthletes = async (req, res) => {
 
     const athletes = await Athlete.find(filter).sort({ createdAt: -1 });
     const rows = athletes.flatMap((a) => flattenAssignments(a, team));
-    // facebookProfileUrl is Admin/Head Coach only (see the Athlete model's
-    // comment) — a Player calling this same endpoint for their own team's
-    // roster must never receive it in the payload, not just have it hidden
-    // in the UI.
+    // facebookProfileUrl/conductStatus/conductNotes are Admin/Head Coach
+    // only (see the Athlete model's comments) — a Player calling this same
+    // endpoint for their own team's roster must never receive them in the
+    // payload, not just have them hidden in the UI.
     if (req.adminRole === "PLAYER") {
       rows.forEach((r) => {
         delete r.facebookProfileUrl;
+        delete r.conductStatus;
+        delete r.conductNotes;
       });
     }
 
@@ -312,10 +314,15 @@ exports.getAthleteById = async (req, res) => {
     const isOwnRecord = req.adminRole === "PLAYER" && req.athleteId && String(req.athleteId) === String(athlete._id);
     if (req.adminRole === "PLAYER") {
       const obj = athlete.toObject();
-      // facebookProfileUrl is Admin/Head Coach only — stripped even from a
-      // Player's OWN record, unlike supportingDocuments below which a
-      // Player can see (and manage) for themselves.
+      // facebookProfileUrl/conductStatus/conductNotes are Admin/Head Coach
+      // only — stripped even from a Player's OWN record (every assignment,
+      // not just one), unlike supportingDocuments below which a Player can
+      // see (and manage) for themselves.
       delete obj.facebookProfileUrl;
+      (obj.assignments || []).forEach((a) => {
+        delete a.conductStatus;
+        delete a.conductNotes;
+      });
       if (!isOwnRecord) delete obj.supportingDocuments;
       return res.json(obj);
     }
@@ -809,6 +816,71 @@ exports.removeFee = async (req, res) => {
     if (error) return res.status(error[0]).json({ message: error[1] });
 
     assignment.fees = assignment.fees.filter((f) => String(f._id) !== String(req.params.feeId));
+    await athlete.save();
+    res.json(athlete);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// A person's overall conduct flag for one assignment is derived from
+// whichever notes are STILL on file, most-severe first — so removing the
+// note that caused a ban/warning clears the flag again, and adding an
+// unrelated plain "note" afterwards never quietly overrides an existing
+// ban/warning that's still there.
+function recomputeConductStatus(notes) {
+  if (notes.some((n) => n.status === "banned")) return "banned";
+  if (notes.some((n) => n.status === "warning")) return "warning";
+  return "normal";
+}
+
+// POST /api/athletes/:id/assignments/:assignmentId/conduct-notes — add one
+// character/behavior note for this person ON THIS TEAM (see the Athlete
+// model's conductNotes comment). `status` says what kind of note this is:
+// "note" (a plain observation), "warning", "banned", or "normal" (a note
+// explicitly clearing things up) — conductStatus is then recomputed from
+// every note still on file, not just this new one.
+exports.addConductNote = async (req, res) => {
+  try {
+    const { athlete, assignment, error } = await findAssignmentForFee(req);
+    if (error) return res.status(error[0]).json({ message: error[1] });
+
+    const text = String(req.body.text || "").trim().slice(0, 500);
+    if (!text) return res.status(400).json({ message: "Note text is required" });
+
+    const status = ["note", "warning", "banned", "normal"].includes(req.body.status)
+      ? req.body.status
+      : "note";
+
+    assignment.conductNotes.push({ text, status });
+    assignment.conductStatus = recomputeConductStatus(assignment.conductNotes);
+    await athlete.save();
+
+    if (status === "warning" || status === "banned") {
+      const icon = status === "banned" ? "🚫" : "⚠️";
+      const verb = status === "banned" ? "banned" : "given a warning";
+      const notifyText = `${icon} ${athlete.fullName} (${assignment.team}) was ${verb}: ${text}`;
+      notifyAdmins(notifyText);
+      notifyTeamCoaches(assignment.team, notifyText);
+    }
+
+    res.status(201).json(athlete);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// DELETE /api/athletes/:id/assignments/:assignmentId/conduct-notes/:noteId
+// — remove one note (e.g. entered by mistake, or a warning being lifted).
+exports.removeConductNote = async (req, res) => {
+  try {
+    const { athlete, assignment, error } = await findAssignmentForFee(req);
+    if (error) return res.status(error[0]).json({ message: error[1] });
+
+    assignment.conductNotes = assignment.conductNotes.filter(
+      (n) => String(n._id) !== String(req.params.noteId)
+    );
+    assignment.conductStatus = recomputeConductStatus(assignment.conductNotes);
     await athlete.save();
     res.json(athlete);
   } catch (err) {

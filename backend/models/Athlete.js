@@ -76,6 +76,43 @@ const assignmentSchema = new mongoose.Schema(
     // reflects what actually got printed once that's confirmed, without
     // overwriting it while the order's still being decided/paid.
     jerseyNumber: { type: Number, min: 0, max: 99, default: null },
+    // Character/behavior record for this person ON THIS TEAM — free-text
+    // notes an Admin or Head Coach jots down (e.g. "Skipped practice twice
+    // without notice", "Great attitude, helps organize warm-ups"), each one
+    // optionally flagged as a warning or a ban via its own `status`.
+    // `conductStatus` is the assignment's overall flag, recomputed every
+    // time a note is added or removed (see recomputeConductStatus in
+    // athleteController.js): "banned" if any remaining note says banned,
+    // else "warning" if any remaining note says warning, else "normal" —
+    // so deleting the note that caused a ban/warning clears the flag again.
+    // This is informational/record-keeping only for now — a "banned" status
+    // doesn't itself block anything (no automatic enforcement), it's just
+    // visible to staff to act on manually. Tracked per-assignment, not
+    // per-person, since someone can behave differently on two different
+    // teams. Admin/Head Coach (own team) only — never shown to a Player
+    // (even about themselves), and never in a public API response or on
+    // any printed/exported card, same as fees/facebookProfileUrl above.
+    conductStatus: {
+      type: String,
+      enum: ["normal", "warning", "banned"],
+      default: "normal",
+    },
+    conductNotes: {
+      type: [
+        new mongoose.Schema(
+          {
+            text: { type: String, required: true },
+            status: {
+              type: String,
+              enum: ["note", "warning", "banned", "normal"],
+              default: "note",
+            },
+          },
+          { timestamps: true }
+        ),
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );

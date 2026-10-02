@@ -326,21 +326,67 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
   if (loading) return <p>{t("common.loading")}</p>;
   if (error) return <p className="error-text">{error}</p>;
 
+  // At-a-glance registration/payment counts — how many have registered so
+  // far and how many of those are actually paid up, without having to
+  // scroll the whole table and count badges by eye. Fan orders are counted
+  // separately from player orders (same "type" split already shown per
+  // row) since they're a different kind of registration, not someone owing
+  // a fee on their own playing record.
+  const playerOrders = orders.filter((o) => !o.isFan);
+  const fanOrders = orders.filter((o) => o.isFan);
+  const paidCount = orders.filter((o) => o.feePaid).length;
+  const partialCount = orders.filter((o) => !o.feePaid && o.feePaidAmount > 0).length;
+  const unpaidCount = orders.length - paidCount - partialCount;
+
   return (
     <div>
-      <h3 style={{ marginTop: 0 }}>
-        {t("jerseyOrderManager.title")} — {team}
-      </h3>
-      <p className="help-text" style={{ marginTop: -6 }}>
-        {t("jerseyOrderManager.intro")}
+      <div className="no-print" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <h3 style={{ marginTop: 0 }}>
+            {t("jerseyOrderManager.title")} — {team}
+          </h3>
+          <p className="help-text" style={{ marginTop: -6 }}>
+            {t("jerseyOrderManager.intro")}
+          </p>
+        </div>
+        <button type="button" className="btn btn-primary" onClick={() => window.print()}>
+          {t("debtReport.printButton")}
+        </button>
+      </div>
+      <p className="help-text no-print" style={{ marginTop: -8 }}>
+        {t("debtReport.printHint")}
       </p>
+
+      {/* .no-print title/intro above are hidden on print — this stands in
+          as the list's own title/date on the printed page/PDF, same
+          pattern as the Debt Report. */}
+      <div className="print-only" style={{ marginBottom: 16 }}>
+        <h2 style={{ margin: 0 }}>
+          {t("jerseyOrderManager.title")} — {team}
+        </h2>
+        <p style={{ margin: "4px 0" }}>{new Date().toLocaleDateString()}</p>
+      </div>
+
+      {orders.length > 0 && (
+        <p className="help-text" style={{ fontWeight: 600 }}>
+          {t("jerseyOrderManager.summaryLine")
+            .replace("{total}", orders.length)
+            .replace("{players}", playerOrders.length)
+            .replace("{fans}", fanOrders.length)}
+          {" — "}
+          {t("jerseyOrderManager.summaryPaid").replace("{count}", paidCount)}
+          {partialCount > 0 && ` · ${t("jerseyOrderManager.summaryPartial").replace("{count}", partialCount)}`}
+          {unpaidCount > 0 && ` · ${t("jerseyOrderManager.summaryUnpaid").replace("{count}", unpaidCount)}`}
+        </p>
+      )}
 
       {/* Self-service register form — individual Player login. Stays visible
           even after they already have their own (non-Fan) order, so they
           can keep adding Fan orders; in that case the Fan checkbox below
-          is forced on. */}
+          is forced on. Hidden on print — a form has nothing to do with a
+          printed/PDF snapshot of the list. */}
       {isPlayer && athleteId && (
-        <form className="card" style={{ maxWidth: 420, marginBottom: 24 }} onSubmit={submitSelf}>
+        <form className="card no-print" style={{ maxWidth: 420, marginBottom: 24 }} onSubmit={submitSelf}>
           <h4 style={{ marginTop: 0 }}>{t("jerseyOrderManager.registerMine")}</h4>
           {myNonFanOrder && (
             <p className="help-text" style={{ marginTop: -6 }}>
@@ -394,7 +440,7 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
 
       {/* Staff "register on behalf" form */}
       {isStaff && (
-        <form className="card" style={{ maxWidth: 480, marginBottom: 24 }} onSubmit={submitOnBehalf}>
+        <form className="card no-print" style={{ maxWidth: 480, marginBottom: 24 }} onSubmit={submitOnBehalf}>
           <h4 style={{ marginTop: 0 }}>{t("jerseyOrderManager.registerOnBehalf")}</h4>
           <div className="field">
             <label>{t("common.name")}</label>
@@ -462,7 +508,7 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
               <th>{t("jerseyOrderManager.colSize")}</th>
               <th>{t("jerseyOrderManager.colNote")}</th>
               <th>{t("jerseyOrderManager.colPaid")}</th>
-              <th>{t("common.actions")}</th>
+              <th className="no-print">{t("common.actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -570,7 +616,7 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
                       </>
                     )}
                   </td>
-                  <td data-label={t("common.actions")} className="actions-cell">
+                  <td data-label={t("common.actions")} className="actions-cell no-print">
                     {isEditing ? (
                       <>
                         <button className="link-btn" onClick={() => saveEdit(order)} disabled={savingEdit}>

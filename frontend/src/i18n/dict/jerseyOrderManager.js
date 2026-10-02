@@ -55,6 +55,10 @@ export const km = {
   "jerseyOrderManager.failedToRemove": "បរាជ័យក្នុងការដកចេញ",
   "jerseyOrderManager.failedToKeep": "បរាជ័យក្នុងការរក្សាទុក",
   "jerseyOrderManager.noneYet": "មិនទាន់មានការបញ្ជាទិញអាវនៅឡើយទេ។",
+  "jerseyOrderManager.summaryLine": "ចុះឈ្មោះសរុប {total} នាក់ ({players} កីឡាករ, {fans} អ្នកគាំទ្រ)",
+  "jerseyOrderManager.summaryPaid": "បានបង់ពេញ {count} នាក់",
+  "jerseyOrderManager.summaryPartial": "បង់ខ្លះ {count} នាក់",
+  "jerseyOrderManager.summaryUnpaid": "មិនទាន់បង់ {count} នាក់",
 };
 
 export const en = {
@@ -114,4 +118,8 @@ export const en = {
   "jerseyOrderManager.failedToRemove": "Failed to remove",
   "jerseyOrderManager.failedToKeep": "Failed to keep",
   "jerseyOrderManager.noneYet": "No jersey orders yet.",
+  "jerseyOrderManager.summaryLine": "{total} registered total ({players} players, {fans} fans)",
+  "jerseyOrderManager.summaryPaid": "{count} paid in full",
+  "jerseyOrderManager.summaryPartial": "{count} partially paid",
+  "jerseyOrderManager.summaryUnpaid": "{count} unpaid",
 };

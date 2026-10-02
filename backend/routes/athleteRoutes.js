@@ -17,6 +17,8 @@ const {
   addFee,
   updateFee,
   removeFee,
+  addConductNote,
+  removeConductNote,
   renewVerification,
   getScanLogs,
   getStats,
@@ -118,6 +120,23 @@ router.put("/:id/assignments/:assignmentId/reject", requireRole("ADMIN"), reject
 router.post("/:id/assignments/:assignmentId/fees", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, addFee);
 router.put("/:id/assignments/:assignmentId/fees/:feeId", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, updateFee);
 router.delete("/:id/assignments/:assignmentId/fees/:feeId", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, removeFee);
+
+// Character/behavior notes on one assignment — same Admin/Head Coach (own
+// team) access as fees above. A note can carry a "warning" or "banned"
+// status (see the Athlete model's conductNotes comment); this is a record
+// for staff, not an automatic block on anything.
+router.post(
+  "/:id/assignments/:assignmentId/conduct-notes",
+  requireRole("ADMIN", "HEAD_COACH"),
+  requireActiveSubscription,
+  addConductNote
+);
+router.delete(
+  "/:id/assignments/:assignmentId/conduct-notes/:noteId",
+  requireRole("ADMIN", "HEAD_COACH"),
+  requireActiveSubscription,
+  removeConductNote
+);
 
 // Admin-only — a Head Coach removes someone through the assignment routes
 // above instead (which always requires Admin confirmation, per team).

@@ -36,6 +36,12 @@ function flattenAssignments(athlete, teamFilter) {
     .filter((a) => !teamFilter || a.team === teamFilter)
     .map((a) => {
       const fees = (a.fees || []).map((f) => ({ _id: f._id, amount: f.amount || 0, note: f.note || "" }));
+      const conductNotes = (a.conductNotes || []).map((n) => ({
+        _id: n._id,
+        text: n.text || "",
+        status: n.status || "note",
+        createdAt: n.createdAt,
+      }));
       return {
         ...base,
         assignmentId: a._id,
@@ -51,6 +57,11 @@ function flattenAssignments(athlete, teamFilter) {
         // wants to show what's actually owed for.
         feeOwed: fees.reduce((sum, f) => sum + f.amount, 0),
         fees,
+        // Admin/Head Coach only (see the Athlete model's conductNotes
+        // comment) — the caller is responsible for stripping these back out
+        // when the caller is a Player, same as facebookProfileUrl above.
+        conductStatus: a.conductStatus || "normal",
+        conductNotes,
       };
     });
 }
