@@ -5,7 +5,6 @@ import api from "../api/axios";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { saveCanvasAsImage } from "../utils/saveCanvasAsImage";
 import { useLanguage } from "../i18n/LanguageContext";
-
 // Shared across every IDCard instance on the page (e.g. dozens of cards on
 // AllCardsPage) so cards for the same team don't each fire their own
 // request for a logo that's already known — a plain module-level cache of
@@ -203,7 +202,7 @@ export default function IDCard({ athlete, hideActions }) {
 
           <div className="id-card-footer">
             <div className="id-card-issue-info">
-              <div>id-verify-liart.vercel.app</div>
+              <div>https//id.brathna.com</div>
               {issuedDate && <div>ISSUED: {issuedDate}</div>}
               <div>VALID: {validUntilDate || "PENDING"}</div>
             </div>
