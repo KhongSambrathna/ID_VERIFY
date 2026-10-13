@@ -7,6 +7,7 @@ import SquadListManager from "../components/SquadListManager";
 import FormationManager from "../components/FormationManager";
 import StartingXIManager from "../components/StartingXIManager";
 import JerseyOrderManager from "../components/JerseyOrderManager";
+import AttendanceManager from "../components/AttendanceManager";
 import RequireActiveSubscription from "../components/RequireActiveSubscription";
 import { useLanguage } from "../i18n/LanguageContext";
 
@@ -28,7 +29,7 @@ export default function CoachDashboard() {
   const [searchParams] = useSearchParams();
   // Lets a link from elsewhere (e.g. a tournament's squad page) land
   // directly on a specific tab, e.g. /coach?tab=lineups.
-  const validTabs = ["athletes", "owing", "lineups", "formations", "startingxi", "jerseyorders", "accounts"];
+  const validTabs = ["athletes", "owing", "lineups", "formations", "startingxi", "jerseyorders", "accounts", "attendance"];
   const tabFromUrl = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState(validTabs.includes(tabFromUrl) ? tabFromUrl : "athletes");
 
@@ -377,6 +378,12 @@ export default function CoachDashboard() {
           onClick={() => setActiveTab("accounts")}
         >
           {t("coachDashboard.tabPlayerAccounts")}
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "attendance" ? "active" : ""}`}
+          onClick={() => setActiveTab("attendance")}
+        >
+          {t("attendance.title")}
         </button>
       </div>
 
@@ -767,6 +774,15 @@ export default function CoachDashboard() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ATTENDANCE TAB — record who showed up to training or matches, and
+          view a per-athlete attendance-rate summary. Scoped to this Head
+          Coach's own team (the component reads `team` from context). */}
+      {activeTab === "attendance" && (
+        <div className="tab-content">
+          <AttendanceManager team={team} athletes={athletes} />
         </div>
       )}
     </div>

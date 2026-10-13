@@ -5,6 +5,7 @@ import TeamSelect from "../components/TeamSelect";
 import SquadListManager from "../components/SquadListManager";
 import FormationManager from "../components/FormationManager";
 import StartingXIManager from "../components/StartingXIManager";
+import AttendanceManager from "../components/AttendanceManager";
 import { useLanguage } from "../i18n/LanguageContext";
 
 export default function AdminMatchDay() {
@@ -16,7 +17,7 @@ export default function AdminMatchDay() {
   const [athletes, setAthletes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const validTabs = ["lineups", "formations", "startingxi"];
+  const validTabs = ["lineups", "formations", "startingxi", "attendance"];
   const tabFromUrl = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState(validTabs.includes(tabFromUrl) ? tabFromUrl : "lineups");
 
@@ -70,6 +71,12 @@ export default function AdminMatchDay() {
             >
               {t("adminMatchDay.tabStartingXI")}
             </button>
+            <button
+              className={`tab-btn ${activeTab === "attendance" ? "active" : ""}`}
+              onClick={() => setActiveTab("attendance")}
+            >
+              {t("attendance.title")}
+            </button>
           </div>
 
           {loading && <p>{t("adminMatchDay.loadingRoster")}</p>}
@@ -80,6 +87,7 @@ export default function AdminMatchDay() {
               {activeTab === "lineups" && <SquadListManager team={team} athletes={athletes} />}
               {activeTab === "formations" && <FormationManager team={team} athletes={athletes} />}
               {activeTab === "startingxi" && <StartingXIManager team={team} />}
+              {activeTab === "attendance" && <AttendanceManager team={team} athletes={athletes} />}
             </div>
           )}
         </>
