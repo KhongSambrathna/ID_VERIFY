@@ -16,6 +16,7 @@ const tournamentRoutes = require("./routes/tournamentRoutes");
 const serviceRoutes = require("./routes/serviceRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const attendanceRoutes = require("./routes/attendanceRoutes");
+const registrationRoutes = require("./routes/registrationRoutes");
 
 const app = express();
 
@@ -43,6 +44,10 @@ app.use("/api/tournaments", tournamentRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/attendance", attendanceRoutes);
+// Player self-registration via a Head Coach's shared link — public token
+// routes (a brand-new player with no account submits their own details) plus
+// coach/admin routes to create & manage those links.
+app.use("/api/registration", registrationRoutes);
 // Social-media share/preview pages — paste these into Facebook/Telegram
 // instead of the plain frontend links to get a real preview image
 // (see shareController.js for why the SPA can't provide this on its own).

@@ -26,6 +26,7 @@ export const km = {
     "ស្នើសុំដកតួនាទី/ក្រុមនេះចេញឬ? អ្នកគ្រប់គ្រងត្រូវការបញ្ជាក់ជាមុនសិន។",
   "coachDashboard.failedToRequestRemoval": "បរាជ័យក្នុងការស្នើសុំដកចេញ",
   "coachDashboard.tabPlayerAccounts": "គណនីកីឡាករ",
+  "coachDashboard.tabRegistration": "តំណចុះឈ្មោះ",
   "coachDashboard.playerAccountsTitle": "គណនីកីឡាករ (ចូលបុគ្គល)",
   "coachDashboard.playerAccountsIntro":
     "កំណត់ពាក្យសម្ងាត់ឡើងវិញសម្រាប់គណនីចូលបុគ្គលរបស់កីឡាករនៅក្នុងក្រុមរបស់អ្នក — ប្រើនៅពេលកីឡាករភ្លេចពាក្យសម្ងាត់ ហើយមុខងារ \"ភ្លេចពាក្យសម្ងាត់\" ដោយខ្លួនឯងមិនដំណើរការ (ឧ. មិនទាន់ភ្ជាប់ Telegram)។",
@@ -91,6 +92,7 @@ export const en = {
     "Request removal of this team/role? An Admin needs to confirm it.",
   "coachDashboard.failedToRequestRemoval": "Failed to request removal",
   "coachDashboard.tabPlayerAccounts": "Player accounts",
+  "coachDashboard.tabRegistration": "Registration links",
   "coachDashboard.playerAccountsTitle": "Player accounts (individual logins)",
   "coachDashboard.playerAccountsIntro":
     "Reset the password for an individual player login on your team — use this when a player forgets their password and the self-service \"forgot password\" flow isn't available to them (e.g. Telegram isn't linked yet).",

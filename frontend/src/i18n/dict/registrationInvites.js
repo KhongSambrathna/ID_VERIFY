@@ -1,0 +1,39 @@
+export const km = {
+  "registrationInvites.title": "តំណចុះឈ្មោះកីឡាករ",
+  "registrationInvites.intro":
+    "បង្កើតតំណចុះឈ្មោះ ហើយផ្ញើវាទៅកីឡាករ (តាម Telegram/Facebook ជាដើម)។ កីឡាករបើកតំណ បំពេញព័ត៌មានខ្លួនឯង ហើយដាក់ស្នើ — កំណត់ត្រានឹងក្លាយជា \"កំពុងរង់ចាំ\" រហូតដល់អ្នកគ្រប់គ្រងអនុម័ត។ តំណនីមួយៗប្រើបានម្តងទៅតែកីឡាករម្នាក់ប៉ុណ្ណោះ — បង្កើតតំណថ្មីសម្រាប់កីឡាករបន្ទាប់។",
+  "registrationInvites.createLink": "+ បង្កើតតំណចុះឈ្មោះ",
+  "registrationInvites.creating": "កំពុងបង្កើត…",
+  "registrationInvites.createFailed": "បរាជ័យក្នុងការបង្កើតតំណចុះឈ្មោះ",
+  "registrationInvites.copyLink": "ចម្លងតំណ",
+  "registrationInvites.copied": "បានចម្លង!",
+  "registrationInvites.revoke": "លុបចេញ",
+  "registrationInvites.revokeFailed": "បរាជ័យក្នុងការលុបតំណចេញ",
+  "registrationInvites.confirmRevoke": "លុបតំណចុះឈ្មោះនេះចេញឬ? វានឹងលែងអាចប្រើបានទៀត។",
+  "registrationInvites.colLink": "តំណចែករំលែក",
+  "registrationInvites.colPlayer": "កីឡាករដែលបានចុះឈ្មោះ",
+  "registrationInvites.noInvites": "មិនទាន់មានតំណចុះឈ្មោះនៅឡើយទេ។",
+  "registrationInvites.statusActive": "កំពុងដំណើរការ",
+  "registrationInvites.statusUsed": "បានប្រើរួច",
+  "registrationInvites.statusRevoked": "បានលុបចេញ",
+};
+
+export const en = {
+  "registrationInvites.title": "Player registration links",
+  "registrationInvites.intro":
+    "Create a registration link and send it to a player (via Telegram/Facebook, etc.). The player opens the link, fills in their own details, and submits — the record stays \"pending\" until an Admin approves it. Each link works once, for one player only — create a new one for the next player.",
+  "registrationInvites.createLink": "+ Create registration link",
+  "registrationInvites.creating": "Creating…",
+  "registrationInvites.createFailed": "Failed to create registration link",
+  "registrationInvites.copyLink": "Copy link",
+  "registrationInvites.copied": "Copied!",
+  "registrationInvites.revoke": "Revoke",
+  "registrationInvites.revokeFailed": "Failed to revoke the link",
+  "registrationInvites.confirmRevoke": "Revoke this registration link? It will no longer be usable.",
+  "registrationInvites.colLink": "Shareable link",
+  "registrationInvites.colPlayer": "Registered player",
+  "registrationInvites.noInvites": "No registration links yet.",
+  "registrationInvites.statusActive": "Active",
+  "registrationInvites.statusUsed": "Used",
+  "registrationInvites.statusRevoked": "Revoked",
+};

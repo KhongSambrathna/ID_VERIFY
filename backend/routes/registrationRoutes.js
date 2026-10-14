@@ -1,0 +1,42 @@
+const express = require("express");
+const router = express.Router();
+const { requireAuth, requireRole } = require("../middleware/auth");
+const { requireActiveSubscription } = require("../middleware/subscription");
+const upload = require("../middleware/upload");
+const {
+  createInvite,
+  listInvites,
+  revokeInvite,
+  getInviteByToken,
+  registerViaInvite,
+} = require("../controllers/registrationController");
+
+// ---- PUBLIC (no login) — the player-facing side of a shared link. ----
+// These MUST stay above the requireAuth gate below, or a player with no
+// account (the whole point — they haven't registered yet) couldn't reach them.
+// The token in the URL is the only thing that authorizes these, and each is
+// single-use (see registrationController). A player submitting their details
+// needs the same photo/documents upload the staff add-athlete form uses.
+router.get("/invites/:token", getInviteByToken);
+router.post(
+  "/invites/:token",
+  upload.fields([
+    { name: "photo", maxCount: 1 },
+    { name: "documents", maxCount: 10 },
+  ]),
+  registerViaInvite
+);
+
+// ---- Coach/Admin — managing the links themselves. ----
+// Creating/sending a registration link is a roster-management action for a
+// Head Coach, so it's gated behind their team's active subscription exactly
+// like adding an athlete directly is (requireActiveSubscription is a no-op for
+// Admin). Listing/revoking is lighter bookkeeping and stays open, so a lapsed
+// team can still cancel links they already sent.
+router.use(requireAuth);
+
+router.get("/invites", requireRole("ADMIN", "HEAD_COACH"), listInvites);
+router.post("/invites", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, createInvite);
+router.delete("/invites/:id", requireRole("ADMIN", "HEAD_COACH"), revokeInvite);
+
+module.exports = router;

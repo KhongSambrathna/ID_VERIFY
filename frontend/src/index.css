@@ -440,6 +440,36 @@ a {
   width: 100%;
   max-width: 420px;
 }
+/* The "here's your ID + password, write it down" box on the self-registration
+   success screen — deliberately high-contrast so a player can copy the values
+   accurately the one time they're ever shown. */
+.credentials-box {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fbf8ef;
+  padding: 14px 16px;
+  margin: 16px 0;
+}
+.credential-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+.credential-row + .credential-row {
+  border-top: 1px dashed var(--line);
+}
+.credential-label {
+  font-size: 13.5px;
+  color: #555;
+}
+.credential-value {
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: 0.5px;
+  color: var(--navy);
+}
 .field {
   margin-bottom: 16px;
 }

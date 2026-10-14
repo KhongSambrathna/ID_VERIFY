@@ -8,6 +8,7 @@ import FormationManager from "../components/FormationManager";
 import StartingXIManager from "../components/StartingXIManager";
 import JerseyOrderManager from "../components/JerseyOrderManager";
 import AttendanceManager from "../components/AttendanceManager";
+import RegistrationInviteManager from "../components/RegistrationInviteManager";
 import RequireActiveSubscription from "../components/RequireActiveSubscription";
 import { useLanguage } from "../i18n/LanguageContext";
 
@@ -29,7 +30,7 @@ export default function CoachDashboard() {
   const [searchParams] = useSearchParams();
   // Lets a link from elsewhere (e.g. a tournament's squad page) land
   // directly on a specific tab, e.g. /coach?tab=lineups.
-  const validTabs = ["athletes", "owing", "lineups", "formations", "startingxi", "jerseyorders", "accounts", "attendance"];
+  const validTabs = ["athletes", "owing", "lineups", "formations", "startingxi", "jerseyorders", "accounts", "registration", "attendance"];
   const tabFromUrl = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState(validTabs.includes(tabFromUrl) ? tabFromUrl : "athletes");
 
@@ -378,6 +379,12 @@ export default function CoachDashboard() {
           onClick={() => setActiveTab("accounts")}
         >
           {t("coachDashboard.tabPlayerAccounts")}
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "registration" ? "active" : ""}`}
+          onClick={() => setActiveTab("registration")}
+        >
+          {t("coachDashboard.tabRegistration")}
         </button>
         <button
           className={`tab-btn ${activeTab === "attendance" ? "active" : ""}`}
@@ -774,6 +781,15 @@ export default function CoachDashboard() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* REGISTRATION LINKS TAB — create shareable self-registration links to
+          send to players, who then fill in their own details. Backend forces
+          each link to this coach's own team. */}
+      {activeTab === "registration" && (
+        <div className="tab-content">
+          <RegistrationInviteManager />
         </div>
       )}
 

@@ -8,6 +8,7 @@ const cloudinary = require("../config/cloudinary");
 const flattenAssignments = require("../utils/flattenAssignments");
 const { notifyAdmins, notifyTeamCoaches } = require("../utils/notify");
 const { planInfo, countTeamPlayers } = require("../utils/subscriptionPlans");
+const { ensurePlayerAccountForAthlete } = require("../utils/playerAccount");
 
 // Enforces a team's subscription plan player cap (see
 // utils/subscriptionPlans.js) for any assignment being added/changed to
@@ -29,6 +30,9 @@ async function checkPlayerCap(team, role) {
   }
   return null;
 }
+// Exported so the public self-registration route enforces the exact same
+// per-team cap without duplicating the rule.
+exports.checkPlayerCap = checkPlayerCap;
 
 function toBool(value) {
   if (typeof value === "boolean") return value;
@@ -983,6 +987,18 @@ exports.approveAssignment = async (req, res) => {
     promotePendingPhotoIfAny(athlete);
     promotePendingProfileChangesIfAny(athlete);
     await athlete.save();
+    // Approving is the moment a self-registered (or otherwise account-less)
+    // player finally gets their login — provision it now if they don't have
+    // one yet. Idempotent, so approving again later is a harmless no-op. See
+    // utils/playerAccount.js.
+    try {
+      await ensurePlayerAccountForAthlete(athlete);
+    } catch (err) {
+      // A login-provisioning hiccup must never fail the approval itself — the
+      // assignment is already saved and public. It can be created later from
+      // the admin "generate missing accounts" action.
+      console.warn("Auto-creating player account on approval failed:", err.message);
+    }
     notifyTeamCoaches(team, `✅ ${fullName}'s ${team} assignment was approved by Admin.`);
     res.json(athlete);
   } catch (err) {
@@ -1365,6 +1381,11 @@ exports.bulkApproveAssignments = async (req, res) => {
           promotePendingPhotoIfAny(athlete);
           promotePendingProfileChangesIfAny(athlete);
           await athlete.save();
+          // Same auto-provisioning as the single approve above — approving a
+          // self-registered player creates their login. Idempotent, and a
+          // failure here is contained to this one item (caught below), so it
+          // never aborts the rest of the batch.
+          await ensurePlayerAccountForAthlete(athlete);
         }
         results.push({ ...item, ok: true });
       } catch (err) {

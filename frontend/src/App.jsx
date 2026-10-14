@@ -38,6 +38,7 @@ import PricingPage from "./pages/PricingPage";
 import PosterGenerator from "./pages/PosterGenerator";
 import PaymentReturn from "./pages/PaymentReturn";
 import RefereeSchedulePage from "./pages/RefereeSchedulePage";
+import PlayerRegister from "./pages/PlayerRegister";
 
 export default function App() {
   return (
@@ -64,6 +65,10 @@ export default function App() {
           }
         />
         <Route path="/verify/:verifyId" element={<VerifyPage />} />
+        {/* Public player self-registration via a Head Coach's shared link —
+            no login (the player doesn't have an account yet). The token in
+            the URL authorizes it; see PlayerRegister.jsx. */}
+        <Route path="/register/:token" element={<PlayerRegister />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/shop" element={<ShopPage />} />
         <Route path="/pricing" element={<PricingPage />} />
