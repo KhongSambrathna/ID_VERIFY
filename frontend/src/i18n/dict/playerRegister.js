@@ -14,6 +14,9 @@ export const km = {
   "playerRegister.pendingNote":
     "ការចុះឈ្មោះរបស់អ្នកកំពុងរង់ចាំការអនុម័តពីអ្នកគ្រប់គ្រង។ បន្ទាប់ពីត្រូវបានអនុម័ត អ្នកអាចចូលគណនីដោយប្រើលេខសម្គាល់ និងលេខសម្ងាត់ខាងលើ ហើយអ្នកនឹងត្រូវប្តូរលេខសម្ងាត់ជារបស់ខ្លួនឯងនៅពេលចូលដំបូង។",
   "playerRegister.goToLogin": "ទៅទំព័រចូលគណនី",
+  "playerRegister.fullNamePlaceholder": "LA TUNNAM",
+  "playerRegister.khmerNamePlaceholder": "ឡា តុនណាម",
+  "playerRegister.addressPlaceholder": "ភូមិនគរភាស២ ឃុំនគរភាស ស្រុកអង្គរជុំ ខេត្តសៀមរាប",
 };
 
 export const en = {
@@ -32,4 +35,7 @@ export const en = {
   "playerRegister.pendingNote":
     "Your registration is waiting for admin approval. Once approved, you can sign in with the ID and password above, and you'll be asked to set your own password the first time.",
   "playerRegister.goToLogin": "Go to sign in",
+  "playerRegister.fullNamePlaceholder": "LA TUNNAM",
+  "playerRegister.khmerNamePlaceholder": "ឡា តុនណាម",
+  "playerRegister.addressPlaceholder": "ភូមិនគរភាស២ ឃុំនគរភាស ស្រុកអង្គរជុំ ខេត្តសៀមរាប",
 };

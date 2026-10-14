@@ -149,11 +149,20 @@ export default function PlayerRegister() {
 
         <div className="field">
           <label>{t("addAthlete.fullName")}</label>
-          <input value={form.fullName} onChange={update("fullName")} required />
+          <input
+            value={form.fullName}
+            onChange={update("fullName")}
+            placeholder={t("playerRegister.fullNamePlaceholder")}
+            required
+          />
         </div>
         <div className="field">
           <label>{t("addAthlete.khmerName")}</label>
-          <input value={form.khmerName} onChange={update("khmerName")} />
+          <input
+            value={form.khmerName}
+            onChange={update("khmerName")}
+            placeholder={t("playerRegister.khmerNamePlaceholder")}
+          />
         </div>
         <div className="field">
           <label>{t("addAthlete.dateOfBirth")}</label>
@@ -169,7 +178,11 @@ export default function PlayerRegister() {
         </div>
         <div className="field">
           <label>{t("addAthlete.address")}</label>
-          <input value={form.address} onChange={update("address")} />
+          <input
+            value={form.address}
+            onChange={update("address")}
+            placeholder={t("playerRegister.addressPlaceholder")}
+          />
         </div>
         <div className="field">
           <label>{t("addAthlete.photo")}</label>
