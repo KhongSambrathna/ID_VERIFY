@@ -53,6 +53,7 @@ export const km = {
   "adminDashboard.prevPage": "← មុន",
   "adminDashboard.nextPage": "បន្ទាប់ →",
   "adminDashboard.pageOf": "ទំព័រ {page} / {totalPages}",
+  "adminDashboard.registrationLinksTab": "តំណចុះឈ្មោះកីឡាករ",
 };
 
 export const en = {
@@ -110,4 +111,5 @@ export const en = {
   "adminDashboard.prevPage": "← Prev",
   "adminDashboard.nextPage": "Next →",
   "adminDashboard.pageOf": "Page {page} / {totalPages}",
+  "adminDashboard.registrationLinksTab": "Registration links",
 };

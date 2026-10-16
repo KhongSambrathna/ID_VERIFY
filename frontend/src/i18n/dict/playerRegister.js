@@ -17,6 +17,13 @@ export const km = {
   "playerRegister.fullNamePlaceholder": "LA TUNNAM",
   "playerRegister.khmerNamePlaceholder": "ឡា តុនណាម",
   "playerRegister.addressPlaceholder": "ភូមិនគរភាស២ ឃុំនគរភាស ស្រុកអង្គរជុំ ខេត្តសៀមរាប",
+  "playerRegister.duplicateTitle": "ឈ្មោះនេះមាននៅក្រុមផ្សេងទៀតហើយ!",
+  "playerRegister.duplicateIntro": 'ឈ្មោះ "{team}" ត្រូវការកំណែកមុខមុនបន្ត។',
+  "playerRegister.duplicateNote": "កីឡាករមានមួយអោយមានក្រុមប៉ុណ្ណោះប្រើប្រាស់ — សូមជ្រើសរើសរបៀបរួមដោយជ្រើសរើសមុន។",
+  "playerRegister.thisIsMeAddToTeam": 'បាទ/ចាសខ្ញុំនឹងអ្នកនេះបន្ទាប់ចូលក្រុម "{team}"',
+  "playerRegister.registerAnyway": "ចូលរួមជាអ្នកផ្សេងទៀតដោយមិនប្រើឈ្មោះនេះ",
+  "playerRegister.duplicateInOtherTeam": "ឈ្មោះនេះមាននៅក្រុមផ្សេងទៀត ត្រូវការកំណែកមុខមុន។",
+  "playerRegister.claimFailed": "បរាជ័យក្នុងការចូលរួមក្រុម",
 };
 
 export const en = {
@@ -38,4 +45,11 @@ export const en = {
   "playerRegister.fullNamePlaceholder": "LA TUNNAM",
   "playerRegister.khmerNamePlaceholder": "ឡា តុនណាម",
   "playerRegister.addressPlaceholder": "ភូមិនគរភាស២ ឃុំនគរភាស ស្រុកអង្គរជុំ ខេត្តសៀមរាប",
+  "playerRegister.duplicateTitle": "This name is already on another team!",
+  "playerRegister.duplicateIntro": 'The "{team}" name exists — confirmation required before continuing.',
+  "playerRegister.duplicateNote": "A player can belong to more than one team — please confirm how to proceed before continuing.",
+  "playerRegister.thisIsMeAddToTeam": 'Yes, this is me — add me to "{team}"',
+  "playerRegister.registerAnyway": "No, register me as a new person anyway",
+  "playerRegister.duplicateInOtherTeam": "This name is already registered on another team — confirmation required",
+  "playerRegister.claimFailed": "Failed to join team",
 };

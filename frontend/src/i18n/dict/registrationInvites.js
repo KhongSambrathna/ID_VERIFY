@@ -16,6 +16,10 @@ export const km = {
   "registrationInvites.statusActive": "កំពុងដំណើរការ",
   "registrationInvites.statusUsed": "បានប្រើរួច",
   "registrationInvites.statusRevoked": "បានលុបចេញ",
+  "registrationInvites.adminOnlyCreate":
+    "តំណចុះឈ្មោះអាចបង្កើតបានដោយអ្នកគ្រប់គ្រង (ADMIN) តែម្ដង។",
+  "registrationInvites.adminOnly": "អាចបង្កើតតំណចុះឈ្មោះបានដោយអ្នកគ្រប់គ្រង (ADMIN) តែម្ដង។",
+  "registrationInvites.teamRequired": "សូមជ្រើសក្រុមមុនបង្កើតតំណ។",
 };
 
 export const en = {
@@ -36,4 +40,7 @@ export const en = {
   "registrationInvites.statusActive": "Active",
   "registrationInvites.statusUsed": "Used",
   "registrationInvites.statusRevoked": "Revoked",
+  "registrationInvites.adminOnlyCreate": "Registration links can only be created by an Admin.",
+  "registrationInvites.adminOnly": "Only an Admin can create registration links.",
+  "registrationInvites.teamRequired": "Please pick a team before creating the link.",
 };

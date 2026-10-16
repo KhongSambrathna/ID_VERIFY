@@ -4,6 +4,7 @@ import api from "../api/axios";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { useLanguage } from "../i18n/LanguageContext";
 import useScrollRestoration from "../hooks/useScrollRestoration";
+import RegistrationInviteManager from "../components/RegistrationInviteManager";
 
 const PAGE_SIZE = 15;
 
@@ -316,6 +317,12 @@ export default function AdminDashboard() {
         >
           {t("adminDashboard.pendingEditTab").replace("{count}", pendingEditCount)}
         </button>
+        <button
+          className={`tab-btn ${activeTab === "registration" ? "active" : ""}`}
+          onClick={() => switchTab("registration")}
+        >
+          {t("adminDashboard.registrationLinksTab")}
+        </button>
       </div>
 
       {/* ALL ATHLETES TAB — browse/manage everything; approve/reject moved to
@@ -553,6 +560,7 @@ export default function AdminDashboard() {
           )}
         </>
       )}
+      {activeTab === "registration" && <RegistrationInviteManager />}
     </div>
   );
 }
