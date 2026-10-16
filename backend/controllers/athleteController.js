@@ -1085,33 +1085,33 @@ exports.deleteAthlete = async (req, res) => {
   }
 };
 
-// GET /api/athletes/check-duplicate?fullName=...&khmerName=...  (admin/head
-// coach) — used by the Add-athlete form to warn before registering a player
-// whose name already exists, so the same real person doesn't accidentally
-// get an untracked second profile. Not a hard block — two different people
-// can share a name — so it just returns whatever near-matches exist (with
-// their current team/role assignments) and lets the caller decide whether
-// to register a new person or add a team/role to the matched one instead
-// (via addAssignment above). A Head Coach only sees matches that include
-// their own team.
+// GET /api/athletes/check-duplicate?fullName=...  (admin/head coach) — used
+// by the Add-athlete form to surface players whose name already exists, so the
+// same real person doesn't accidentally get an untracked second profile. The
+// person filling the form can then either attach this team/role to a matched
+// record (via addAssignment) or confirm they really are a new, separate
+// person. ENGLISH NAME ONLY — Khmer names are deliberately not searched
+// (transliteration makes them unreliable to match on); this matches the
+// self-registration form, which searches the same way. Matching is "same or
+// similar": a case-insensitive substring, so a partial name ("TUN") surfaces
+// the full one ("LA TUNNAM") and an exact name still matches. Advisory only —
+// never a hard block, since two different people can share a name. A Head
+// Coach only sees matches that include their own team.
 exports.checkDuplicateName = async (req, res) => {
   try {
     const fullName = (req.query.fullName || "").trim();
-    const khmerName = (req.query.khmerName || "").trim();
-    if (!fullName && !khmerName) return res.json({ duplicates: [] });
+    // Ignore 1-character inputs — they'd match half the roster and just add
+    // noise. The frontend also waits for real input before calling this.
+    if (fullName.length < 2) return res.json({ duplicates: [] });
 
     const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const orClauses = [];
-    if (fullName) orClauses.push({ fullName: new RegExp(`^${escape(fullName)}$`, "i") });
-    if (khmerName) orClauses.push({ khmerName: new RegExp(`^${escape(khmerName)}$`, "i") });
-
-    const query = { $or: orClauses };
+    const query = { fullName: new RegExp(escape(fullName), "i") };
     if (req.query.excludeId) query._id = { $ne: req.query.excludeId };
     if (req.adminRole === "HEAD_COACH") query["assignments.team"] = req.adminTeam;
 
     const duplicates = await Athlete.find(query)
       .select("fullName khmerName assignments verifyId photoUrl")
-      .limit(5);
+      .limit(8);
 
     res.json({ duplicates });
   } catch (err) {

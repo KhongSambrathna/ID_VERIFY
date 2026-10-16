@@ -40,9 +40,11 @@ export default function AddAthlete() {
   const update = (key) => (e) => setForm({ ...form, [key]: e.target.value });
 
   useEffect(() => {
+    // English name ONLY drives the duplicate search — Khmer names are never
+    // searched (transliteration is unreliable), same rule as the backend's
+    // check-duplicate and the self-registration form.
     const fullName = form.fullName.trim();
-    const khmerName = form.khmerName.trim();
-    if (!fullName && !khmerName) {
+    if (fullName.length < 2) {
       setDuplicates([]);
       return;
     }
@@ -51,7 +53,7 @@ export default function AddAthlete() {
     const timer = setTimeout(async () => {
       try {
         const { data } = await api.get("/athletes/check-duplicate", {
-          params: { fullName, khmerName },
+          params: { fullName },
         });
         setDuplicates(data.duplicates || []);
       } catch {
@@ -62,7 +64,7 @@ export default function AddAthlete() {
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [form.fullName, form.khmerName]);
+  }, [form.fullName]);
 
   // Attaches the team/role currently filled in on this form to an EXISTING
   // matched person, instead of creating a whole new record for them.
