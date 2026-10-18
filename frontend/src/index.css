@@ -470,6 +470,44 @@ a {
   letter-spacing: 0.5px;
   color: var(--navy);
 }
+/* Large athlete photo frame shown on the self-registration success screen,
+   right after the player submits their photo + ID documents. */
+.register-photo-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 14px 0 10px;
+}
+.register-photo {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 3px solid var(--navy);
+  background: #eee;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.register-photo-placeholder {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 3px dashed var(--line);
+  background: #f3f1e8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #888;
+}
+.register-photo-placeholder span[role="img"] {
+  font-size: 42px;
+  line-height: 1;
+}
+.register-photo-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+}
 .field {
   margin-bottom: 16px;
 }

@@ -29,6 +29,10 @@ export default function DebtReportPage() {
   const [cashNote, setCashNote] = useState("");
   const [cashSaving, setCashSaving] = useState(false);
   const [cashError, setCashError] = useState("");
+  // Bakong KHQR payment state.
+  const [bakongOpenId, setBakongOpenId] = useState(null);
+  const [bakongCreating, setBakongCreating] = useState(false);
+  const [bakongError, setBakongError] = useState("");
   // "Copy debt message" — briefly shows a "Copied!" state on whichever row's
   // button was just clicked, per assignmentId.
   const [copiedId, setCopiedId] = useState(null);
@@ -85,6 +89,28 @@ export default function DebtReportPage() {
       setCashError(err.response?.data?.message || t("debtReport.cashSaveFailed"));
     } finally {
       setCashSaving(false);
+    }
+  };
+
+  const createBakongPayment = async (a) => {
+    setBakongOpenId(a.assignmentId);
+    setBakongCreating(true);
+    setBakongError("");
+    try {
+      const { data } = await api.post("/bakong/payment/create", {
+        athleteId: a._id,
+        assignmentId: a.assignmentId,
+        amount: a.feeOwed,
+      });
+      if (data.md5) {
+        window.location.href = `/payment/return?md5=${encodeURIComponent(data.md5)}`;
+      } else {
+        setBakongError("Bakong did not return a payment reference");
+        setBakongCreating(false);
+      }
+    } catch (err) {
+      setBakongError(err.response?.data?.message || t("debtReport.bakongCreateFailed"));
+      setBakongCreating(false);
     }
   };
 
@@ -252,6 +278,16 @@ export default function DebtReportPage() {
                           onClick={() => (cashOpenId === a.assignmentId ? closeCashForm() : openCashForm(a))}
                         >
                           {t("debtReport.recordCash")}
+                        </button>
+                        <button
+                          type="button"
+                          className="action-btn"
+                          disabled={bakongOpenId === a.assignmentId && bakongCreating}
+                          onClick={() => createBakongPayment(a)}
+                        >
+                          {bakongOpenId === a.assignmentId && bakongCreating
+                            ? t("debtReport.bakongCreatingBtn")
+                            : t("debtReport.bakongPayBtn")}
                         </button>
                         {a.facebookProfileUrl && (
                           <a

@@ -15,6 +15,7 @@ const shareRoutes = require("./routes/shareRoutes");
 const tournamentRoutes = require("./routes/tournamentRoutes");
 const serviceRoutes = require("./routes/serviceRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
+const bakongRoutes = require("./routes/bakongRoutes");
 const attendanceRoutes = require("./routes/attendanceRoutes");
 const registrationRoutes = require("./routes/registrationRoutes");
 
@@ -43,6 +44,7 @@ app.use("/api/products", productRoutes);
 app.use("/api/tournaments", tournamentRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/bakong", bakongRoutes);
 app.use("/api/attendance", attendanceRoutes);
 // Player self-registration via a Head Coach's shared link — public token
 // routes (a brand-new player with no account submits their own details) plus

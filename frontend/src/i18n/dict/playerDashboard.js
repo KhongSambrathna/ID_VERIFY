@@ -14,6 +14,8 @@ export const km = {
   "playerDashboard.khqrInstructionsSuffix":
     "ដោយខ្លួនឯង (QR មិនកំណត់ចំនួនអោយស្វ័យប្រវត្តិទេ) បន្ទាប់មកប្រាប់គ្រូបង្វឹក ឬអ្នកគ្រប់គ្រងថាបានទូទាត់រួចហើយ ដើម្បីអោយគេកត់ត្រាទុក។",
   "playerDashboard.khqrNotSetUp": "ក្រុមរបស់អ្នកមិនទាន់រៀបចំ QR ទូទាត់ ABA នៅឡើយទេ — សូមទូទាត់ដោយផ្ទាល់ជាមួយគ្រូបង្វឹក ឬអ្នកគ្រប់គ្រង។",
+  "playerDashboard.bakongPayBtn": "ទូទាត់ជា Bakong KHQR",
+  "playerDashboard.bakongCreating": "កំពុងបង់អប់អប់…",
   "playerDashboard.editMyProfile": "កែប្រែពត៌មានផ្ទាល់ខ្លួន",
 };
 
@@ -33,5 +35,7 @@ export const en = {
   "playerDashboard.khqrInstructionsSuffix":
     "yourself (the QR doesn't carry an amount automatically), then tell your coach or admin you've paid so they can record it.",
   "playerDashboard.khqrNotSetUp": "Your team hasn't set up an ABA payment QR yet — please pay your coach or admin directly.",
+  "playerDashboard.bakongPayBtn": "Pay with Bakong KHQR",
+  "playerDashboard.bakongCreating": "Creating Bakong QR…",
   "playerDashboard.editMyProfile": "Edit my profile",
 };

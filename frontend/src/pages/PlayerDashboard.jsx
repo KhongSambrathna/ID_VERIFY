@@ -40,6 +40,9 @@ export default function PlayerDashboard() {
   // coach/admin so it gets recorded (Debt report → "ABA (KHQR)").
   const [khqrImageUrl, setKhqrImageUrl] = useState(null);
   const [khqrLoading, setKhqrLoading] = useState(true);
+  // Bakong KHQR dynamic payment state — keyed by assignmentId.
+  const [bakongCreatingId, setBakongCreatingId] = useState(null);
+  const [bakongError, setBakongError] = useState("");
 
   const toggleExpanded = (assignmentId) => {
     setExpandedIds((prev) => {
@@ -76,6 +79,27 @@ export default function PlayerDashboard() {
       })
       .finally(() => setKhqrLoading(false));
   }, []);
+
+  const createBakongPayment = async (athlete) => {
+    setBakongCreatingId(athlete.assignmentId);
+    setBakongError("");
+    try {
+      const { data } = await api.post("/bakong/payment/create", {
+        athleteId: athlete._id,
+        assignmentId: athlete.assignmentId,
+        amount: athlete.feeOwed,
+      });
+      if (data.md5) {
+        window.location.href = `/payment/return?md5=${encodeURIComponent(data.md5)}`;
+      } else {
+        setBakongError("Bakong did not return a payment reference");
+        setBakongCreatingId(null);
+      }
+    } catch (err) {
+      setBakongError(err.response?.data?.message || "Could not create Bakong payment");
+      setBakongCreatingId(null);
+    }
+  };
 
   const filteredAthletes = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -189,6 +213,20 @@ export default function PlayerDashboard() {
                     <p className="help-text" style={{ margin: 0 }}>
                       {t("playerDashboard.khqrNotSetUp")}
                     </p>
+                  )}
+                  {athlete.feeOwed > 0 && bakongCreatingId === athlete.assignmentId && (
+                    <p className="help-text" style={{ margin: "6px 0 0 0", color: "#d9534f" }}>
+                      {bakongError || t("playerDashboard.bakongCreating")}
+                    </p>
+                  )}
+                  {athlete.feeOwed > 0 && bakongCreatingId !== athlete.assignmentId && (
+                    <button
+                      type="button"
+                      className="link-btn"
+                      onClick={() => createBakongPayment(athlete)}
+                    >
+                      {t("playerDashboard.bakongPayBtn")}
+                    </button>
                   )}
                 </div>
               )}

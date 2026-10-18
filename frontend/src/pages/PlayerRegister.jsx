@@ -199,6 +199,22 @@ export default function PlayerRegister() {
         <div className="card" style={{ maxWidth: 520 }}>
           <h2>✅ {t("playerRegister.successTitle")}</h2>
           <p>{t("playerRegister.successIntro")}</p>
+          <div className="register-photo-wrap">
+            {result.photoUrl ? (
+              <img
+                className="register-photo"
+                src={resolveFileUrl(result.photoUrl)}
+                alt={result.fullName}
+              />
+            ) : (
+              <div className="register-photo-placeholder">
+                <span role="img" aria-label={t("common.photo")}>
+                  📷
+                </span>
+                <span className="register-photo-label">{t("common.photo")}</span>
+              </div>
+            )}
+          </div>
           <div className="credentials-box">
             <div className="credential-row">
               <span className="credential-label">{t("playerRegister.yourId")}</span>
