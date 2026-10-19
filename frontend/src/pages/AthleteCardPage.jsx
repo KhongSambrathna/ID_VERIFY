@@ -41,10 +41,8 @@ export default function AthleteCardPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [feeExpanded, setFeeExpanded] = useState(false);
-  const [renewing, setRenewing] = useState(false);
   const [scanLogs, setScanLogs] = useState(null);
   const [scanLogsOpen, setScanLogsOpen] = useState(false);
-  const [autoRenewing, setAutoRenewing] = useState(false);
   const [pendingAction, setPendingAction] = useState(null); // "print" | "jpg" | null
   const exportWrapRef = useRef(null);
 
@@ -60,19 +58,7 @@ export default function AthleteCardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // Admin any record; Head Coach their own team — just stamps
-  // lastVerifiedAt to today, clearing the "needs renewal" badge.
-  const renewVerification = async () => {
-    setRenewing(true);
-    try {
-      const { data } = await api.put(`/athletes/${id}/renew`);
-      setAthlete(data);
-    } catch {
-      // non-critical — silently ignore, the badge just stays as-is
-    } finally {
-      setRenewing(false);
-    }
-  };
+
 
   // QR-verify scan history — timestamp + IP/device only (that page has no
   // login, so there's no "who" to show). Admin/Head Coach only, loaded on
@@ -144,22 +130,8 @@ export default function AthleteCardPage() {
     }
   };
 
-  // Stamps verification to today before every print/export, so the VALID
-  // date on the card is always current without a separate manual Renew
-  // step. Only sets pendingAction — the actual print/capture happens in
-  // the effect below, once React has committed the refreshed athlete (and
-  // so the updated VALID date) to the DOM.
   const requestExport = async (action) => {
-    setAutoRenewing(true);
-    try {
-      const { data } = await api.put(`/athletes/${id}/renew`);
-      setAthlete(data);
-      setPendingAction(action);
-    } catch (err) {
-      alert(err.response?.data?.message || t("athleteCardPage.failedToRenew"));
-    } finally {
-      setAutoRenewing(false);
-    }
+    setPendingAction(action);
   };
 
   useEffect(() => {
@@ -327,21 +299,6 @@ export default function AthleteCardPage() {
                           new Date(athlete.lastVerifiedAt).toLocaleDateString()
                         )
                       : t("athleteCardPage.neverVerified")}
-                    {(!athlete.lastVerifiedAt ||
-                      Date.now() - new Date(athlete.lastVerifiedAt).getTime() > 365 * 24 * 60 * 60 * 1000) && (
-                      <span className="badge rejected" style={{ marginLeft: 8 }}>
-                        {t("athleteCardPage.needsRenewal")}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      className="link-btn"
-                      style={{ marginLeft: 8 }}
-                      onClick={renewVerification}
-                      disabled={renewing}
-                    >
-                      {renewing ? t("athleteCardPage.renewing") : t("athleteCardPage.renewVerifiedToday")}
-                    </button>
                     <div style={{ marginTop: 4 }}>
                       <button type="button" className="link-btn" onClick={loadScanLogs}>
                         {scanLogsOpen
@@ -431,21 +388,17 @@ export default function AthleteCardPage() {
               <button
                 className="btn btn-primary"
                 onClick={() => requestExport("print")}
-                disabled={autoRenewing}
+                disabled={saving}
               >
-                {autoRenewing ? t("athleteCardPage.renewing") : t("athleteCardPage.exportPrint")}
+                {t("athleteCardPage.exportPrint")}
               </button>
               <button
                 className="btn btn-outline"
                 style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
                 onClick={() => requestExport("jpg")}
-                disabled={autoRenewing || saving}
+                disabled={saving}
               >
-                {saving
-                  ? t("athleteCardPage.saving")
-                  : autoRenewing
-                  ? t("athleteCardPage.renewing")
-                  : t("athleteCardPage.saveAsJpg")}
+                {saving ? t("athleteCardPage.saving") : t("athleteCardPage.saveAsJpg")}
               </button>
             </div>
           </div>

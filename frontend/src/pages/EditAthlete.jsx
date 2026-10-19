@@ -5,7 +5,6 @@ import TeamSelect from "../components/TeamSelect";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
-import RequireActiveSubscription from "../components/RequireActiveSubscription";
 
 const ROLE_OPTIONS = ["PLAYER", "ASSISTAN COACH", "HEAD COACH", "TECHNICAL", "MEDIC"];
 const ROLE_LABEL_KEYS = {
@@ -188,21 +187,6 @@ export default function EditAthlete() {
     const draft = jerseyDrafts[a._id];
     const draftNum = draft === "" ? null : Number(draft);
     return draftNum !== (a.jerseyNumber ?? null);
-  };
-
-  // Admin any record, Head Coach their own team — just stamps
-  // lastVerifiedAt to today. Never blocks anything; it only clears the
-  // "needs renewal" badge once it's over a year old.
-  const renewVerification = async () => {
-    setRenewing(true);
-    try {
-      const { data } = await api.put(`/athletes/${id}/renew`);
-      setAthlete(data);
-    } catch (err) {
-      setError(err.response?.data?.message || t("editAthlete.failedToRenew"));
-    } finally {
-      setRenewing(false);
-    }
   };
 
   // Saves the "Open Messenger" link on its own — a whole-person field, not
@@ -404,7 +388,6 @@ export default function EditAthlete() {
   }
 
   return (
-    <RequireActiveSubscription>
     <div className="container" style={{ paddingBottom: 60 }}>
       <div className="dash-header">
         <h2>{t("editAthlete.title")}</h2>
@@ -417,13 +400,6 @@ export default function EditAthlete() {
                 )
               : t("editAthlete.neverVerified")}
           </span>
-          {(!athlete?.lastVerifiedAt ||
-            Date.now() - new Date(athlete.lastVerifiedAt).getTime() > 365 * 24 * 60 * 60 * 1000) && (
-            <span className="badge rejected">{t("editAthlete.needsRenewal")}</span>
-          )}
-          <button type="button" className="link-btn" onClick={renewVerification} disabled={renewing}>
-            {renewing ? t("editAthlete.renewing") : t("editAthlete.renewVerifiedToday")}
-          </button>
           {!isHeadCoach && (
             <Link to={`/admin/athlete/${id}`} className="link-btn">
               {t("editAthlete.backToRecord")}
@@ -850,6 +826,7 @@ export default function EditAthlete() {
         </button>
       </form>
     </div>
-    </RequireActiveSubscription>
+    
+
   );
 }

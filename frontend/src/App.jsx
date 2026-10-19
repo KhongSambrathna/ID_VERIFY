@@ -15,14 +15,12 @@ import SearchPage from "./pages/SearchPage";
 import AboutUs from "./pages/AboutUs";
 import CoachDashboard from "./pages/CoachDashboard";
 import AdminUsers from "./pages/AdminUsers";
-import AdminSubscriptions from "./pages/AdminSubscriptions";
 import AdminSponsors from "./pages/AdminSponsors";
 import AdminMatchDay from "./pages/AdminMatchDay";
 import AdminShop from "./pages/AdminShop";
 import ShopPage from "./pages/ShopPage";
 import DebtReportPage from "./pages/DebtReportPage";
 import StatsPage from "./pages/StatsPage";
-import RenewPage from "./pages/RenewPage";
 import PlayerDashboard from "./pages/PlayerDashboard";
 import PlayerEditProfile from "./pages/PlayerEditProfile";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
@@ -138,14 +136,6 @@ export default function App() {
           }
         />
         <Route
-          path="/admin/subscriptions"
-          element={
-            <ProtectedRoute role="ADMIN">
-              <AdminSubscriptions />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/admin/matchday"
           element={
             <ProtectedRoute role="ADMIN">
@@ -190,14 +180,6 @@ export default function App() {
           element={
             <ProtectedRoute role={["ADMIN", "HEAD_COACH"]}>
               <StatsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/renew"
-          element={
-            <ProtectedRoute role={["ADMIN", "HEAD_COACH"]}>
-              <RenewPage />
             </ProtectedRoute>
           }
         />

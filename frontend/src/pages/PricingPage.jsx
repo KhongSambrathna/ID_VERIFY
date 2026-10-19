@@ -3,48 +3,26 @@ import { Link } from "react-router-dom";
 import api from "../api/axios";
 import { useLanguage } from "../i18n/LanguageContext";
 
-const PLAN_ORDER = ["BASIC", "PRO", "PRO_MAX", "UNLIMITED"];
-const CYCLE_ORDER = ["MONTHLY", "HALF_YEAR", "YEARLY"];
 const TELEGRAM_USERNAME = "sambrathnajr";
 
-// Public marketing/pricing page — no login required. Reads two public
-// endpoints: GET /teams/plans (the same subscription pricing table the
-// Admin Subscriptions page uses — one source of truth, see
-// backend/utils/subscriptionPlans.js) and GET /services/pricing (referee +
-// trophy/award pricing, see backend/utils/servicePricing.js). There is no
-// in-app checkout for any of this — every service here is arranged with
-// the Admin outside the app, the same way Shop orders are.
+// Public marketing/pricing page — no login required. Reads GET /services/pricing
+// (referee + trophy/award pricing, see backend/utils/servicePricing.js). There is
+// no in-app checkout — every service is arranged with the Admin outside the app.
 export default function PricingPage() {
   const { t } = useLanguage();
-  const [plans, setPlans] = useState([]);
   const [services, setServices] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    Promise.all([api.get("/teams/plans"), api.get("/services/pricing")])
-      .then(([{ data: planData }, { data: serviceData }]) => {
-        setPlans(planData);
+    api
+      .get("/services/pricing")
+      .then(({ data: serviceData }) => {
         setServices(serviceData);
       })
       .catch((err) => setError(err.response?.data?.message || t("pricingPage.failedToLoad")))
       .finally(() => setLoading(false));
   }, []);
-
-  const planLabel = (key) =>
-    ({
-      BASIC: t("pricingPage.planBasic"),
-      PRO: t("pricingPage.planPro"),
-      PRO_MAX: t("pricingPage.planProMax"),
-      UNLIMITED: t("pricingPage.planUnlimited"),
-    })[key] || key;
-
-  const cycleLabel = (key) =>
-    ({
-      MONTHLY: t("pricingPage.cycleMonthly"),
-      HALF_YEAR: t("pricingPage.cycleHalfYear"),
-      YEARLY: t("pricingPage.cycleYearly"),
-    })[key] || key;
 
   // "Contact Admin" placeholder for any service price not filled in yet.
   const money = (value, suffix = "") =>
@@ -64,55 +42,6 @@ export default function PricingPage() {
 
       {!loading && !error && (
         <>
-          <h2 className="pricing-section-title">{t("pricingPage.subscriptionHeading")}</h2>
-          <p className="pricing-section-intro">{t("pricingPage.subscriptionIntro")}</p>
-
-          <div className="pricing-grid">
-            {PLAN_ORDER.map((key) => {
-              const plan = plans.find((p) => p.key === key);
-              if (!plan) return null;
-              const yearly = plan.pricing.find((p) => p.billingCycle === "YEARLY");
-              const featured = key === "PRO";
-              return (
-                <div key={key} className={`pricing-card${featured ? " featured" : ""}`}>
-                  {featured && <span className="pricing-ribbon">{t("pricingPage.mostPopular")}</span>}
-                  <h3 className="pricing-card-name">{planLabel(key)}</h3>
-                  <p className="pricing-card-cap">
-                    {plan.maxPlayers == null
-                      ? t("pricingPage.unlimitedPlayers")
-                      : t("pricingPage.playerCap").replace("{n}", plan.maxPlayers)}
-                  </p>
-                  {yearly && (
-                    <p className="pricing-card-price">
-                      <span className="pricing-amount">${yearly.pricePerMonth}</span>
-                      <span className="pricing-per">/{t("pricingPage.perMonth")}</span>
-                    </p>
-                  )}
-                  <p className="pricing-card-billed">
-                    {yearly && t("pricingPage.billedYearly").replace("{total}", yearly.total)}
-                  </p>
-                  <ul className="pricing-card-cycles">
-                    {CYCLE_ORDER.map((cycle) => {
-                      const price = plan.pricing.find((p) => p.billingCycle === cycle);
-                      if (!price) return null;
-                      return (
-                        <li key={cycle}>
-                          {cycleLabel(cycle)}: <strong>${price.pricePerMonth}</strong>/{t("pricingPage.perMonthShort")}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              );
-            })}
-          </div>
-          <p className="pricing-contact-note">
-            {t("pricingPage.subscriptionContactNote")}{" "}
-            <a href={contactHref} target="_blank" rel="noopener noreferrer">
-              Telegram
-            </a>
-          </p>
-
           <h2 className="pricing-section-title">{t("pricingPage.servicesHeading")}</h2>
           <p className="pricing-section-intro">{t("pricingPage.servicesIntro")}</p>
 

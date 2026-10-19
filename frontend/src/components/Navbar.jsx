@@ -111,14 +111,12 @@ export default function Navbar() {
 
           {isAuthed && !isPlayer && !isReferee && (
             <NavDropdown label={t("navbar.manage")}>
-              <Link to="/admin/renew" onClick={closeMenu}>{t("navbar.idRenewal")}</Link>
               <Link to="/admin/tournaments" onClick={closeMenu}>{t("navbar.tournaments")}</Link>
               {isAdmin && <Link to="/admin/matchday" onClick={closeMenu}>{t("navbar.matchDay")}</Link>}
               {isHeadCoach && (
                 <Link to="/coach?tab=attendance" onClick={closeMenu}>{t("navbar.attendance")}</Link>
               )}
               {isAdmin && <Link to="/admin/users" onClick={closeMenu}>{t("navbar.users")}</Link>}
-              {isAdmin && <Link to="/admin/subscriptions" onClick={closeMenu}>{t("navbar.subscriptions")}</Link>}
               {isAdmin && <Link to="/admin/jersey-orders" onClick={closeMenu}>{t("navbar.jerseyOrders")}</Link>}
             </NavDropdown>
           )}

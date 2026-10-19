@@ -6,9 +6,6 @@ const generateAthleteQR = require("../utils/generateQR");
 const uploadBufferToCloudinary = require("../utils/uploadToCloudinary");
 const { notifyAdmins } = require("../utils/notify");
 const { DEFAULT_PLAYER_PASSWORD } = require("../utils/playerAccount");
-// Reuse the exact same per-team player-cap rule the normal add-athlete route
-// enforces, so a self-registration can't sneak past a team's plan limit.
-const { checkPlayerCap } = require("./athleteController");
 
 // Resolve which team an invite targets. A Head Coach is always forced to
 // their OWN team (req.adminTeam) — the team is never trusted from the request
@@ -272,9 +269,6 @@ exports.registerViaInvite = async (req, res) => {
       }
     }
 
-    const capError = await checkPlayerCap(team, role);
-    if (capError) return res.status(400).json({ message: capError });
-
     const verifyId = await generateShortId();
 
     const athlete = new Athlete({
@@ -410,9 +404,6 @@ exports.claimExisting = async (req, res) => {
     if (athlete.assignments.some((a) => a.team === team && a.role === role)) {
       return res.status(400).json({ message: `They're already on ${team} as ${role}` });
     }
-
-    const capError = await checkPlayerCap(team, role);
-    if (capError) return res.status(400).json({ message: capError });
 
     athlete.assignments.push({ team, role, approvalStatus: "pending", everApproved: false });
     await athlete.save();

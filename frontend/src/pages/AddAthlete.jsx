@@ -5,7 +5,6 @@ import TeamSelect from "../components/TeamSelect";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
-import RequireActiveSubscription from "../components/RequireActiveSubscription";
 
 export default function AddAthlete() {
   const { t } = useLanguage();
@@ -113,7 +112,6 @@ export default function AddAthlete() {
   };
 
   return (
-    <RequireActiveSubscription>
     <div className="container" style={{ paddingBottom: 60 }}>
       <div className="dash-header">
         <h2>{t("addAthlete.title")}</h2>
@@ -236,6 +234,6 @@ export default function AddAthlete() {
         </button>
       </form>
     </div>
-    </RequireActiveSubscription>
+    
   );
 }

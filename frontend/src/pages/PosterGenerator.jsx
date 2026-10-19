@@ -20,13 +20,6 @@ const CREAM = "#f6f3ec";
 const DISPLAY_SIZE = 540;
 const EXPORT_SCALE = 2;
 
-const PLAN_LABEL_KEY = {
-  BASIC: "pricingPage.planBasic",
-  PRO: "pricingPage.planPro",
-  PRO_MAX: "pricingPage.planProMax",
-  UNLIMITED: "pricingPage.planUnlimited",
-};
-
 // A generic shield-check glyph — this poster type is the "general
 // marketing" one (trust / official-club messaging), not tied to any one
 // feature, so a single consistent icon is used rather than a picker.
@@ -92,7 +85,6 @@ export default function PosterGenerator() {
     }
   };
 
-  const planLabel = selectedTeam?.subscriptionPlan ? t(PLAN_LABEL_KEY[selectedTeam.subscriptionPlan]) : null;
   const playerCount = selectedTeam?.playerCount ?? null;
 
   const downloadPng = async () => {

@@ -7,32 +7,7 @@ const uploadBufferToCloudinary = require("../utils/uploadToCloudinary");
 const cloudinary = require("../config/cloudinary");
 const flattenAssignments = require("../utils/flattenAssignments");
 const { notifyAdmins, notifyTeamCoaches } = require("../utils/notify");
-const { planInfo, countTeamPlayers } = require("../utils/subscriptionPlans");
 const { ensurePlayerAccountForAthlete } = require("../utils/playerAccount");
-
-// Enforces a team's subscription plan player cap (see
-// utils/subscriptionPlans.js) for any assignment being added/changed to
-// role "PLAYER" — a team that's never been assigned a plan defaults to
-// BASIC's 20-player cap rather than being treated as uncapped. Non-PLAYER
-// roles (coach/technical/medic) never count against this, and UNLIMITED
-// plans (maxPlayers: null) always pass. Returns null when it's fine to
-// proceed, or an error message string when the cap would be exceeded.
-async function checkPlayerCap(team, role) {
-  if (role !== "PLAYER") return null;
-  const teamDoc = await Team.findOne({ name: team });
-  const plan = teamDoc?.subscriptionPlan || "BASIC";
-  const { maxPlayers } = planInfo(plan);
-  if (maxPlayers == null) return null;
-
-  const current = await countTeamPlayers(Athlete, team);
-  if (current >= maxPlayers) {
-    return `${team} is at its ${plan.replace("_", " ")} plan's ${maxPlayers}-player limit. Ask an Admin to upgrade the plan to add more players.`;
-  }
-  return null;
-}
-// Exported so the public self-registration route enforces the exact same
-// per-team cap without duplicating the rule.
-exports.checkPlayerCap = checkPlayerCap;
 
 function toBool(value) {
   if (typeof value === "boolean") return value;
@@ -146,11 +121,6 @@ exports.createAthlete = async (req, res) => {
     const team = isHeadCoach ? req.adminTeam : req.body.team;
     if (isHeadCoach && !team) {
       return res.status(400).json({ message: "Your account has no team set — contact an admin" });
-    }
-
-    if (team) {
-      const capError = await checkPlayerCap(team, role || "PLAYER");
-      if (capError) return res.status(400).json({ message: capError });
     }
 
     const verifyId = await generateShortId();
@@ -651,9 +621,6 @@ exports.addAssignment = async (req, res) => {
       return res.status(400).json({ message: "This person already has that exact team and role" });
     }
 
-    const capError = await checkPlayerCap(team, role);
-    if (capError) return res.status(400).json({ message: capError });
-
     athlete.assignments.push({
       team,
       role,
@@ -692,8 +659,6 @@ exports.updateAssignment = async (req, res) => {
 
     if (req.body.role && req.body.role !== assignment.role) {
       if (req.body.role === "PLAYER") {
-        const capError = await checkPlayerCap(assignment.team, "PLAYER");
-        if (capError) return res.status(400).json({ message: capError });
       }
       assignment.role = req.body.role;
       if (isHeadCoach) assignment.approvalStatus = "pending";
@@ -715,26 +680,6 @@ exports.updateAssignment = async (req, res) => {
       }
     }
 
-    await athlete.save();
-    res.json(athlete);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-// PUT /api/athletes/:id/renew — marks this person's identity as freshly
-// re-checked today (Admin any record; Head Coach only their own team).
-// Just stamps `lastVerifiedAt` — never blocks or gates anything else, it
-// only clears the "needs renewal" badge once it's over a year old.
-exports.renewVerification = async (req, res) => {
-  try {
-    const athlete = await Athlete.findById(req.params.id);
-    if (!athlete) return res.status(404).json({ message: "Athlete not found" });
-    const isHeadCoach = req.adminRole === "HEAD_COACH";
-    if (isHeadCoach && !athlete.assignments.some((a) => a.team === req.adminTeam)) {
-      return res.status(403).json({ message: "Access denied" });
-    }
-    athlete.lastVerifiedAt = new Date();
     await athlete.save();
     res.json(athlete);
   } catch (err) {
@@ -1398,40 +1343,4 @@ exports.bulkApproveAssignments = async (req, res) => {
   }
 };
 
-// PUT /api/athletes/bulk-renew  (admin any; head coach only athletes on
-// their own team) — body: { athleteIds: [...] }. Stamps lastVerifiedAt to
-// today for each one, for clearing a backlog of "needs renewal" people from
-// the dedicated Renewal page instead of one at a time. lastVerifiedAt is a
-// whole-person field (not per-assignment), so this takes athlete ids
-// directly rather than {athleteId, assignmentId} pairs. Each item is
-// handled independently, same as bulk-approve above.
-exports.bulkRenewVerification = async (req, res) => {
-  try {
-    const athleteIds = Array.isArray(req.body.athleteIds) ? req.body.athleteIds : [];
-    if (!athleteIds.length) return res.status(400).json({ message: "No athletes given" });
 
-    const isHeadCoach = req.adminRole === "HEAD_COACH";
-    const results = [];
-    for (const athleteId of athleteIds) {
-      try {
-        const athlete = await Athlete.findById(athleteId);
-        if (!athlete) {
-          results.push({ athleteId, ok: false, message: "Athlete not found" });
-          continue;
-        }
-        if (isHeadCoach && !athlete.assignments.some((a) => a.team === req.adminTeam)) {
-          results.push({ athleteId, ok: false, message: "Access denied" });
-          continue;
-        }
-        athlete.lastVerifiedAt = new Date();
-        await athlete.save();
-        results.push({ athleteId, ok: true });
-      } catch (err) {
-        results.push({ athleteId, ok: false, message: err.message });
-      }
-    }
-    res.json({ results });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};

@@ -9,7 +9,6 @@ import StartingXIManager from "../components/StartingXIManager";
 import JerseyOrderManager from "../components/JerseyOrderManager";
 import AttendanceManager from "../components/AttendanceManager";
 import RegistrationInviteManager from "../components/RegistrationInviteManager";
-import RequireActiveSubscription from "../components/RequireActiveSubscription";
 import { useLanguage } from "../i18n/LanguageContext";
 
 function formatDob(dob) {
@@ -334,16 +333,7 @@ export default function CoachDashboard() {
     }
   };
 
-  // loading/error are checked INSIDE RequireActiveSubscription, not as an
-  // early return before it. This dashboard's own data fetch
-  // (GET /coach/my-team) is gated by the exact same subscription check as
-  // everything else on the coach router, so an expired Head Coach's fetch
-  // always fails with a 402 — if that failure short-circuited the render
-  // before reaching the wrapper below, they'd see this raw error text
-  // instead of the proper "subscription required" lock screen every time
-  // they opened this page.
   return (
-    <RequireActiveSubscription>
     {loading ? (
       <div className="container"><p>{t("common.loading")}</p></div>
     ) : error ? (
@@ -358,9 +348,6 @@ export default function CoachDashboard() {
         </p>
         <Link to="/admin/stats" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
           {t("coachDashboard.pendingDebtReport")}
-        </Link>
-        <Link to="/admin/renew" className="btn btn-outline" style={{ color: "var(--navy)", borderColor: "var(--navy)" }}>
-          {t("coachDashboard.idRenewal")}
         </Link>
       </div>
 
@@ -479,10 +466,6 @@ export default function CoachDashboard() {
                       >
                         {t("coachDashboard.owes")} ${athlete.feeOwed}
                       </span>
-                    )}
-                    {(!athlete.lastVerifiedAt ||
-                      Date.now() - new Date(athlete.lastVerifiedAt).getTime() > 365 * 24 * 60 * 60 * 1000) && (
-                      <span className="badge rejected">{t("coachDashboard.needsRenewal")}</span>
                     )}
                   </div>
                   <div className="athlete-status" style={{ marginTop: 8 }}>
@@ -841,6 +824,5 @@ export default function CoachDashboard() {
       )}
     </div>
     )}
-    </RequireActiveSubscription>
   );
 }

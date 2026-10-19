@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const { requireAuth, requireRole } = require("../middleware/auth");
-const { requireActiveSubscription } = require("../middleware/subscription");
 const {
   listAttendance,
   attendanceSummary,
@@ -11,12 +10,9 @@ const {
   deleteAttendance,
 } = require("../controllers/attendanceController");
 
-// Attendance recording is a staff (Admin/Head Coach) squad-management tool,
-// so it's gated behind the team's plan subscription exactly like squad
-// lists / formations / starting XI — requireActiveSubscription is a no-op
-// for Admin and only blocks a Head Coach whose own team's plan has lapsed.
-// Only Admin/Head Coach ever reach these routes.
-router.use(requireAuth, requireActiveSubscription);
+// Attendance recording is a staff (Admin/Head Coach) squad-management tool.
+// No longer gated behind a team's subscription.
+router.use(requireAuth);
 
 // Bare "/summary" above "/:id", same reasoning as tournamentRoutes/athleteRoutes.
 router.get("/summary", requireRole("ADMIN", "HEAD_COACH"), attendanceSummary);

@@ -6,8 +6,6 @@ const {
   listTeams,
   createTeam,
   deleteTeam,
-  listPlans,
-  getMySubscription,
   getMyKhqr,
   uploadMyKhqr,
   removeMyKhqr,
@@ -17,8 +15,6 @@ const {
   removeMyLogo,
   uploadTeamLogo,
   removeTeamLogo,
-  recordSubscriptionPayment,
-  revokeSubscription,
 } = require("../controllers/teamController");
 const {
   listMyJerseyOrders,
@@ -38,16 +34,11 @@ const {
   keepTeamJerseyOrderAdmin,
 } = require("../controllers/jerseyOrderController");
 
-// The plan/pricing table, a Head Coach's own subscription status, the
-// public team-logo lookup, and the "my team" KHQR/logo routes are all kept
+// The public team-logo lookup and the "my team" KHQR/logo routes are kept
 // above the blanket Admin-only gate below so they aren't swallowed by it.
-// The pricing table and the team-logo lookup are fully public (no auth) —
-// the pricing table is shown on the public Pricing page
-// (frontend/src/pages/PricingPage.jsx), and the logo lookup is what every
-// ID card (IDCard.jsx) calls to show a team's crest next to its QR code.
-router.get("/plans", listPlans);
+// The logo lookup is what every ID card (IDCard.jsx) calls to show a
+// team's crest next to its QR code.
 router.get("/logo/:name", getTeamLogo);
-router.get("/mine/subscription", requireAuth, requireRole("HEAD_COACH"), getMySubscription);
 
 // A team's static ABA Merchant KHQR image ("scan to pay" — see the Team
 // model comment for why this exists instead of full PayWay API access).
@@ -116,8 +107,6 @@ router.post("/", createTeam);
 router.delete("/:id", deleteTeam);
 router.put("/:id/logo", upload.single("logo"), uploadTeamLogo);
 router.delete("/:id/logo", removeTeamLogo);
-router.post("/:id/subscription", recordSubscriptionPayment);
-router.post("/:id/subscription/revoke", revokeSubscription);
 
 // Admin flavor of the jersey-order routes above — any team, by Team._id.
 router.get("/:id/jersey-orders", listTeamJerseyOrders);

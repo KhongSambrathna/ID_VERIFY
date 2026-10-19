@@ -1,19 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const { requireAuth, requireRole } = require("../middleware/auth");
-const { requireActiveSubscription } = require("../middleware/subscription");
 const Athlete = require("../models/Athlete");
 const Lineup = require("../models/Lineup");
 const Formation = require("../models/Formation");
 const StartingXI = require("../models/StartingXI");
 const flattenAssignments = require("../utils/flattenAssignments");
 
-// Every route below is squad-list/formation/starting-XI/roster management —
-// exactly the set of features gated behind a team's $15/year subscription.
-// requireActiveSubscription is a no-op for Admin (and Player, on the
-// read-only routes it's allowed on) and only blocks a Head Coach whose own
-// team's subscription has lapsed.
-router.use(requireAuth, requireActiveSubscription);
+// Squad-list/formation/starting-XI/roster management routes. No longer gated
+// behind a team's subscription — any Head Coach can manage their team.
+router.use(requireAuth);
 
 // A formation's players must come from an already-created Squad List
 // (Lineup) belonging to the SAME team — this stops a Head Coach from

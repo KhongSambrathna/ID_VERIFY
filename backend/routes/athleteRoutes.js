@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const { requireAuth, requireRole } = require("../middleware/auth");
-const { requireActiveSubscription } = require("../middleware/subscription");
 const upload = require("../middleware/upload");
 const {
   createAthlete,
@@ -19,12 +18,10 @@ const {
   removeFee,
   addConductNote,
   removeConductNote,
-  renewVerification,
   getScanLogs,
   getStats,
   exportRosterCsv,
   bulkApproveAssignments,
-  bulkRenewVerification,
   deleteAthlete,
   verifyAthlete,
   searchAthletes,
@@ -57,19 +54,13 @@ router.get("/check-duplicate", requireRole("ADMIN", "HEAD_COACH"), checkDuplicat
 router.get("/stats", requireRole("ADMIN", "HEAD_COACH"), getStats);
 router.get("/export.csv", requireRole("ADMIN", "HEAD_COACH"), exportRosterCsv);
 router.put("/bulk-approve", requireRole("ADMIN"), bulkApproveAssignments);
-router.put("/bulk-renew", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, bulkRenewVerification);
 router.get("/:id", requireRole("ADMIN", "HEAD_COACH", "PLAYER"), getAthleteById);
 router.get("/:id/scan-logs", requireRole("ADMIN", "HEAD_COACH"), getScanLogs);
 
-// createAthlete/updateAthlete/renewVerification and everything below them
-// are athlete-roster MANAGEMENT actions — a Head Coach needs their team's
-// $15/year subscription active to reach them (requireActiveSubscription is
-// always a no-op for Admin). Viewing the roster (the GET routes above)
-// stays open regardless, so an unpaid team can still see who's on it.
+// Roster management actions are no longer gated behind a team's subscription.
 router.post(
   "/",
   requireRole("ADMIN", "HEAD_COACH"),
-  requireActiveSubscription,
   upload.fields([
     { name: "photo", maxCount: 1 },
     { name: "documents", maxCount: 10 },
@@ -78,19 +69,16 @@ router.post(
 );
 // PLAYER is allowed here too — an individual Player account (not the
 // shared/legacy team-wide login) editing their OWN record, gated inside
-// updateAthlete. requireActiveSubscription is a no-op for any role other
-// than HEAD_COACH, so it stays harmless for a Player submit.
+// updateAthlete.
 router.put(
   "/:id",
   requireRole("ADMIN", "HEAD_COACH", "PLAYER"),
-  requireActiveSubscription,
   upload.fields([
     { name: "photo", maxCount: 1 },
     { name: "documents", maxCount: 10 },
   ]),
   updateAthlete
 );
-router.put("/:id/renew", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, renewVerification);
 // Admin/Head Coach only — sets/clears the stored Facebook profile link used
 // for the "Open Messenger" quick-link (Debt Report, Squad list). Never
 // reachable by PLAYER, matching the controller stripping this field out of
@@ -98,7 +86,6 @@ router.put("/:id/renew", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscr
 router.put(
   "/:id/facebook-link",
   requireRole("ADMIN", "HEAD_COACH"),
-  requireActiveSubscription,
   updateFacebookProfileUrl
 );
 
@@ -106,9 +93,9 @@ router.put(
 // several on the same team, e.g. Player + Assistant Coach). Add/edit/remove
 // act on ONE assignment at a time; approve/reject (admin-only) are how an
 // Admin signs off on a Head Coach's pending add or pending removal request.
-router.post("/:id/assignments", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, addAssignment);
-router.put("/:id/assignments/:assignmentId", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, updateAssignment);
-router.delete("/:id/assignments/:assignmentId", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, removeAssignment);
+router.post("/:id/assignments", requireRole("ADMIN", "HEAD_COACH"), addAssignment);
+router.put("/:id/assignments/:assignmentId", requireRole("ADMIN", "HEAD_COACH"), updateAssignment);
+router.delete("/:id/assignments/:assignmentId", requireRole("ADMIN", "HEAD_COACH"), removeAssignment);
 router.put("/:id/assignments/:assignmentId/approve", requireRole("ADMIN"), approveAssignment);
 router.put("/:id/assignments/:assignmentId/reject", requireRole("ADMIN"), rejectAssignment);
 
@@ -117,9 +104,9 @@ router.put("/:id/assignments/:assignmentId/reject", requireRole("ADMIN"), reject
 // removed independently. Same Admin/Head Coach (own team) access as the
 // assignment routes above; a Player account only ever GETs this data via
 // the flattened total + breakdown, never through these.
-router.post("/:id/assignments/:assignmentId/fees", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, addFee);
-router.put("/:id/assignments/:assignmentId/fees/:feeId", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, updateFee);
-router.delete("/:id/assignments/:assignmentId/fees/:feeId", requireRole("ADMIN", "HEAD_COACH"), requireActiveSubscription, removeFee);
+router.post("/:id/assignments/:assignmentId/fees", requireRole("ADMIN", "HEAD_COACH"), addFee);
+router.put("/:id/assignments/:assignmentId/fees/:feeId", requireRole("ADMIN", "HEAD_COACH"), updateFee);
+router.delete("/:id/assignments/:assignmentId/fees/:feeId", requireRole("ADMIN", "HEAD_COACH"), removeFee);
 
 // Character/behavior notes on one assignment — same Admin/Head Coach (own
 // team) access as fees above. A note can carry a "warning" or "banned"
@@ -128,13 +115,11 @@ router.delete("/:id/assignments/:assignmentId/fees/:feeId", requireRole("ADMIN",
 router.post(
   "/:id/assignments/:assignmentId/conduct-notes",
   requireRole("ADMIN", "HEAD_COACH"),
-  requireActiveSubscription,
   addConductNote
 );
 router.delete(
   "/:id/assignments/:assignmentId/conduct-notes/:noteId",
   requireRole("ADMIN", "HEAD_COACH"),
-  requireActiveSubscription,
   removeConductNote
 );
 

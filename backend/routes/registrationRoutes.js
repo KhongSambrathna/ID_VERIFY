@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const { requireAuth, requireRole } = require("../middleware/auth");
-const { requireActiveSubscription } = require("../middleware/subscription");
 const upload = require("../middleware/upload");
 const {
   createInvite,
@@ -40,18 +39,12 @@ router.get("/invites/:token/check-duplicate", checkDuplicate);
 router.post("/invites/:token/claim/:athleteId", claimExisting);
 
 // ---- Coach/Admin — managing the links themselves. ----
-// Creating/sending a registration link is a roster-management action for a
-// Head Coach, so it's gated behind their team's active subscription exactly
-// like adding an athlete directly is (requireActiveSubscription is a no-op for
-// Admin). Listing/revoking is lighter bookkeeping and stays open, so a lapsed
-// team can still cancel links they already sent.
+// Creating/sending a registration link and listing/revoking links are both
+// open to Admin and Head Coach for their own team — no subscription gate.
 router.use(requireAuth);
 
 router.get("/invites", requireRole("ADMIN", "HEAD_COACH"), listInvites);
-// Creating a registration link is an Admin-only roster action: only an Admin
-// issues links (and picks the existing team they register into). Head
-// Coaches can still list/revoke their own team's links below.
-router.post("/invites", requireRole("ADMIN"), requireActiveSubscription, createInvite);
+router.post("/invites", requireRole("ADMIN"), createInvite);
 router.delete("/invites/:id", requireRole("ADMIN", "HEAD_COACH"), revokeInvite);
 
 // Admin registration statistics — lots of data for the dashboard:
