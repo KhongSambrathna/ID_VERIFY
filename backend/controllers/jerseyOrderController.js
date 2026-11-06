@@ -45,6 +45,9 @@ function shapeOrder(o) {
     feePaidAmount: o.feePaidAmount,
     feePaid: o.feePaid,
     pendingRemoval: o.pendingRemoval,
+    printBatch: o.printBatch ?? null,
+    sentToPrintAt: o.sentToPrintAt || null,
+    changedAfterPrint: !!o.changedAfterPrint,
     createdAt: o.createdAt,
   };
 }
@@ -317,6 +320,15 @@ async function updateOrder(req, res, team) {
     order.syncedToProfile = false;
   }
 
+  // Already sent to the printer? Then any change to what's actually printed
+  // on the shirt (name/number/size) flags it for a possible re-print.
+  if (
+    order.printBatch &&
+    (nextName !== order.jerseyName || nextNumber !== order.jerseyNumber || nextSize !== order.jerseySize)
+  ) {
+    order.changedAfterPrint = true;
+  }
+
   order.jerseyName = nextName;
   order.jerseyNumber = nextNumber;
   order.jerseySize = nextSize;
@@ -520,6 +532,119 @@ exports.keepTeamJerseyOrderAdmin = async (req, res) => {
     const team = await resolveTeamById(req, res);
     if (!team) return;
     await keepOrder(req, res, team);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ---- combined multi-team view + print batches (Admin only) ----------------
+
+// GET /api/teams/jersey-orders/combined?teams=id1,id2  (omit = every team)
+// One flat list of orders from several teams together, each tagged with its
+// team, plus `nextBatch` (the next unused print-batch number across ALL
+// teams) so the UI can suggest it.
+async function nextBatchNumber() {
+  const teams = await Team.find({}, "jerseyOrders.printBatch").lean();
+  let max = 0;
+  teams.forEach((tm) => (tm.jerseyOrders || []).forEach((o) => {
+    if (o.printBatch && o.printBatch > max) max = o.printBatch;
+  }));
+  return max + 1;
+}
+
+exports.listCombinedJerseyOrders = async (req, res) => {
+  try {
+    const ids = String(req.query.teams || "")
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
+    const filter = ids.length ? { _id: { $in: ids } } : {};
+    const teams = await Team.find(filter).sort({ name: 1 });
+    const orders = [];
+    teams.forEach((team) => {
+      team.jerseyOrders.forEach((o) => {
+        orders.push({ ...shapeOrder(o), teamId: team._id, teamName: team.name });
+      });
+    });
+    res.json({ orders, nextBatch: await nextBatchNumber() });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Groups [{ teamId, orderId }] by team so each team document is loaded and
+// saved once.
+function groupItems(items) {
+  const byTeam = new Map();
+  (Array.isArray(items) ? items : []).forEach((it) => {
+    if (!it || !it.teamId || !it.orderId) return;
+    const key = String(it.teamId);
+    if (!byTeam.has(key)) byTeam.set(key, []);
+    byTeam.get(key).push(String(it.orderId));
+  });
+  return byTeam;
+}
+
+// PATCH /api/teams/jersey-orders/mark-printed
+// body: { items: [{ teamId, orderId }], batch? }  — batch omitted = next
+// unused number. Re-marking an already-sent order moves it to this batch
+// (e.g. a re-print after changedAfterPrint) and clears that flag.
+exports.markJerseyOrdersPrinted = async (req, res) => {
+  try {
+    const byTeam = groupItems(req.body.items);
+    if (byTeam.size === 0) return res.status(400).json({ message: "No orders selected" });
+
+    let batch = req.body.batch !== undefined && req.body.batch !== null && req.body.batch !== ""
+      ? Number(req.body.batch)
+      : await nextBatchNumber();
+    if (!Number.isInteger(batch) || batch < 1) {
+      return res.status(400).json({ message: "Batch must be a whole number of 1 or more" });
+    }
+
+    const now = new Date();
+    let updated = 0;
+    for (const [teamId, orderIds] of byTeam) {
+      const team = await Team.findById(teamId);
+      if (!team) continue;
+      orderIds.forEach((oid) => {
+        const order = team.jerseyOrders.id(oid);
+        if (!order) return;
+        order.printBatch = batch;
+        order.sentToPrintAt = now;
+        order.sentToPrintBy = req.adminId || null;
+        order.changedAfterPrint = false;
+        updated++;
+      });
+      await team.save();
+    }
+    res.json({ updated, batch });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PATCH /api/teams/jersey-orders/unmark-printed  body: { items }
+// Undo — puts the orders back to "not sent yet".
+exports.unmarkJerseyOrdersPrinted = async (req, res) => {
+  try {
+    const byTeam = groupItems(req.body.items);
+    if (byTeam.size === 0) return res.status(400).json({ message: "No orders selected" });
+    let updated = 0;
+    for (const [teamId, orderIds] of byTeam) {
+      const team = await Team.findById(teamId);
+      if (!team) continue;
+      orderIds.forEach((oid) => {
+        const order = team.jerseyOrders.id(oid);
+        if (!order) return;
+        order.printBatch = null;
+        order.sentToPrintAt = null;
+        order.sentToPrintBy = null;
+        order.changedAfterPrint = false;
+        updated++;
+      });
+      await team.save();
+    }
+    res.json({ updated });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

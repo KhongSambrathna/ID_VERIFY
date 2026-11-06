@@ -334,6 +334,7 @@ export default function CoachDashboard() {
   };
 
   return (
+    <>
     {loading ? (
       <div className="container"><p>{t("common.loading")}</p></div>
     ) : error ? (
@@ -824,5 +825,6 @@ export default function CoachDashboard() {
       )}
     </div>
     )}
+    </>
   );
 }

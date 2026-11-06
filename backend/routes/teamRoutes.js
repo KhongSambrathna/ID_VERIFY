@@ -32,6 +32,9 @@ const {
   removeTeamJerseyOrderAdmin,
   keepMyTeamJerseyOrder,
   keepTeamJerseyOrderAdmin,
+  listCombinedJerseyOrders,
+  markJerseyOrdersPrinted,
+  unmarkJerseyOrdersPrinted,
 } = require("../controllers/jerseyOrderController");
 
 // The public team-logo lookup and the "my team" KHQR/logo routes are kept
@@ -103,6 +106,13 @@ router.patch(
 router.use(requireAuth, requireRole("ADMIN"));
 
 router.get("/", listTeams);
+
+// Combined multi-team jersey list + print-batch marking. Declared before the
+// "/:id/..." routes so "jersey-orders" is never read as a team id.
+router.get("/jersey-orders/combined", listCombinedJerseyOrders);
+router.patch("/jersey-orders/mark-printed", markJerseyOrdersPrinted);
+router.patch("/jersey-orders/unmark-printed", unmarkJerseyOrdersPrinted);
+
 router.post("/", createTeam);
 router.delete("/:id", deleteTeam);
 router.put("/:id/logo", upload.single("logo"), uploadTeamLogo);

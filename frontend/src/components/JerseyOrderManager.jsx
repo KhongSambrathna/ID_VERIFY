@@ -508,6 +508,7 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
               <th>{t("jerseyOrderManager.colSize")}</th>
               <th>{t("jerseyOrderManager.colNote")}</th>
               <th>{t("jerseyOrderManager.colPaid")}</th>
+              <th>{t("combinedJerseyOrders.colPrint")}</th>
               <th className="no-print">{t("common.actions")}</th>
             </tr>
           </thead>
@@ -616,6 +617,22 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
                       </>
                     )}
                   </td>
+                  <td data-label={t("combinedJerseyOrders.colPrint")}>
+                    {order.printBatch ? (
+                      <>
+                        <span className="badge verified">
+                          {t("combinedJerseyOrders.batchLabel").replace("{n}", order.printBatch)}
+                        </span>
+                        {order.changedAfterPrint && (
+                          <span className="badge rejected" style={{ display: "inline-block", marginTop: 4 }}>
+                            {t("combinedJerseyOrders.printChanged")}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="badge pending">{t("combinedJerseyOrders.printNotSent")}</span>
+                    )}
+                  </td>
                   <td data-label={t("common.actions")} className="actions-cell no-print">
                     {isEditing ? (
                       <>
@@ -708,7 +725,7 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
             })}
             {orders.length === 0 && (
               <tr>
-                <td colSpan={9} style={{ textAlign: "center", color: "#777" }}>
+                <td colSpan={10} style={{ textAlign: "center", color: "#777" }}>
                   {t("jerseyOrderManager.noneYet")}
                 </td>
               </tr>

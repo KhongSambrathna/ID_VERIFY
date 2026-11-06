@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
 import JerseyOrderManager from "../components/JerseyOrderManager";
+import CombinedJerseyOrders from "../components/CombinedJerseyOrders";
 import { useLanguage } from "../i18n/LanguageContext";
 
 // Admin-side entry point for jersey orders — unlike Squad list/Formation/
@@ -14,6 +15,9 @@ export default function AdminJerseyOrders() {
   const [teams, setTeams] = useState([]);
   const [teamsLoading, setTeamsLoading] = useState(true);
   const [selectedTeamId, setSelectedTeamId] = useState("");
+  // "team" = one team at a time (manage orders); "combined" = several teams
+  // together, for building print lists and marking print batches.
+  const [mode, setMode] = useState("team");
 
   const [athletes, setAthletes] = useState([]);
   const [athletesLoading, setAthletesLoading] = useState(false);
@@ -51,7 +55,24 @@ export default function AdminJerseyOrders() {
         <p>{t("adminJerseyOrders.intro")}</p>
       </div>
 
-      <div className="field" style={{ maxWidth: 320 }}>
+      <div className="tabs no-print">
+        <button type="button" className={`tab-btn ${mode === "team" ? "active" : ""}`} onClick={() => setMode("team")}>
+          {t("adminJerseyOrders.tabTeam")}
+        </button>
+        <button
+          type="button"
+          className={`tab-btn ${mode === "combined" ? "active" : ""}`}
+          onClick={() => setMode("combined")}
+        >
+          {t("adminJerseyOrders.tabCombined")}
+        </button>
+      </div>
+
+      {mode === "combined" ? (
+        <CombinedJerseyOrders teams={teams} />
+      ) : (
+      <>
+      <div className="field no-print" style={{ maxWidth: 320 }}>
         <label>{t("common.team")}</label>
         {teamsLoading ? (
           <p>{t("common.loading")}</p>
@@ -80,6 +101,8 @@ export default function AdminJerseyOrders() {
           />
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

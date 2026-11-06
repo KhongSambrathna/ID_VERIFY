@@ -63,6 +63,19 @@ const jerseyOrderSchema = new mongoose.Schema(
     // removal or declines it (keeping the order as-is). An Admin/Head
     // Coach removing an order by hand never goes through this flag.
     pendingRemoval: { type: Boolean, default: false },
+    // "Sent to the printer" marker. Shirts are usually printed in rounds
+    // (paid players first, the rest later), and often several teams'
+    // orders go to the printer together - so this is a batch NUMBER shared
+    // across teams (1, 2, 3...), not a plain yes/no. null = not sent yet.
+    // Set/cleared from the Admin combined view (jerseyOrderController's
+    // markPrinted/unmarkPrinted).
+    printBatch: { type: Number, default: null, min: 1 },
+    sentToPrintAt: { type: Date, default: null },
+    sentToPrintBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
+    // Flipped on when jersey name/number/size is edited AFTER the order was
+    // already sent to print - a reminder that the printed shirt no longer
+    // matches and may need re-printing. Cleared when it's marked again.
+    changedAfterPrint: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
