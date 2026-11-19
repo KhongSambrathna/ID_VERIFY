@@ -2806,3 +2806,219 @@ html:lang(km) body {
   }
 }
 
+
+/* ---------- Shop report + visitor analytics (MiniCharts.jsx) ---------- */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.stat-tile {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  border-left: 4px solid var(--navy);
+}
+.stat-tile.ok { border-left-color: var(--ok); }
+.stat-tile.bad { border-left-color: var(--bad); }
+.stat-tile-label { font-size: 13px; color: #666; }
+.stat-tile-value {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--navy);
+  line-height: 1.2;
+  word-break: break-word;
+}
+.stat-tile.ok .stat-tile-value { color: var(--ok); }
+.stat-tile.bad .stat-tile-value { color: var(--bad); }
+.stat-tile-sub { font-size: 12px; color: #888; }
+
+.mini-chart-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: #555; margin-bottom: 8px; }
+.mini-chart-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+.mini-chart-bars { display: flex; align-items: stretch; gap: 2px; overflow-x: auto; }
+.mini-chart-col { flex: 1 0 8px; display: flex; flex-direction: column; min-width: 8px; }
+.mini-chart-stack { flex: 1; display: flex; align-items: flex-end; gap: 1px; border-bottom: 1px solid var(--line); }
+.mini-chart-bar { flex: 1; min-height: 0; border-radius: 2px 2px 0 0; transition: opacity 0.15s; }
+.mini-chart-col:hover .mini-chart-bar { opacity: 0.75; }
+.mini-chart-label { height: 18px; font-size: 10px; color: #888; white-space: nowrap; overflow: visible; }
+
+.hbar-list { display: flex; flex-direction: column; gap: 9px; }
+.hbar-top { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.hbar-key { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hbar-key small, .hbar-val small { color: #888; }
+.hbar-val { white-space: nowrap; font-weight: 600; }
+.hbar-track { height: 6px; background: #eee9dd; border-radius: 3px; overflow: hidden; margin-top: 3px; }
+.hbar-fill { height: 100%; border-radius: 3px; }
+.mini-empty { color: #888; font-size: 13px; margin: 0; }
+
+.report-two-col {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.report-two-col .card { margin: 0; }
+
+.seg-toggle { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; }
+.seg-toggle button {
+  border: none;
+  background: none;
+  padding: 7px 14px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  color: #555;
+  border-right: 1px solid var(--line);
+}
+.seg-toggle button:last-child { border-right: none; }
+.seg-toggle button.active { background: var(--navy); color: #fff; }
+
+.profit-hint { margin: 4px 0 8px; font-size: 13px; }
+.profit-hint.ok { color: var(--ok); }
+.profit-hint.bad { color: var(--bad); }
+.movement-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  background: var(--cream);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 6px;
+  font-size: 14px;
+}
+.movement-summary small { color: #888; }
+
+.kv-list > div { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 14px; }
+.low-stock-list { list-style: none; padding: 0; margin: 0; }
+.low-stock-list li { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 14px; }
+
+/* ---------- Install app (PWA) button + iPhone guide ---------- */
+.install-app-btn {
+  margin-left: 16px;
+  background: var(--gold);
+  border: none;
+  color: var(--navy-deep);
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 5px 13px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.install-app-btn:hover { filter: brightness(1.08); }
+@media (max-width: 1200px) {
+  .navbar nav .install-app-btn { margin: 10px 4px 0; align-self: flex-start; }
+}
+.install-ios-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 24, 48, 0.55);
+  z-index: 2000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+}
+.install-ios-box {
+  background: #fff;
+  color: var(--ink);
+  border-radius: 14px;
+  padding: 20px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+}
+.install-ios-box img { border-radius: 12px; }
+.install-ios-box h3 { margin: 10px 0; }
+.install-ios-box ol { text-align: left; padding-left: 20px; margin: 0 0 16px; font-size: 14px; }
+.install-ios-box li { margin-bottom: 6px; }
+
+/* ---------- Navbar: organised groups, active page, account menu ---------- */
+.navbar nav { flex-wrap: nowrap; }
+.navbar nav > a.active,
+.nav-group.active > .nav-group-btn {
+  color: #fff;
+  box-shadow: inset 0 -2px 0 var(--gold);
+  padding-bottom: 3px;
+}
+.nav-group-menu a.active {
+  color: var(--gold);
+  background: rgba(255, 255, 255, 0.06);
+}
+.nav-group.align-right .nav-group-menu { left: auto; right: 0; }
+.nav-group-label {
+  padding: 8px 16px 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gold);
+  opacity: 0.85;
+}
+.nav-group-menu .nav-group-label:not(:first-child) {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 4px;
+}
+.nav-group-menu a.nav-logout { color: #f0b2a8; }
+.nav-account {
+  display: inline-block;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+.nav-spacer { display: none; }
+.navbar nav a.nav-login-btn {
+  background: var(--gold);
+  color: var(--navy-deep);
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 5px 14px;
+}
+.navbar nav a.nav-login-btn:hover { filter: brightness(1.08); color: var(--navy-deep); }
+
+@media (max-width: 1200px) {
+  .navbar nav { max-height: calc(100vh - var(--navbar-h)); overflow-y: auto; }
+  .navbar nav > a.active,
+  .nav-group.active > .nav-group-btn {
+    box-shadow: inset 3px 0 0 var(--gold);
+    padding-left: 10px;
+    padding-bottom: 12px;
+  }
+  .navbar nav .nav-spacer {
+    display: block;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.15);
+    margin: 8px 0 2px;
+  }
+  .navbar nav a.nav-login-btn {
+    margin: 10px 4px 0;
+    align-self: flex-start;
+    padding: 8px 18px;
+    border-bottom: none;
+  }
+  .navbar nav .nav-group-label { padding-left: 20px; }
+  .nav-account { max-width: none; }
+}
+
+/* Shop: best-seller badge + change-photo button */
+.badge.best-seller { background: #fde4c8; color: #b4501c; margin-left: 4px; }
+.change-photo-btn {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 3px 9px;
+  font-size: 12px;
+  border: 1px dashed var(--navy);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--navy);
+  white-space: nowrap;
+}
+.change-photo-btn:hover { background: var(--cream); }
+
+/* Approximate Riel shown under/next to shop dollar prices */
+.price-khr { display: block; font-size: 11px; font-weight: 400; color: #888; white-space: nowrap; }
+.shop-card-price .price-khr { font-size: 12px; margin-top: 1px; }

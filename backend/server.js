@@ -18,6 +18,7 @@ const paymentRoutes = require("./routes/paymentRoutes");
 const bakongRoutes = require("./routes/bakongRoutes");
 const attendanceRoutes = require("./routes/attendanceRoutes");
 const registrationRoutes = require("./routes/registrationRoutes");
+const analyticsRoutes = require("./routes/analyticsRoutes");
 
 const app = express();
 
@@ -28,7 +29,9 @@ app.set("trust proxy", true);
 
 connectDB();
 
-app.use(cors());
+// exposedHeaders lets the browser read the renewed login token the auth
+// middleware sends back (sliding session — see middleware/auth.js).
+app.use(cors({ exposedHeaders: ["X-Refresh-Token"] }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -50,6 +53,8 @@ app.use("/api/attendance", attendanceRoutes);
 // routes (a brand-new player with no account submits their own details) plus
 // coach/admin routes to create & manage those links.
 app.use("/api/registration", registrationRoutes);
+// Visitor analytics — public page-view tracking + the admin report.
+app.use("/api/analytics", analyticsRoutes);
 // Social-media share/preview pages — paste these into Facebook/Telegram
 // instead of the plain frontend links to get a real preview image
 // (see shareController.js for why the SPA can't provide this on its own).

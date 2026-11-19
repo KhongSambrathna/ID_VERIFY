@@ -14,3 +14,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     </BrowserRouter>
   </React.StrictMode>
 );
+
+// Installable home-screen app (PWA). Only in the production build — in
+// `npm run dev` a service worker would cache Vite's dev files and hide
+// your code changes.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch((err) => console.warn("Service worker failed:", err));
+  });
+}

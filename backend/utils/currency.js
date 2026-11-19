@@ -13,4 +13,10 @@ function formatKHR(amount) {
   return `៛${roundKHR(amount).toLocaleString("en-US")}`;
 }
 
-module.exports = { roundKHR, formatKHR };
+// Shop products (selling price, buying cost, stock in/out records) are in
+// US dollars — rounded to the cent. Everything else in the app stays Riel.
+function roundUSD(amount) {
+  return Math.round((Number(amount) || 0) * 100) / 100;
+}
+
+module.exports = { roundKHR, formatKHR, roundUSD };

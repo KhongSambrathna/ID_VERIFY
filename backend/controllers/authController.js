@@ -12,7 +12,12 @@ function signToken(admin) {
       athleteId: admin.athleteId || null,
     },
     process.env.JWT_SECRET,
-    { expiresIn: "7d" }
+    // Long-lived on purpose: students found it hard to keep logging back in.
+    // middleware/auth.js also renews the token automatically while the app
+    // is being used, so an active user is effectively never logged out —
+    // only someone who hasn't opened the app for this long has to sign in
+    // again. Override with TOKEN_EXPIRES_IN in .env (e.g. "365d").
+    { expiresIn: process.env.TOKEN_EXPIRES_IN || "90d" }
   );
 }
 

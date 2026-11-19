@@ -8,6 +8,10 @@ const {
   createProduct,
   updateProduct,
   deleteProduct,
+  createMovement,
+  listMovements,
+  deleteMovement,
+  report,
 } = require("../controllers/productController");
 
 // Public — the storefront (/shop) reads this without logging in.
@@ -15,6 +19,13 @@ router.get("/public", listPublicProducts);
 
 // Admin only, below this line.
 router.use(requireAuth, requireRole("ADMIN"));
+
+// Stock in / sales out / adjustments + the profit report. Registered before
+// "/:id" so "movements" and "report" are never mistaken for a product id.
+router.get("/report", report);
+router.get("/movements", listMovements);
+router.post("/movements", createMovement);
+router.delete("/movements/:id", deleteMovement);
 
 router.get("/", listProducts);
 router.post("/", upload.fields([{ name: "image", maxCount: 1 }]), createProduct);

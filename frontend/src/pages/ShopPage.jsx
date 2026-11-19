@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
 import { useLanguage } from "../i18n/LanguageContext";
+import { formatUSD, approxKHR, formatUSDwithKHR } from "../utils/currency";
 
 const TELEGRAM_USERNAME = "sambrathnajr";
 
@@ -14,7 +15,7 @@ function stockBadge(stock) {
 // typed in — buyers just hit send. There's no in-app checkout, orders are
 // handled over Telegram by a person.
 function orderLink(product) {
-  const message = `Hello, I'd like to order: ${product.name} ($${Number(product.price).toFixed(2)})`;
+  const message = `Hello, I'd like to order: ${product.name} (${formatUSDwithKHR(product.price)})`;
   return `https://t.me/${TELEGRAM_USERNAME}?text=${encodeURIComponent(message)}`;
 }
 
@@ -69,9 +70,13 @@ export default function ShopPage() {
                 />
                 <div className="shop-card-body">
                   <p className="shop-card-name">{p.name}</p>
+                  {p.bestSeller && <span className="badge best-seller">🔥 {t("shopPage.bestSeller")}</span>}
                   <span className={`badge ${badge.cls}`}>{t(badge.key)}</span>
                   <div className="shop-card-footer">
-                    <span className="shop-card-price">${Number(p.price).toFixed(2)}</span>
+                    <span className="shop-card-price">
+                      {formatUSD(p.price)}
+                      <small className="price-khr">{approxKHR(p.price)}</small>
+                    </span>
                     {outOfStock ? (
                       <span className="shop-order-btn disabled">{t("shopPage.order")}</span>
                     ) : (

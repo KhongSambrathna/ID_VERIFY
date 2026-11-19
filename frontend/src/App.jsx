@@ -37,8 +37,13 @@ import PosterGenerator from "./pages/PosterGenerator";
 import PaymentReturn from "./pages/PaymentReturn";
 import RefereeSchedulePage from "./pages/RefereeSchedulePage";
 import PlayerRegister from "./pages/PlayerRegister";
+import AdminAnalytics from "./pages/AdminAnalytics";
+import usePageTracking from "./hooks/usePageTracking";
 
 export default function App() {
+  // Counts every page opened, for the admin Analytics page.
+  usePageTracking();
+
   return (
     <LanguageProvider>
       <Navbar />
@@ -148,6 +153,14 @@ export default function App() {
           element={
             <ProtectedRoute role="ADMIN">
               <AdminShop />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/analytics"
+          element={
+            <ProtectedRoute role="ADMIN">
+              <AdminAnalytics />
             </ProtectedRoute>
           }
         />
