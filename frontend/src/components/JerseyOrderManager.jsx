@@ -74,11 +74,39 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
   // athlete's own profile — see backend's syncOrder).
   const [syncingId, setSyncingId] = useState(null);
 
+  // Ordering open/closed for this team (an Admin can close it, e.g. once the
+  // list has gone to the printer). While closed only an Admin can still add,
+  // edit or remove orders.
+  const [ordersOpen, setOrdersOpen] = useState(true);
+  const [closedNote, setClosedNote] = useState("");
+  const [closeNoteDraft, setCloseNoteDraft] = useState("");
+  const [savingStatus, setSavingStatus] = useState(false);
+  const locked = !ordersOpen && !isAdmin;
+  // Only the Admin flavor of the route (/teams/:id/jersey-orders) can change it.
+  const canToggleStatus = isAdmin && !basePath.includes("/mine/");
+
+  const setStatus = async (open) => {
+    if (!open && !confirm(t("jerseyOrdersClose.confirmClose").replace("{team}", team))) return;
+    setSavingStatus(true);
+    try {
+      const { data } = await api.patch(`${basePath}-status`, { open, note: open ? "" : closeNoteDraft });
+      setOrdersOpen(data.ordersOpen !== false);
+      setClosedNote(data.closedNote || "");
+      setCloseNoteDraft("");
+    } catch (err) {
+      alert(err.response?.data?.message || t("jerseyOrdersClose.failed"));
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
   const load = async () => {
     setLoading(true);
     try {
       const { data } = await api.get(basePath);
       setOrders(data.orders || []);
+      setOrdersOpen(data.ordersOpen !== false);
+      setClosedNote(data.closedNote || "");
       setError("");
     } catch (err) {
       setError(err.response?.data?.message || t("jerseyOrderManager.failedToLoad"));
@@ -367,6 +395,42 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
         <p style={{ margin: "4px 0" }}>{new Date().toLocaleDateString()}</p>
       </div>
 
+      {!ordersOpen && (
+        <div className="jersey-closed-banner no-print">
+          🔒 <b>{t("jerseyOrdersClose.closedBanner")}</b>
+          {closedNote && <span> — {closedNote}</span>}
+          {!isAdmin && <div className="help-text" style={{ margin: "4px 0 0" }}>{t("jerseyOrdersClose.closedHelp")}</div>}
+        </div>
+      )}
+
+      {canToggleStatus && (
+        <div className="card no-print jersey-status-card">
+          <div>
+            <b>{t("jerseyOrdersClose.statusLabel")}:</b>{" "}
+            <span className={`badge ${ordersOpen ? "verified" : "rejected"}`}>
+              {ordersOpen ? t("jerseyOrdersClose.open") : t("jerseyOrdersClose.closed")}
+            </span>
+          </div>
+          {ordersOpen ? (
+            <div className="jersey-status-actions">
+              <input
+                value={closeNoteDraft}
+                onChange={(e) => setCloseNoteDraft(e.target.value)}
+                placeholder={t("jerseyOrdersClose.notePlaceholder")}
+                maxLength={200}
+              />
+              <button type="button" className="btn btn-danger" disabled={savingStatus} onClick={() => setStatus(false)}>
+                🔒 {t("jerseyOrdersClose.closeButton")}
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="btn btn-primary" disabled={savingStatus} onClick={() => setStatus(true)}>
+              🔓 {t("jerseyOrdersClose.openButton")}
+            </button>
+          )}
+        </div>
+      )}
+
       {orders.length > 0 && (
         <p className="help-text" style={{ fontWeight: 600 }}>
           {t("jerseyOrderManager.summaryLine")
@@ -385,7 +449,7 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
           can keep adding Fan orders; in that case the Fan checkbox below
           is forced on. Hidden on print — a form has nothing to do with a
           printed/PDF snapshot of the list. */}
-      {isPlayer && athleteId && (
+      {isPlayer && athleteId && !locked && (
         <form className="card no-print" style={{ maxWidth: 420, marginBottom: 24 }} onSubmit={submitSelf}>
           <h4 style={{ marginTop: 0 }}>{t("jerseyOrderManager.registerMine")}</h4>
           {myNonFanOrder && (
@@ -439,7 +503,7 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
       )}
 
       {/* Staff "register on behalf" form */}
-      {isStaff && (
+      {isStaff && !locked && (
         <form className="card no-print" style={{ maxWidth: 480, marginBottom: 24 }} onSubmit={submitOnBehalf}>
           <h4 style={{ marginTop: 0 }}>{t("jerseyOrderManager.registerOnBehalf")}</h4>
           <div className="field">
@@ -515,7 +579,7 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
           <tbody>
             {orders.map((order) => {
               const isMine = isPlayer && athleteId && String(order.athlete) === String(athleteId);
-              const canEdit = isMine || isStaff;
+              const canEdit = (isMine || isStaff) && !locked;
               const isEditing = editingId === order._id;
               const isPayEditing = payEditingId === order._id;
               return (
@@ -689,7 +753,7 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
                             {t("jerseyOrderManager.cancelRequestedBadge")}
                           </span>
                         )}
-                        {isStaff && order.pendingRemoval && (
+                        {isStaff && !locked && order.pendingRemoval && (
                           <>
                             <button
                               className="action-btn danger"
@@ -707,12 +771,12 @@ export default function JerseyOrderManager({ team, basePath, athletes = [] }) {
                             </button>
                           </>
                         )}
-                        {isStaff && !order.pendingRemoval && (
+                        {isStaff && !locked && !order.pendingRemoval && (
                           <button className="link-btn" disabled={actingId === order._id} onClick={() => removeOrder(order)}>
                             {t("common.remove")}
                           </button>
                         )}
-                        {isMine && !isStaff && !order.pendingRemoval && (
+                        {isMine && !isStaff && !locked && !order.pendingRemoval && (
                           <button className="link-btn" disabled={actingId === order._id} onClick={() => removeOrder(order)}>
                             {t("common.cancel")}
                           </button>

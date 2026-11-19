@@ -36,6 +36,9 @@ export default function CombinedJerseyOrders({ teams }) {
   const [selected, setSelected] = useState(() => new Set());
   const [batchInput, setBatchInput] = useState("");
   const [busy, setBusy] = useState(false);
+  // Open/closed ordering status of each loaded team (from the combined list).
+  const [teamStatus, setTeamStatus] = useState([]);
+  const [closeNote, setCloseNote] = useState("");
 
   const load = async () => {
     if (teamIds.length === 0) {
@@ -49,6 +52,7 @@ export default function CombinedJerseyOrders({ teams }) {
       });
       setOrders(data.orders || []);
       setNextBatch(data.nextBatch || 1);
+      setTeamStatus(data.teams || []);
       setError("");
     } catch (err) {
       setError(err.response?.data?.message || c("failedToLoad"));
@@ -158,6 +162,41 @@ export default function CombinedJerseyOrders({ teams }) {
     }
   };
 
+  // Permanently delete the selected orders (Admin).
+  const deleteSelected = async () => {
+    if (visibleSelected.length === 0) return alert(c("selectFirst"));
+    const names = visibleSelected.slice(0, 5).map((o) => `• ${o.fullName} (#${o.jerseyNumber}, ${o.teamName})`).join("\n");
+    const more = visibleSelected.length > 5 ? `\n… +${visibleSelected.length - 5}` : "";
+    if (!confirm(t("jerseyOrdersClose.confirmDeleteSelected").replace("{count}", visibleSelected.length) + "\n\n" + names + more)) return;
+    setBusy(true);
+    try {
+      await api.post("/teams/jersey-orders/delete-selected", { items: items() });
+      setSelected(new Set());
+      await load();
+    } catch (err) {
+      alert(err.response?.data?.message || t("common.failedToSave"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Close / open ordering for every team currently ticked above.
+  const setStatusForChosen = async (open) => {
+    const names = teams.filter((tm) => teamIds.includes(tm._id)).map((tm) => tm.name).join(", ");
+    const msg = (open ? t("jerseyOrdersClose.confirmOpenTeams") : t("jerseyOrdersClose.confirmCloseTeams")).replace("{teams}", names);
+    if (!confirm(msg)) return;
+    setBusy(true);
+    try {
+      await api.patch("/teams/jersey-orders/status-all", { open, note: closeNote, teams: teamIds });
+      setCloseNote("");
+      await load();
+    } catch (err) {
+      alert(err.response?.data?.message || t("common.failedToSave"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const selectedTeamNames = teams.filter((tm) => teamIds.includes(tm._id)).map((tm) => tm.name);
   const printLabel =
     printFilter === "notSent"
@@ -237,6 +276,32 @@ export default function CombinedJerseyOrders({ teams }) {
             </div>
           </div>
 
+          {/* Ordering open / closed for the chosen teams */}
+          <div className="card no-print jersey-status-card" style={{ marginBottom: 12 }}>
+            <div style={{ flexBasis: "100%" }}>
+              <b>{t("jerseyOrdersClose.statusLabel")}:</b>{" "}
+              {teamStatus.map((ts) => (
+                <span key={ts._id} className={`badge ${ts.ordersOpen ? "verified" : "rejected"}`} style={{ marginRight: 6 }}>
+                  {ts.ordersOpen ? "🔓" : "🔒"} {ts.name}
+                </span>
+              ))}
+            </div>
+            <div className="jersey-status-actions">
+              <input
+                value={closeNote}
+                onChange={(e) => setCloseNote(e.target.value)}
+                placeholder={t("jerseyOrdersClose.notePlaceholder")}
+                maxLength={200}
+              />
+              <button type="button" className="btn btn-danger" disabled={busy} onClick={() => setStatusForChosen(false)}>
+                🔒 {t("jerseyOrdersClose.closeChosen")}
+              </button>
+              <button type="button" className="btn btn-outline" disabled={busy} onClick={() => setStatusForChosen(true)}>
+                🔓 {t("jerseyOrdersClose.openChosen")}
+              </button>
+            </div>
+          </div>
+
           {/* Actions */}
           <div className="card no-print" style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end", marginBottom: 12 }}>
             <div className="field" style={{ marginBottom: 0 }}>
@@ -255,6 +320,9 @@ export default function CombinedJerseyOrders({ teams }) {
             </button>
             <button className="btn btn-outline" disabled={busy} onClick={unmarkPrinted}>
               {c("unmarkButton")}
+            </button>
+            <button className="btn btn-danger" disabled={busy || visibleSelected.length === 0} onClick={deleteSelected}>
+              🗑 {t("jerseyOrdersClose.deleteSelected").replace("{count}", visibleSelected.length)}
             </button>
             <button className="btn btn-outline" onClick={() => window.print()}>
               {t("debtReport.printButton")}

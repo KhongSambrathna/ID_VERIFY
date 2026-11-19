@@ -19,6 +19,20 @@ async function resolveMyTeam(req, res) {
   return team;
 }
 
+// Ordering closed by an Admin → only an Admin may still add/edit/cancel.
+// Returns true (and sends the 403) when the request must stop.
+function blockIfClosed(req, res, team) {
+  if (team.jerseyOrdersOpen !== false || req.adminRole === "ADMIN") return false;
+  res.status(403).json({
+    code: "JERSEY_ORDERS_CLOSED",
+    message:
+      "Jersey ordering is closed for this team" +
+      (team.jerseyOrdersClosedNote ? ` — ${team.jerseyOrdersClosedNote}` : ".") +
+      " Ask an Admin if something needs changing.",
+  });
+  return true;
+}
+
 async function resolveTeamById(req, res) {
   const team = await Team.findById(req.params.id);
   if (!team) {
@@ -55,6 +69,8 @@ function shapeOrder(o) {
 function shapeTeamOrders(team) {
   return {
     team: team.name,
+    ordersOpen: team.jerseyOrdersOpen !== false,
+    closedNote: team.jerseyOrdersClosedNote || "",
     orders: team.jerseyOrders
       .slice()
       .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
@@ -145,6 +161,7 @@ exports.registerMyJerseyOrder = async (req, res) => {
     }
     const team = await resolveMyTeam(req, res);
     if (!team) return;
+    if (blockIfClosed(req, res, team)) return;
 
     const athlete = await Athlete.findById(req.athleteId);
     if (!athlete) return res.status(404).json({ message: "Athlete not found" });
@@ -194,6 +211,7 @@ exports.registerMyJerseyOrder = async (req, res) => {
 // Admin, any team via :id) — body: { athleteId, jerseyName, jerseyNumber,
 // jerseySize, note?, isFan? }.
 async function registerOnBehalf(req, res, team) {
+  if (blockIfClosed(req, res, team)) return;
   const { athleteId } = req.body;
   const athlete = await Athlete.findById(athleteId);
   if (!athlete) return res.status(404).json({ message: "Athlete not found" });
@@ -267,6 +285,7 @@ async function updateOrder(req, res, team) {
   const isOwnRow = req.adminRole === "PLAYER" && req.athleteId && String(order.athlete) === String(req.athleteId);
   const isStaff = req.adminRole === "HEAD_COACH" || req.adminRole === "ADMIN";
   if (!isOwnRow && !isStaff) return res.status(403).json({ message: "Access denied" });
+  if (blockIfClosed(req, res, team)) return;
 
   const { jerseyName, jerseyNumber, jerseySize, note, isFan } = req.body;
 
@@ -461,6 +480,7 @@ exports.syncTeamJerseyOrderAdmin = async (req, res) => {
 async function removeOrder(req, res, team) {
   const order = team.jerseyOrders.id(req.params.orderId);
   if (!order) return res.status(404).json({ message: "Jersey order not found" });
+  if (blockIfClosed(req, res, team)) return;
 
   const isOwnRow = req.adminRole === "PLAYER" && req.athleteId && String(order.athlete) === String(req.athleteId);
   const isStaff = req.adminRole === "HEAD_COACH" || req.adminRole === "ADMIN";
@@ -566,7 +586,12 @@ exports.listCombinedJerseyOrders = async (req, res) => {
         orders.push({ ...shapeOrder(o), teamId: team._id, teamName: team.name });
       });
     });
-    res.json({ orders, nextBatch: await nextBatchNumber() });
+    const teamStatus = teams.map((tm) => ({
+      _id: tm._id,
+      name: tm.name,
+      ordersOpen: tm.jerseyOrdersOpen !== false,
+    }));
+    res.json({ orders, teams: teamStatus, nextBatch: await nextBatchNumber() });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -645,6 +670,68 @@ exports.unmarkJerseyOrdersPrinted = async (req, res) => {
       await team.save();
     }
     res.json({ updated });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ---- open / close ordering + bulk delete (Admin only) ----------------------
+
+// PATCH /api/teams/:id/jersey-orders-status  body: { open, note? }
+exports.setTeamJerseyOrdersStatus = async (req, res) => {
+  try {
+    const team = await resolveTeamById(req, res);
+    if (!team) return;
+    team.jerseyOrdersOpen = req.body.open !== false;
+    team.jerseyOrdersClosedNote = team.jerseyOrdersOpen ? "" : String(req.body.note || "").trim().slice(0, 200);
+    await team.save();
+    notifyTeamCoaches(
+      team.name,
+      team.jerseyOrdersOpen
+        ? `👕 Jersey ordering is OPEN again for ${team.name}.`
+        : `🔒 Jersey ordering is now CLOSED for ${team.name}${team.jerseyOrdersClosedNote ? ` — ${team.jerseyOrdersClosedNote}` : ""}.`
+    );
+    res.json(shapeTeamOrders(team));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PATCH /api/teams/jersey-orders/status-all  body: { open, note?, teams? }
+// Opens or closes ordering for every team at once (or only the team ids
+// listed in `teams`).
+exports.setAllJerseyOrdersStatus = async (req, res) => {
+  try {
+    const open = req.body.open !== false;
+    const note = open ? "" : String(req.body.note || "").trim().slice(0, 200);
+    const ids = Array.isArray(req.body.teams) ? req.body.teams.filter(Boolean) : [];
+    const filter = ids.length ? { _id: { $in: ids } } : {};
+    const r = await Team.updateMany(filter, { $set: { jerseyOrdersOpen: open, jerseyOrdersClosedNote: note } });
+    res.json({ updated: r.modifiedCount, open });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// POST /api/teams/jersey-orders/delete-selected  body: { items: [{ teamId, orderId }] }
+// Permanently removes the selected orders (from the combined view).
+exports.deleteSelectedJerseyOrders = async (req, res) => {
+  try {
+    const byTeam = groupItems(req.body.items);
+    if (byTeam.size === 0) return res.status(400).json({ message: "No orders selected" });
+    let deleted = 0;
+    for (const [teamId, orderIds] of byTeam) {
+      const team = await Team.findById(teamId);
+      if (!team) continue;
+      orderIds.forEach((oid) => {
+        const order = team.jerseyOrders.id(oid);
+        if (!order) return;
+        order.deleteOne();
+        deleted++;
+      });
+      await team.save();
+    }
+    res.json({ deleted });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

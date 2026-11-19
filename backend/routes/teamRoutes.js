@@ -35,6 +35,9 @@ const {
   listCombinedJerseyOrders,
   markJerseyOrdersPrinted,
   unmarkJerseyOrdersPrinted,
+  setTeamJerseyOrdersStatus,
+  setAllJerseyOrdersStatus,
+  deleteSelectedJerseyOrders,
 } = require("../controllers/jerseyOrderController");
 
 // The public team-logo lookup and the "my team" KHQR/logo routes are kept
@@ -112,6 +115,8 @@ router.get("/", listTeams);
 router.get("/jersey-orders/combined", listCombinedJerseyOrders);
 router.patch("/jersey-orders/mark-printed", markJerseyOrdersPrinted);
 router.patch("/jersey-orders/unmark-printed", unmarkJerseyOrdersPrinted);
+router.patch("/jersey-orders/status-all", setAllJerseyOrdersStatus);
+router.post("/jersey-orders/delete-selected", deleteSelectedJerseyOrders);
 
 router.post("/", createTeam);
 router.delete("/:id", deleteTeam);
@@ -120,6 +125,7 @@ router.delete("/:id/logo", removeTeamLogo);
 
 // Admin flavor of the jersey-order routes above — any team, by Team._id.
 router.get("/:id/jersey-orders", listTeamJerseyOrders);
+router.patch("/:id/jersey-orders-status", setTeamJerseyOrdersStatus);
 router.post("/:id/jersey-orders/register-admin", registerJerseyOrderOnBehalfAdmin);
 router.patch("/:id/jersey-orders/:orderId", updateTeamJerseyOrderAdmin);
 router.patch("/:id/jersey-orders/:orderId/paid", setTeamJerseyOrderPaidAdmin);

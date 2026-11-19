@@ -1,0 +1,38 @@
+// Open/close jersey ordering + delete selected orders (Admin).
+export const km = {
+  "jerseyOrdersClose.statusLabel": "ស្ថានភាពការបញ្ជាទិញអាវ",
+  "jerseyOrdersClose.open": "កំពុងបើក",
+  "jerseyOrdersClose.closed": "បានបិទ",
+  "jerseyOrdersClose.closeButton": "បិទការបញ្ជាទិញ",
+  "jerseyOrdersClose.openButton": "បើកការបញ្ជាទិញវិញ",
+  "jerseyOrdersClose.closeChosen": "បិទក្រុមដែលបានជ្រើស",
+  "jerseyOrdersClose.openChosen": "បើកក្រុមដែលបានជ្រើស",
+  "jerseyOrdersClose.notePlaceholder": "សារពេលបិទ (មិនចាំបាច់) ឧ. បានផ្ញើទៅរោងពុម្ពហើយ",
+  "jerseyOrdersClose.confirmClose": "បិទការបញ្ជាទិញអាវសម្រាប់ {team}? កីឡាករ និងគ្រូបង្វឹកនឹងមិនអាចបន្ថែម កែ ឬលុបការបញ្ជាទិញបានទៀតទេ។",
+  "jerseyOrdersClose.confirmCloseTeams": "បិទការបញ្ជាទិញអាវសម្រាប់៖ {teams}?",
+  "jerseyOrdersClose.confirmOpenTeams": "បើកការបញ្ជាទិញអាវវិញសម្រាប់៖ {teams}?",
+  "jerseyOrdersClose.closedBanner": "ការបញ្ជាទិញអាវត្រូវបានបិទ",
+  "jerseyOrdersClose.closedHelp": "មិនអាចបន្ថែម កែ ឬលុបការបញ្ជាទិញបានទេ — សូមទាក់ទង Admin បើត្រូវការកែប្រែ។",
+  "jerseyOrdersClose.failed": "បរាជ័យក្នុងការប្តូរស្ថានភាព",
+  "jerseyOrdersClose.deleteSelected": "លុបដែលបានជ្រើស ({count})",
+  "jerseyOrdersClose.confirmDeleteSelected": "លុបការបញ្ជាទិញអាវ {count} ជាអចិន្ត្រៃយ៍? មិនអាចយកមកវិញបានទេ។",
+};
+
+export const en = {
+  "jerseyOrdersClose.statusLabel": "Jersey ordering",
+  "jerseyOrdersClose.open": "Open",
+  "jerseyOrdersClose.closed": "Closed",
+  "jerseyOrdersClose.closeButton": "Close ordering",
+  "jerseyOrdersClose.openButton": "Re-open ordering",
+  "jerseyOrdersClose.closeChosen": "Close chosen teams",
+  "jerseyOrdersClose.openChosen": "Open chosen teams",
+  "jerseyOrdersClose.notePlaceholder": "Message when closed (optional), e.g. sent to the printer",
+  "jerseyOrdersClose.confirmClose": "Close jersey ordering for {team}? Players and the Head Coach won't be able to add, edit or remove orders.",
+  "jerseyOrdersClose.confirmCloseTeams": "Close jersey ordering for: {teams}?",
+  "jerseyOrdersClose.confirmOpenTeams": "Re-open jersey ordering for: {teams}?",
+  "jerseyOrdersClose.closedBanner": "Jersey ordering is closed",
+  "jerseyOrdersClose.closedHelp": "Orders can't be added, edited or removed — contact an Admin if something needs changing.",
+  "jerseyOrdersClose.failed": "Failed to change status",
+  "jerseyOrdersClose.deleteSelected": "Delete selected ({count})",
+  "jerseyOrdersClose.confirmDeleteSelected": "Permanently delete {count} jersey order(s)? This can't be undone.",
+};

@@ -115,6 +115,13 @@ const teamSchema = new mongoose.Schema(
     // One combined list (not split per season/event) since a shirt order is
     // an ongoing thing, not scoped to any one tournament.
     jerseyOrders: { type: [jerseyOrderSchema], default: [] },
+    // Admin can close jersey ordering for this team (e.g. once the list has
+    // gone to the printer). While closed, Players and the Head Coach can't
+    // add, edit or cancel orders — only an Admin can. Payment marking and
+    // "Synchronize" still work. jerseyOrdersClosedNote is an optional
+    // message shown to the team ("Closed — next round opens in January").
+    jerseyOrdersOpen: { type: Boolean, default: true },
+    jerseyOrdersClosedNote: { type: String, trim: true, default: "" },
   },
   { timestamps: true }
 );
