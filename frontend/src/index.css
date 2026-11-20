@@ -3379,3 +3379,15 @@ tr.inv-excluded td:first-child { opacity: 1; }
 .tg-order-cust { font-size: 14px; line-height: 1.7; margin-bottom: 6px; }
 .tg-order-btn { display: inline-block; margin-top: 10px; background: #229ed9; color: #fff; border: none; }
 .tg-order-btn:hover { background: #1b8bc0; color: #fff; }
+
+/* Monthly plan — templates, frequency, sure/essential */
+.plan-templates { margin-bottom: 12px; }
+.plan-templates > div, .plan-freqs, .plan-flags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.plan-freqs, .plan-flags { margin: 2px 0 10px; }
+.fin-form .chip { border: 1px solid var(--line, #d8d2c3); background: #fff; border-radius: 999px; padding: 5px 12px; cursor: pointer; font: inherit; font-size: 14px; }
+.fin-form .chip.active { background: var(--navy, #13294b); color: #fff; border-color: var(--navy, #13294b); }
+.plan-preview { margin: 0 0 8px; color: var(--ok, #2e7d4f); }
+.plan-safe { border-radius: 10px; padding: 10px 14px; margin: -4px 0 16px; border: 1px solid; }
+.plan-safe.ok { background: #eef6f0; border-color: #cfe5d6; }
+.plan-safe.bad { background: #fbeeeb; border-color: #efcfc8; }
+.plan-safe-warn { color: var(--bad, #b33); margin-top: 4px; font-size: 14px; }

@@ -75,7 +75,7 @@ export const km = {
   "finance.enterParty": "សូមបញ្ចូលឈ្មោះ",
   "finance.noDebts": "មិនទាន់មានបំណុល",
   "finance.paidOff": "សងរួច",
-  "finance.planIntro": "បញ្ចូលចំណូល និងចំណាយដែលកើតឡើងរៀងរាល់ខែ (ប្រាក់ខែ ថ្លៃផ្ទះ ថ្លៃទូរស័ព្ទ…)។ ប្រព័ន្ធប្រៀបធៀបជាមួយការកត់ត្រាជាក់ស្តែង តាមប្រភេទដូចគ្នា។",
+  "finance.planIntro": "បញ្ចូលចំណូលដែលរំពឹងទុក (ប្រាក់ខែ សេវាកម្ម លក់ផ្សេងៗ ការប្រកួត…) និងចំណាយចាំបាច់ប្រចាំខែ (សាំង/ធ្វើដំណើរ អាហារ ទូរស័ព្ទ ទឹកភ្លើង…)។ ប្រព័ន្ធប្រៀបធៀបជាមួយការកត់ត្រាជាក់ស្តែង តាមប្រភេទដូចគ្នា។",
   "finance.fromDebts": "ពីបំណុលដែលបានកំណត់",
   "finance.savingRate": "សន្សំបាន {pct}% នៃចំណូល",
   "finance.planName": "ឈ្មោះ",
@@ -108,6 +108,13 @@ export const km = {
   "finance.cat_bonus": "ប្រាក់រង្វាន់",
   "finance.cat_gift": "អំណោយ",
   "finance.cat_transfer": "ផ្ទេររវាងគណនី",
+  "finance.cat_service": "សេវាកម្ម",
+  "finance.cat_sales": "លក់ផ្សេងៗ",
+  "finance.cat_tutoring": "បង្រៀនបន្ថែម",
+  "finance.cat_vehicle": "ម៉ូតូ/ឡាន (ថែទាំ)",
+  "finance.cat_ceremony": "បុណ្យ/ការ/ពិធី",
+  "finance.cat_business": "ចំណាយអាជីវកម្ម",
+  "finance.cat_savings": "សន្សំ",
 };
 
 export const en = {
@@ -219,4 +226,11 @@ export const en = {
   "finance.cat_bonus": "Bonus",
   "finance.cat_gift": "Gift",
   "finance.cat_transfer": "Transfer",
+  "finance.cat_service": "Services",
+  "finance.cat_sales": "Other sales",
+  "finance.cat_tutoring": "Extra teaching",
+  "finance.cat_vehicle": "Motorbike / car upkeep",
+  "finance.cat_ceremony": "Weddings / ceremonies",
+  "finance.cat_business": "Business costs",
+  "finance.cat_savings": "Savings",
 };

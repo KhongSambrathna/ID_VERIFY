@@ -15,8 +15,8 @@ export function fmtMoney(amount, currency) {
 }
 export const ACCOUNT_ICON = { cash: "💵", bank: "🏦", wallet: "📲", other: "💼" };
 const QUICK_CATS = {
-  income: ["salary", "football", "shop", "bonus", "gift", "other"],
-  expense: ["food", "transport", "phone", "rent", "utilities", "family", "health", "education", "shopping", "fun", "football", "debt", "other"],
+  income: ["salary", "service", "sales", "shop", "football", "tutoring", "bonus", "gift", "other"],
+  expense: ["food", "transport", "vehicle", "phone", "rent", "utilities", "family", "health", "education", "ceremony", "business", "savings", "shopping", "fun", "football", "debt", "other"],
 };
 
 // ---------------------------------------------------------------------------

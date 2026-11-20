@@ -446,6 +446,9 @@ function readPlan(body, p) {
     p.timesPerMonth = v;
   }
   if (body.active !== undefined) p.active = Boolean(body.active);
+  if (body.sure !== undefined) p.sure = Boolean(body.sure);
+  if (body.essential !== undefined) p.essential = Boolean(body.essential);
+  if (body.note !== undefined) p.note = String(body.note).trim().slice(0, 200);
   if (!p.name) return "Enter a name";
   return null;
 }
@@ -522,8 +525,10 @@ exports.summary = wrap(async (req, res) => {
   // the same category).
   const planRows = plans.map((p) => {
     const monthly = roundUSD(p.amountUSD * (p.timesPerMonth ?? 1));
-    return { _id: p._id, kind: p.kind, name: p.name, category: p.category, monthly };
+    return { _id: p._id, kind: p.kind, name: p.name, category: p.category, monthly, sure: p.sure !== false, essential: p.essential !== false };
   });
+  const plannedIncomeSure = roundUSD(planRows.filter((p) => p.kind === "income" && p.sure).reduce((s, p) => s + p.monthly, 0));
+  const plannedEssential = roundUSD(planRows.filter((p) => p.kind === "expense" && p.essential).reduce((s, p) => s + p.monthly, 0));
   const plannedIncome = roundUSD(planRows.filter((p) => p.kind === "income").reduce((s, p) => s + p.monthly, 0));
   const plannedExpense = roundUSD(planRows.filter((p) => p.kind === "expense").reduce((s, p) => s + p.monthly, 0));
 
@@ -573,6 +578,10 @@ exports.summary = wrap(async (req, res) => {
     plannedExpense,
     monthlyDebtPayments,
     plannedNet: roundUSD(plannedIncome - plannedExpense - monthlyDebtPayments),
+    plannedIncomeSure,
+    plannedEssential,
+    // Worst case: only the sure income comes in, only essentials are paid.
+    plannedSafeNet: roundUSD(plannedIncomeSure - plannedEssential - monthlyDebtPayments),
     projectedIncome,
     projectedExpense,
     projectedNet: roundUSD(projectedIncome - projectedExpense),

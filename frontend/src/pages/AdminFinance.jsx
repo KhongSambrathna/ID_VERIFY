@@ -23,11 +23,12 @@ function fmtMoney(amount, currency) {
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString("en-GB", { timeZone: TZ }) : "");
 
 // Category keys → labels come from i18n ("finance.cat_food", …).
-const EXPENSE_CATS = ["food", "transport", "phone", "rent", "utilities", "family", "health", "education", "shopping", "fun", "football", "debt", "other"];
-const INCOME_CATS = ["salary", "football", "shop", "bonus", "gift", "other"];
+const EXPENSE_CATS = ["food", "transport", "vehicle", "phone", "rent", "utilities", "family", "health", "education", "ceremony", "business", "savings", "shopping", "fun", "football", "debt", "other"];
+const INCOME_CATS = ["salary", "service", "sales", "shop", "football", "tutoring", "bonus", "gift", "other"];
 const CAT_ICON = {
   food: "🍚", transport: "⛽", phone: "📱", rent: "🏠", utilities: "💡", family: "👨‍👩‍👧", health: "💊", education: "📚",
   shopping: "🛍", fun: "🎉", football: "⚽", debt: "💳", other: "📦", salary: "💼", shop: "🏪", bonus: "⭐", gift: "🎁", transfer: "🔁",
+  service: "🛠", sales: "🛒", tutoring: "📖", vehicle: "🏍", ceremony: "💒", business: "📦", savings: "🐷",
 };
 
 // Personal money for the Admin: daily income & expenses, debts, and the
@@ -185,6 +186,12 @@ function Overview({ month, catLabel }) {
               <span>{t("finance.expectedLeftover")}</span>
               <b style={{ color: s.plannedNet >= 0 ? "var(--ok)" : "var(--bad)" }}>{formatUSD(s.plannedNet)}</b>
             </div>
+            {s.plannedSafeNet !== undefined && s.plannedIncomeSure !== s.plannedIncome && (
+              <div>
+                <span>🛡 {t("planX.safeLeftover")}</span>
+                <b style={{ color: s.plannedSafeNet >= 0 ? "var(--ok)" : "var(--bad)" }}>{formatUSD(s.plannedSafeNet)}</b>
+              </div>
+            )}
           </div>
           <h4 style={{ marginBottom: 6 }}>{t("finance.upcomingPayments")}</h4>
           {s.debts.upcoming.length === 0 ? (
@@ -788,7 +795,45 @@ function Debts() {
 }
 
 // ---- Monthly plan ---------------------------------------------------------
-const blankPlan = (kind = "income") => ({ kind, name: "", category: kind === "income" ? "salary" : "food", amount: "", currency: "USD", timesPerMonth: "1", active: true });
+const blankPlan = (kind = "income") => ({
+  kind, name: "", category: kind === "income" ? "salary" : "food", amount: "", currency: "USD", timesPerMonth: "1",
+  active: true, sure: true, essential: true, note: "",
+});
+// How often → times per month.
+const FREQS = [
+  ["daily", 30],
+  ["weekly", 4.33],
+  ["twice", 2],
+  ["monthly", 1],
+  ["quarterly", 0.333],
+  ["yearly", 0.0833],
+];
+// One-tap starters for common income / costs (name comes from i18n).
+const PLAN_TEMPLATES = {
+  income: [
+    { key: "salary", category: "salary", sure: true, times: 2 },
+    { key: "service", category: "service", sure: false, times: 1 },
+    { key: "sales", category: "sales", sure: false, times: 1 },
+    { key: "shop", category: "shop", sure: false, times: 1 },
+    { key: "tournament", category: "football", sure: false, times: 1 },
+    { key: "referee", category: "service", sure: false, times: 4.33 },
+    { key: "tutoring", category: "tutoring", sure: true, times: 1 },
+  ],
+  expense: [
+    { key: "fuel", category: "transport", essential: true, times: 4.33 },
+    { key: "travel", category: "transport", essential: true, times: 1 },
+    { key: "food", category: "food", essential: true, times: 30 },
+    { key: "phone", category: "phone", essential: true, times: 1 },
+    { key: "utilities", category: "utilities", essential: true, times: 1 },
+    { key: "rent", category: "rent", essential: true, times: 1 },
+    { key: "vehicle", category: "vehicle", essential: true, times: 0.333 },
+    { key: "family", category: "family", essential: true, times: 1 },
+    { key: "ceremony", category: "ceremony", essential: false, times: 2 },
+    { key: "savings", category: "savings", essential: true, times: 1 },
+    { key: "fun", category: "fun", essential: false, times: 4.33 },
+  ],
+};
+const freqKey = (n) => (FREQS.find(([, v]) => Math.abs(v - Number(n)) < 0.01) || [null])[0];
 
 function Plan({ catLabel }) {
   const { t } = useLanguage();
@@ -835,16 +880,44 @@ function Plan({ catLabel }) {
     load();
   };
   const monthly = (p) => p.amountUSD * (p.timesPerMonth ?? 1);
-  const inc = list.filter((p) => p.kind === "income" && p.active).reduce((s, p) => s + monthly(p), 0);
-  const exp = list.filter((p) => p.kind === "expense" && p.active).reduce((s, p) => s + monthly(p), 0);
+  const act = list.filter((p) => p.active);
+  const sum = (rows) => rows.reduce((s, p) => s + monthly(p), 0);
+  const inc = sum(act.filter((p) => p.kind === "income"));
+  const incSure = sum(act.filter((p) => p.kind === "income" && p.sure !== false));
+  const exp = sum(act.filter((p) => p.kind === "expense"));
+  const expEssential = sum(act.filter((p) => p.kind === "expense" && p.essential !== false));
   const left = inc - exp - debtPay;
+  const safeLeft = incSure - expEssential - debtPay;
+  const applyTemplate = (kind, tp) =>
+    setForm({
+      ...blankPlan(kind),
+      name: t(`planX.tpl_${tp.key}`),
+      category: tp.category,
+      timesPerMonth: String(tp.times),
+      sure: tp.sure ?? true,
+      essential: tp.essential ?? true,
+    });
+  // live "≈ $x / month" in the form
+  const formMonthly = form
+    ? (Number(form.amount) || 0) * (Number(form.timesPerMonth) || 0) / (form.currency === "KHR" ? 4000 : 1)
+    : 0;
 
   return (
     <>
       <p className="mini-empty">{t("finance.planIntro")}</p>
       <div className="stat-grid">
-        <StatTile label={t("finance.expectedIncome")} value={formatUSD(inc)} sub={approxKHR(inc)} tone="ok" />
-        <StatTile label={t("finance.expectedExpense")} value={formatUSD(exp)} sub={approxKHR(exp)} tone="bad" />
+        <StatTile
+          label={t("finance.expectedIncome")}
+          value={formatUSD(inc)}
+          sub={`✅ ${t("planX.sure")} ${formatUSD(incSure)} · 🤞 ${t("planX.maybe")} ${formatUSD(inc - incSure)}`}
+          tone="ok"
+        />
+        <StatTile
+          label={t("finance.expectedExpense")}
+          value={formatUSD(exp)}
+          sub={`❗ ${t("planX.essential")} ${formatUSD(expEssential)} · ${t("planX.optional")} ${formatUSD(exp - expEssential)}`}
+          tone="bad"
+        />
         <StatTile label={t("finance.debtPayments")} value={formatUSD(debtPay)} sub={t("finance.fromDebts")} />
         <StatTile
           label={t("finance.expectedLeftover")}
@@ -853,9 +926,28 @@ function Plan({ catLabel }) {
           tone={left >= 0 ? "ok" : "bad"}
         />
       </div>
+      {list.length > 0 && (
+        <div className={`plan-safe ${safeLeft >= 0 ? "ok" : "bad"}`}>
+          <b>🛡 {t("planX.safeLeftover")}: {formatUSD(safeLeft)}</b> <small>({approxKHR(safeLeft)})</small>
+          <div className="mini-empty">{t("planX.safeHelp")}</div>
+          {safeLeft < 0 && <div className="plan-safe-warn">⚠️ {t("planX.safeWarn").replace("{amt}", formatUSD(-safeLeft))}</div>}
+        </div>
+      )}
 
       {form ? (
-        <form className="card fin-form" onSubmit={save} style={{ maxWidth: 720 }}>
+        <form className="card fin-form" onSubmit={save} style={{ maxWidth: 760 }}>
+          {!form._id && (
+            <div className="plan-templates">
+              <small className="mini-empty">{t("planX.quickPick")}</small>
+              <div>
+                {PLAN_TEMPLATES[form.kind].map((tp) => (
+                  <button type="button" key={tp.key} className={`chip ${form.name === t(`planX.tpl_${tp.key}`) ? "active" : ""}`} onClick={() => applyTemplate(form.kind, tp)}>
+                    {CAT_ICON[tp.category]} {t(`planX.tpl_${tp.key}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="seg-toggle fin-type" style={{ marginBottom: 10 }}>
             <button type="button" className={form.kind === "income" ? "active income" : ""} onClick={() => setForm((p) => ({ ...p, kind: "income", category: "salary" }))}>⬇ {t("finance.expectedIncome")}</button>
             <button type="button" className={form.kind === "expense" ? "active expense" : ""} onClick={() => setForm((p) => ({ ...p, kind: "expense", category: "food" }))}>⬆ {t("finance.expectedExpense")}</button>
@@ -887,10 +979,36 @@ function Plan({ catLabel }) {
             </div>
             <div className="field" style={{ flex: 1, minWidth: 140 }}>
               <label>{t("finance.timesPerMonth")}</label>
-              <input type="number" min="0" max="31" step="1" value={form.timesPerMonth} onChange={setP("timesPerMonth")} />
+              <input type="number" min="0" max="31" step="any" value={form.timesPerMonth} onChange={setP("timesPerMonth")} />
             </div>
           </div>
-          <p className="mini-empty" style={{ margin: "0 0 6px" }}>{t("finance.timesHelp")}</p>
+          <div className="plan-freqs">
+            {FREQS.map(([k, v]) => (
+              <button type="button" key={k} className={`chip ${freqKey(form.timesPerMonth) === k ? "active" : ""}`} onClick={() => setForm((p) => ({ ...p, timesPerMonth: String(v) }))}>
+                {t(`planX.freq_${k}`)}
+              </button>
+            ))}
+          </div>
+          {formMonthly > 0 && (
+            <p className="plan-preview">≈ <b>{formatUSD(formMonthly)}</b> / {t("finance.month")} <small>({approxKHR(formMonthly)})</small></p>
+          )}
+          <div className="plan-flags">
+            {form.kind === "income" ? (
+              <>
+                <button type="button" className={`chip ${form.sure ? "active" : ""}`} onClick={() => setForm((p) => ({ ...p, sure: true }))}>✅ {t("planX.sureLong")}</button>
+                <button type="button" className={`chip ${!form.sure ? "active" : ""}`} onClick={() => setForm((p) => ({ ...p, sure: false }))}>🤞 {t("planX.maybeLong")}</button>
+              </>
+            ) : (
+              <>
+                <button type="button" className={`chip ${form.essential ? "active" : ""}`} onClick={() => setForm((p) => ({ ...p, essential: true }))}>❗ {t("planX.essentialLong")}</button>
+                <button type="button" className={`chip ${!form.essential ? "active" : ""}`} onClick={() => setForm((p) => ({ ...p, essential: false }))}>✂️ {t("planX.optionalLong")}</button>
+              </>
+            )}
+          </div>
+          <div className="field">
+            <label>{t("finance.note")}</label>
+            <input value={form.note || ""} onChange={setP("note")} placeholder={t("planX.notePh")} />
+          </div>
           {err && <div className="error-text">{err}</div>}
           <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
             <button className="btn btn-primary">{t("common.save")}</button>
@@ -905,7 +1023,13 @@ function Plan({ catLabel }) {
       )}
 
       {["income", "expense"].map((kind) => {
-        const rows = list.filter((p) => p.kind === kind);
+        const rows = list
+          .filter((p) => p.kind === kind)
+          .sort((a, b) =>
+            kind === "income"
+              ? (b.sure !== false) - (a.sure !== false) || monthly(b) - monthly(a)
+              : (b.essential !== false) - (a.essential !== false) || monthly(b) - monthly(a)
+          );
         if (!rows.length) return null;
         return (
           <div key={kind} style={{ marginBottom: 18 }}>
@@ -915,6 +1039,7 @@ function Plan({ catLabel }) {
                 <thead>
                   <tr>
                     <th>{t("finance.planName")}</th>
+                    <th>{kind === "income" ? t("planX.certainty") : t("planX.need")}</th>
                     <th>{t("finance.category")}</th>
                     <th>{t("finance.amountEachTime")}</th>
                     <th>{t("finance.timesPerMonth")}</th>
@@ -925,10 +1050,20 @@ function Plan({ catLabel }) {
                 <tbody>
                   {rows.map((p) => (
                     <tr key={p._id} style={p.active ? undefined : { opacity: 0.5 }}>
-                      <td data-label={t("finance.planName")}><b>{p.name}</b></td>
+                      <td data-label={t("finance.planName")}>
+                        <b>{p.name}</b>
+                        {p.note && <div className="mini-empty">{p.note}</div>}
+                      </td>
+                      <td data-label={kind === "income" ? t("planX.certainty") : t("planX.need")}>
+                        {kind === "income" ? (
+                          <span className={`badge ${p.sure !== false ? "verified" : "pending"}`}>{p.sure !== false ? `✅ ${t("planX.sure")}` : `🤞 ${t("planX.maybe")}`}</span>
+                        ) : (
+                          <span className={`badge ${p.essential !== false ? "rejected" : ""}`}>{p.essential !== false ? `❗ ${t("planX.essential")}` : `✂️ ${t("planX.optional")}`}</span>
+                        )}
+                      </td>
                       <td data-label={t("finance.category")}>{catLabel(p.category)}</td>
                       <td data-label={t("finance.amountEachTime")}>{fmtMoney(p.amount, p.currency)}</td>
-                      <td data-label={t("finance.timesPerMonth")}>×{p.timesPerMonth}</td>
+                      <td data-label={t("finance.timesPerMonth")}>{freqKey(p.timesPerMonth) ? t(`planX.freq_${freqKey(p.timesPerMonth)}`) : `×${p.timesPerMonth}`}</td>
                       <td data-label={t("finance.perMonth")}><b>{formatUSD(monthly(p))}</b></td>
                       <td data-label={t("common.actions")}>
                         <button className="link-btn" onClick={() => setForm({ ...p, amount: String(p.amount), timesPerMonth: String(p.timesPerMonth) })}>✏️</button>

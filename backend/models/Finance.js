@@ -86,6 +86,11 @@ const planSchema = new mongoose.Schema(
     category: { type: String, trim: true, default: "other" },
     ...money, // amount each time
     timesPerMonth: { type: Number, min: 0, default: 1 }, // e.g. salary paid twice a month = 2
+    // income: sure (salary) vs. hoped-for (sales, services, tournaments)
+    sure: { type: Boolean, default: true },
+    // expense: essential (food, fuel, phone…) vs. can be cut if money is short
+    essential: { type: Boolean, default: true },
+    note: { type: String, trim: true, default: "" },
     active: { type: Boolean, default: true },
   },
   { timestamps: true }
