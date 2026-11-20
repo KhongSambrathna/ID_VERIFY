@@ -357,6 +357,7 @@ function autoEligible(o) {
 
 async function syncAutoPayments(req) {
   const now = new Date();
+  const autoPaidNow = [];
   const nowKey = ymKey(now);
   const debts = await FinanceDebt.find({
     ...own(req),
@@ -393,12 +394,19 @@ async function syncAutoPayments(req) {
       if (!(amount > 0)) continue;
       const acc = d.payAccount ? await FinanceAccount.findOne({ _id: d.payAccount, ...own(req) }) : null;
       const err = await recordPayment(req, d, { amount, date: due, account: acc ? acc._id : null, auto: true, split: "auto" });
-      if (!err) changed = true;
+      if (!err) {
+        changed = true;
+        autoPaidNow.push({ debt: d, payment: d.payments[d.payments.length - 1] });
+      }
     }
     if (changed) {
       d.autoDoneThrough = doneThrough;
       await d.save();
     }
+  }
+  if (autoPaidNow.length) {
+    const alerts = require("../utils/telegramAlerts");
+    for (const x of autoPaidNow) alerts.alertAutoPaid(req.adminId, debtView(x.debt), x.payment).catch(() => {});
   }
 }
 exports.syncAutoPayments = syncAutoPayments;
@@ -713,7 +721,9 @@ exports.updateSettings = wrap(async (req, res) => {
 //     still collected through the Debt report as before
 //   • unpaid / part-paid shop invoices (USD)
 //   • money I lent that I recorded myself (Debts → owed to me)
-exports.receivables = wrap(async (req, res) => {
+exports.receivables = wrap(async (req, res) => res.json(await computeReceivables(req)));
+
+async function computeReceivables(req) {
   const st = await getSettings(req);
   const teams = st.receivableTeams || [];
 
@@ -763,7 +773,7 @@ exports.receivables = wrap(async (req, res) => {
   const studentsUSD = roundUSD(students.reduce((s, r) => s + r.totalUSD, 0));
   const invoicesUSD = roundUSD(countedInvoices.reduce((s, r) => s + r.balanceUSD, 0));
   const lentUSD = roundUSD(lent.reduce((s, d) => s + d.remainingUSD, 0));
-  res.json({
+  return {
     rate: KHR_PER_USD,
     settings: st,
     students,
@@ -778,5 +788,8 @@ exports.receivables = wrap(async (req, res) => {
       lentUSD,
       allUSD: roundUSD(studentsUSD + invoicesUSD + lentUSD),
     },
-  });
-});
+  };
+}
+
+// Used by the Telegram alerts (utils/telegramAlerts.js).
+exports.helpers = { computeReceivables, accountsWithBalance, debtView, syncAutoPayments, nextAutoDate, dueInMonth, ymKey, toUSD, KHR_PER_USD };

@@ -3339,3 +3339,43 @@ tr.inv-excluded td:first-child { opacity: 1; }
 .auto-pay-line { color: var(--ok, #2e7d4f); }
 .badge.auto-badge { background: #e6f2ea; color: #2e7d4f; font-size: 11px; padding: 1px 6px; }
 .rate-note { margin: 2px 0 14px; }
+
+/* ---------- Telegram bot page ---------- */
+.tg-setup { display: flex; flex-direction: column; gap: 14px; max-width: 860px; }
+.tg-setup > .card { width: 100%; max-width: none; box-sizing: border-box; }
+.tg-step { padding: 16px 18px; }
+.tg-step-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.tg-step-head h3 { margin: 0; }
+.tg-step-n { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--navy, #13294b); color: #fff; font-weight: 700; flex: none; }
+.tg-step.done .tg-step-n { background: var(--ok, #2e7d4f); }
+.tg-step-body p { margin: 4px 0 10px; }
+.tg-howto { margin: 6px 0 0 18px; line-height: 1.8; }
+.tg-share { margin-top: 14px; }
+.tg-share label { font-weight: 600; display: block; margin-bottom: 6px; }
+.tg-share-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.tg-share-row code { flex: 1 1 260px; background: #f3f0e8; padding: 8px 10px; border-radius: 8px; overflow-wrap: anywhere; font-size: 13px; }
+.tg-share-row .btn { padding: 6px 12px; font-size: 14px; }
+.tg-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.tg-msg { background: #eef6f0; border: 1px solid #cfe5d6; padding: 10px 14px; border-radius: 10px; }
+.tg-private { background: #f6f1e4; padding: 8px 12px; border-radius: 8px; font-size: 14px; }
+.tg-alerts { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.tg-alert { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line, #e2ddd0); border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+.tg-alert.on { border-color: var(--ok, #2e7d4f); background: rgba(46, 125, 79, 0.05); }
+.tg-alert input { width: 18px; height: 18px; margin-top: 3px; flex: none; }
+.tg-alert span { display: flex; flex-direction: column; gap: 3px; }
+.tg-alert small { color: var(--muted, #7a7466); font-size: 12.5px; line-height: 1.5; }
+.tg-hour { font-size: 13px; margin-top: 4px; }
+.tg-hour select { padding: 2px 6px; }
+.tg-awake { padding: 12px 18px; }
+.tg-awake summary { cursor: pointer; font-weight: 600; }
+.tg-count { display: inline-block; margin-left: 6px; background: var(--bad, #b33); color: #fff; border-radius: 10px; padding: 0 7px; font-size: 12px; }
+.tg-filter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.tg-filter .chip { border: 1px solid var(--line, #d8d2c3); background: #fff; border-radius: 999px; padding: 6px 14px; cursor: pointer; font: inherit; }
+.tg-filter .chip.active { background: var(--navy, #13294b); color: #fff; border-color: var(--navy, #13294b); }
+.tg-order.pending { border-top: 4px solid var(--pending, #c58a1b); }
+.tg-order.confirmed { border-top: 4px solid var(--ok, #2e7d4f); }
+.tg-order.rejected, .tg-order.cancelled { opacity: 0.75; }
+.tg-order-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 4px 0 8px; }
+.tg-order-cust { font-size: 14px; line-height: 1.7; margin-bottom: 6px; }
+.tg-order-btn { display: inline-block; margin-top: 10px; background: #229ed9; color: #fff; border: none; }
+.tg-order-btn:hover { background: #1b8bc0; color: #fff; }

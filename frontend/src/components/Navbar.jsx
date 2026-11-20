@@ -178,7 +178,7 @@ export default function Navbar() {
               <NavDropdown
                 label={t("navbar.shop")}
                 active={
-                  anyActive("/admin/shop", "/admin/shop?tab=stock", "/admin/shop?tab=report", "/admin/shop?tab=packages", "/admin/invoices", "/admin/purchase-plans") ||
+                  anyActive("/admin/shop", "/admin/shop?tab=stock", "/admin/shop?tab=report", "/admin/shop?tab=packages", "/admin/invoices", "/admin/purchase-plans", "/admin/telegram", "/admin/telegram?tab=orders") ||
                   location.pathname.startsWith("/admin/invoices/")
                 }
               >
@@ -187,6 +187,7 @@ export default function Navbar() {
                 <L to="/admin/shop?tab=stock">🔄 {t("navbar.shopStock")}</L>
                 <L to="/admin/shop?tab=packages">🎁 {t("navbar.packages")}</L>
                 <L to="/admin/purchase-plans">🛒 {t("navbar.purchasePlans")}</L>
+                <L to="/admin/telegram?tab=orders">🤖 {t("navbar.botOrders")}</L>
                 <L to="/admin/shop?tab=report">📈 {t("navbar.shopReport")}</L>
                 <L to="/shop">🛒 {t("navbar.viewPublicShop")}</L>
               </NavDropdown>
@@ -204,6 +205,7 @@ export default function Navbar() {
                 <L to="/admin/users">🔑 {t("navbar.users")}</L>
                 <L to="/admin/sponsors">🤝 {t("navbar.sponsors")}</L>
                 <L to="/admin/poster">🖼️ {t("navbar.posterGenerator")}</L>
+                <L to="/admin/telegram">🤖 {t("navbar.telegramBot")}</L>
                 <Label>{t("navbar.publicPages")}</Label>
                 <L to="/search">🔍 {t("navbar.findPlayer")}</L>
                 <L to="/pricing">💳 {t("navbar.pricing")}</L>

@@ -48,6 +48,7 @@ async function returnStock(invoice) {
     }
     item.movement = null;
   }
+  require("../utils/telegramAlerts").stockChanged(invoice.items.filter((i) => i.product).map((i) => i.product));
 }
 
 // GET /api/invoices?q=&status=&from=&to=
@@ -207,6 +208,7 @@ exports.createInvoice = async (req, res) => {
     }
 
     await invoice.save();
+    require("../utils/telegramAlerts").stockChanged(items.filter((it) => it.product).map((it) => it.product._id));
     res.status(201).json(invoice);
   } catch (err) {
     res.status(500).json({ message: err.message });

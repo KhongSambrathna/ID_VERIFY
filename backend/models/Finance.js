@@ -118,6 +118,15 @@ const settingsSchema = new mongoose.Schema(
     includeInvoices: { type: Boolean, default: true },
     // Unpaid invoices I chose NOT to count (new invoices count by default)
     excludedInvoices: [{ type: mongoose.Schema.Types.ObjectId, ref: "Invoice" }],
+    // Telegram alerts — sent only to this Admin's own linked Telegram chat.
+    alerts: {
+      orders: { type: Boolean, default: false }, // new bot orders
+      stock: { type: Boolean, default: false }, // product low / out of stock
+      debts: { type: Boolean, default: false }, // pay day tomorrow, auto-paid
+      owed: { type: Boolean, default: false }, // weekly "owed to me"
+      daily: { type: Boolean, default: false }, // evening summary
+      dailyHour: { type: Number, min: 0, max: 23, default: 20 },
+    },
   },
   { timestamps: true }
 );

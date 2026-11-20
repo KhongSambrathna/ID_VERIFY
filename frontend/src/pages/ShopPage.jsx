@@ -35,6 +35,7 @@ export default function ShopPage() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [packages, setPackages] = useState([]);
+  const [botName, setBotName] = useState(null);
 
   useEffect(() => {
     api
@@ -44,6 +45,8 @@ export default function ShopPage() {
       .finally(() => setLoading(false));
     // Packages (e.g. tournament package) — optional, ignore errors.
     api.get("/packages/public").then(({ data }) => setPackages(data)).catch(() => {});
+    // Telegram shop bot, if one is set up — "Order on Telegram" button.
+    api.get("/telegram/public").then(({ data }) => setBotName(data.username)).catch(() => {});
   }, []);
 
   const q = search.trim().toLowerCase();
@@ -54,6 +57,11 @@ export default function ShopPage() {
       <div className="shop-header">
         <h2>{t("shopPage.title")}</h2>
         <p>{t("shopPage.description")}</p>
+        {botName && (
+          <a className="btn tg-order-btn" href={`https://t.me/${botName}?start=shop`} target="_blank" rel="noreferrer">
+            ✈️ {t("tgBot.orderOnTelegram")}
+          </a>
+        )}
       </div>
 
       <div className="field search-field">
@@ -137,7 +145,7 @@ export default function ShopPage() {
                     {outOfStock ? (
                       <span className="shop-order-btn disabled">{t("shopPage.order")}</span>
                     ) : (
-                      <a className="shop-order-btn" href={orderLink(p)} target="_blank" rel="noopener noreferrer">
+                      <a className="shop-order-btn" href={botName ? `https://t.me/${botName}?start=p_${p._id}` : orderLink(p)} target="_blank" rel="noopener noreferrer">
                         {t("shopPage.order")}
                       </a>
                     )}

@@ -23,6 +23,7 @@ const invoiceRoutes = require("./routes/invoiceRoutes");
 const packageRoutes = require("./routes/packageRoutes");
 const purchasePlanRoutes = require("./routes/purchasePlanRoutes");
 const financeRoutes = require("./routes/financeRoutes");
+const telegramRoutes = require("./routes/telegramRoutes");
 
 const app = express();
 
@@ -67,6 +68,8 @@ app.use("/api/packages", packageRoutes);
 app.use("/api/purchase-plans", purchasePlanRoutes);
 // Personal finance (Admin): daily income/expenses, debts, monthly plan.
 app.use("/api/finance", financeRoutes);
+// Telegram shop bot (webhook) + private alerts for the Admin.
+app.use("/api/telegram", telegramRoutes);
 // Social-media share/preview pages — paste these into Facebook/Telegram
 // instead of the plain frontend links to get a real preview image
 // (see shareController.js for why the SPA can't provide this on its own).
@@ -95,3 +98,11 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+
+// Timed Telegram alerts (debt pay days, weekly "owed to me", daily summary).
+// Checked every 10 minutes while the server is awake; each alert is sent once.
+if (process.env.TELEGRAM_BOT_TOKEN && process.env.NODE_ENV !== "test") {
+  const { runScheduled } = require("./utils/telegramAlerts");
+  setTimeout(() => runScheduled().catch(() => {}), 30 * 1000);
+  setInterval(() => runScheduled().catch(() => {}), 10 * 60 * 1000);
+}

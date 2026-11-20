@@ -105,23 +105,27 @@ exports.listProducts = async (req, res) => {
 //   • Best sellers are listed first; the top 3 that have sold get
 //     bestSeller: true for a "🔥 Best seller" badge.
 //   • Buying cost, sales numbers and imagePublicId are private, never sent.
+async function publicProductList() {
+  const [products, sold] = await Promise.all([
+    Product.find({ stock: { $gt: 0 } }).select("-imagePublicId -costPrice -lowStockAlert").lean(),
+    soldCounts(),
+  ]);
+  return sortBestSellersFirst(products, sold).map((p, i) => {
+    const { soldCount, ...rest } = p;
+    const onSale = discountActive(rest);
+    return {
+      ...rest,
+      bestSeller: i < 3 && soldCount > 0,
+      discountActive: onSale,
+      salePrice: onSale ? salePrice(rest) : rest.price,
+    };
+  });
+}
+exports.publicProductList = publicProductList; // also used by the Telegram bot
+
 exports.listPublicProducts = async (req, res) => {
   try {
-    const [products, sold] = await Promise.all([
-      Product.find({ stock: { $gt: 0 } }).select("-imagePublicId -costPrice -lowStockAlert").lean(),
-      soldCounts(),
-    ]);
-    const sorted = sortBestSellersFirst(products, sold).map((p, i) => {
-      const { soldCount, ...rest } = p;
-      const onSale = discountActive(rest);
-      return {
-        ...rest,
-        bestSeller: i < 3 && soldCount > 0,
-        discountActive: onSale,
-        salePrice: onSale ? salePrice(rest) : rest.price,
-      };
-    });
-    res.json(sorted);
+    res.json(await publicProductList());
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -363,6 +367,7 @@ exports.createMovement = async (req, res) => {
 
     await product.save();
     const saved = await StockMovement.create(movement);
+    require("../utils/telegramAlerts").stockChanged([product._id]);
     res.status(201).json({ movement: saved, product });
   } catch (err) {
     res.status(500).json({ message: err.message });

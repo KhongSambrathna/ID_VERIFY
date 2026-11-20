@@ -43,6 +43,7 @@ import InvoiceView from "./pages/InvoiceView";
 import AdminPurchasePlans from "./pages/AdminPurchasePlans";
 import CoachModePicker from "./pages/CoachModePicker";
 import AdminFinance from "./pages/AdminFinance";
+import AdminTelegram from "./pages/AdminTelegram";
 import CoachModeBanner from "./components/CoachModeBanner";
 import usePageTracking from "./hooks/usePageTracking";
 
@@ -55,6 +56,14 @@ export default function App() {
       <Navbar />
       <CoachModeBanner />
       <Routes>
+        <Route
+          path="/admin/telegram"
+          element={
+            <ProtectedRoute role="ADMIN">
+              <AdminTelegram />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/admin/finance"
           element={
