@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
-import InstallAppButton from "./InstallAppButton";
 
 // Is this link the page we're on? A link with "?tab=…" only matches that
 // exact tab; a plain link matches its path when no tab is selected — so
@@ -248,8 +247,6 @@ export default function Navbar() {
           )}
 
           <span className="nav-spacer" />
-
-          <InstallAppButton onDone={closeMenu} />
 
           <button type="button" className="lang-switch" onClick={toggleLanguage}>
             {language === "km" ? "EN" : "ខ្មែរ"}
