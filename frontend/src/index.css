@@ -3266,3 +3266,38 @@ html:lang(km) body {
 .coach-team-card img { width: 64px; height: 64px; object-fit: contain; }
 .coach-team-noimg { font-size: 40px; line-height: 64px; }
 .coach-team-name { font-weight: 700; color: var(--navy); }
+
+/* ---------- Personal finance ---------- */
+.month-switch { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+.month-switch .btn { padding: 6px 12px; }
+.fin-form { max-width: 760px; margin-bottom: 18px; }
+.fin-type button.active.expense { background: var(--bad); }
+.fin-type button.active.income { background: var(--ok); }
+.fin-amount-row { display: flex; gap: 10px; align-items: center; margin: 12px 0; }
+.fin-amount { font-size: 28px; font-weight: 800; max-width: 240px; padding: 8px 12px; }
+.fin-cats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.fin-cat { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 5px 11px; cursor: pointer; font: inherit; font-size: 13px; }
+.fin-cat.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+.fin-month-tot { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin: 4px 0 12px; font-size: 15px; }
+.fin-month-tot select { margin-left: auto; }
+.fin-day { background: #fff; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+.fin-day-head { display: flex; justify-content: space-between; padding: 8px 12px; background: var(--cream); font-size: 14px; }
+.fin-row { display: grid; grid-template-columns: 170px 1fr auto auto; gap: 10px; align-items: center; padding: 8px 12px; border-top: 1px solid #f0ebe0; font-size: 14px; }
+.fin-row-note { color: #555; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.fin-in { color: var(--ok); white-space: nowrap; }
+.fin-out { color: var(--bad); white-space: nowrap; }
+.fin-row-actions { white-space: nowrap; }
+@media (max-width: 600px) {
+  .fin-row { grid-template-columns: 1fr auto; }
+  .fin-row-note { grid-column: 1 / -1; order: 3; }
+  .fin-row-actions { order: 4; }
+}
+.fin-cat-row { margin-bottom: 9px; }
+.fin-cat-top { display: flex; justify-content: space-between; font-size: 14px; }
+.fin-cat-top small { color: #888; }
+.fin-debt { border-top: 4px solid var(--gold); margin: 0; }
+.fin-debt.owe { border-top-color: var(--bad); }
+.fin-debt.lend { border-top-color: var(--ok); }
+.fin-debt.closed { opacity: 0.6; }
+.fin-pay { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; }
+.fin-pay input { width: 130px; }

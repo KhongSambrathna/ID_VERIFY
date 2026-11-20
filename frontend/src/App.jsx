@@ -42,6 +42,7 @@ import AdminInvoices from "./pages/AdminInvoices";
 import InvoiceView from "./pages/InvoiceView";
 import AdminPurchasePlans from "./pages/AdminPurchasePlans";
 import CoachModePicker from "./pages/CoachModePicker";
+import AdminFinance from "./pages/AdminFinance";
 import CoachModeBanner from "./components/CoachModeBanner";
 import usePageTracking from "./hooks/usePageTracking";
 
@@ -54,6 +55,14 @@ export default function App() {
       <Navbar />
       <CoachModeBanner />
       <Routes>
+        <Route
+          path="/admin/finance"
+          element={
+            <ProtectedRoute role="ADMIN">
+              <AdminFinance />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/admin/coach-mode"
           element={

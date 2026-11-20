@@ -190,10 +190,11 @@ export default function Navbar() {
                 <L to="/admin/shop?tab=report">📈 {t("navbar.shopReport")}</L>
                 <L to="/shop">🛒 {t("navbar.viewPublicShop")}</L>
               </NavDropdown>
-              <NavDropdown label={t("navbar.reports")} active={anyActive("/admin/stats", "/debt-report", "/admin/analytics")}>
+              <NavDropdown label={t("navbar.reports")} active={anyActive("/admin/stats", "/debt-report", "/admin/analytics", "/admin/finance")}>
                 <L to="/admin/stats">📊 {t("navbar.stats")}</L>
                 <L to="/debt-report">💰 {t("navbar.debtReport")}</L>
                 <L to="/admin/analytics">👥 {t("navbar.analytics")}</L>
+                <L to="/admin/finance">💰 {t("navbar.myFinance")}</L>
               </NavDropdown>
               <NavDropdown
                 label={t("navbar.system")}
