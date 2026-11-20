@@ -3,6 +3,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useLanguage } from "../i18n/LanguageContext";
 import { formatUSD, approxKHR } from "../utils/currency";
+import { effectivePrice } from "../utils/pricing";
+import ProductPicker from "../components/ProductPicker";
 
 function todayStr() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -35,6 +37,8 @@ export default function AdminInvoices() {
   // form
   const [date, setDate] = useState(todayStr());
   const [invLang, setInvLang] = useState(language === "en" ? "en" : "km");
+  // Retail or wholesale customer — wholesale gets each product's wholesale price.
+  const [customerType, setCustomerType] = useState("retail");
   const [cName, setCName] = useState("");
   const [cPhone, setCPhone] = useState("");
   const [cAddress, setCAddress] = useState("");
@@ -80,6 +84,7 @@ export default function AdminInvoices() {
       name: it.product ? "" : it.name,
       quantity: String(it.quantity),
       unitPrice: String(it.unitPrice),
+      priceManual: true, // keep the package's own prices
       group: pkg.name,
     }));
     setLines((ls) => {
@@ -99,9 +104,27 @@ export default function AdminInvoices() {
   }, [packages]);
 
   const setLine = (i, patch) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  // Price for a stock line from the product's rules: sale discount,
+  // wholesale customer, or wholesale quantity — unless typed in by hand.
+  const autoPrice = (productId, qty, type = customerType) => {
+    const p = products.find((x) => x._id === productId);
+    return p ? String(effectivePrice(p, Number(qty) || 0, type === "wholesale").unitPrice) : "";
+  };
   const pickProduct = (i, id) => {
     const p = products.find((x) => x._id === id);
-    setLine(i, { productId: id, name: p ? p.name : "", unitPrice: p ? String(p.price) : "" });
+    setLine(i, { productId: id, name: p ? p.name : "", unitPrice: autoPrice(id, lines[i].quantity), priceManual: false });
+  };
+  const setQty = (i, qty) => {
+    const l = lines[i];
+    const patch = { quantity: qty };
+    if (l.kind === "stock" && l.productId && !l.priceManual) patch.unitPrice = autoPrice(l.productId, qty);
+    setLine(i, patch);
+  };
+  const changeCustomerType = (type) => {
+    setCustomerType(type);
+    setLines((ls) =>
+      ls.map((l) => (l.kind === "stock" && l.productId && !l.priceManual ? { ...l, unitPrice: autoPrice(l.productId, l.quantity, type) } : l))
+    );
   };
 
   const subtotal = lines.reduce((s, l) => s + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0), 0);
@@ -123,6 +146,7 @@ export default function AdminInvoices() {
     setCPhone("");
     setCAddress("");
     setLines([blankLine()]);
+    setCustomerType("retail");
     setDiscount("");
     setPaid("");
     setNote("");
@@ -154,6 +178,7 @@ export default function AdminInvoices() {
       const { data } = await api.post("/invoices", {
         date,
         language: invLang,
+        customerType,
         customer: { name: cName, phone: cPhone, address: cAddress },
         items,
         discount: Number(discount) || 0,
@@ -198,7 +223,17 @@ export default function AdminInvoices() {
           </div>
           <p className="mini-empty" style={{ margin: "4px 0 12px" }}>{t("invoices.langHint")}</p>
 
-          <h4 className="invoice-form-h">{t("invoices.customer")}</h4>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 14 }}>
+            <h4 className="invoice-form-h" style={{ margin: 0 }}>{t("invoices.customer")}</h4>
+            <div className="seg-toggle">
+              <button type="button" className={customerType === "retail" ? "active" : ""} onClick={() => changeCustomerType("retail")}>
+                🛍 {t("pricing.retail")}
+              </button>
+              <button type="button" className={customerType === "wholesale" ? "active" : ""} onClick={() => changeCustomerType("wholesale")}>
+                📦 {t("pricing.wholesaleCustomer")}
+              </button>
+            </div>
+          </div>
           <div className="filter-row" style={{ marginBottom: 0 }}>
             <div className="field" style={{ flex: 2, minWidth: 180 }}>
               <label>{t("invoices.customerName")}</label>
@@ -237,18 +272,27 @@ export default function AdminInvoices() {
                   </div>
                   <div className="invoice-line-desc">
                     {l.kind === "stock" ? (
-                      <select value={l.productId} onChange={(e) => pickProduct(i, e.target.value)}>
-                        <option value="">{t("invoices.chooseProduct")}</option>
-                        {products.map((x) => (
-                          <option key={x._id} value={x._id} disabled={x.stock <= 0}>
-                            {x.name} — {t("invoices.inStock")} {x.stock}
-                          </option>
-                        ))}
-                      </select>
+                      <ProductPicker products={products} value={l.productId} onChange={(id) => pickProduct(i, id)} />
                     ) : (
                       <input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} placeholder={t("invoices.descriptionPh")} />
                     )}
                     {over && <small className="error-text">{t("invoices.notEnoughStock")} ({p.stock})</small>}
+                    {p && !l.priceManual && (() => {
+                      const ep = effectivePrice(p, Number(l.quantity) || 0, customerType === "wholesale");
+                      if (!ep.reason) return null;
+                      return (
+                        <small className={`price-reason ${ep.reason}`}>
+                          {ep.reason === "discount" ? `🏷 -${p.discountPercent}%` : `📦 ${t("pricing.wholesalePrice")}`} ·{" "}
+                          <s>{formatUSD(ep.listPrice)}</s> → {formatUSD(ep.unitPrice)}
+                        </small>
+                      );
+                    })()}
+                    {p && !l.priceManual && customerType !== "wholesale" && p.wholesalePrice > 0 && p.wholesaleMinQty > 0 &&
+                      (Number(l.quantity) || 0) < p.wholesaleMinQty && (
+                        <small className="mini-empty">
+                          {t("pricing.wholesaleHint").replace("{n}", p.wholesaleMinQty).replace("{price}", formatUSD(p.wholesalePrice))}
+                        </small>
+                      )}
                   </div>
                   <input
                     className="invoice-line-qty"
@@ -256,7 +300,7 @@ export default function AdminInvoices() {
                     min="0"
                     step={l.kind === "stock" ? 1 : "any"}
                     value={l.quantity}
-                    onChange={(e) => setLine(i, { quantity: e.target.value })}
+                    onChange={(e) => setQty(i, e.target.value)}
                     aria-label={t("invoices.qty")}
                     placeholder={t("invoices.qty")}
                   />
@@ -266,7 +310,7 @@ export default function AdminInvoices() {
                     min="0"
                     step="0.01"
                     value={l.unitPrice}
-                    onChange={(e) => setLine(i, { unitPrice: e.target.value })}
+                    onChange={(e) => setLine(i, { unitPrice: e.target.value, priceManual: true })}
                     aria-label={t("invoices.unitPrice")}
                     placeholder="$"
                   />

@@ -18,6 +18,14 @@ const productSchema = new mongoose.Schema(
     costPrice: { type: Number, min: 0, default: 0 },
     stock: { type: Number, required: true, min: 0, default: 0 },
     unit: { type: String, trim: true, default: "pcs" },
+    // Sale: percent off the selling price, optionally only between two dates.
+    discountPercent: { type: Number, min: 0, max: 100, default: 0 },
+    discountStart: { type: Date, default: null },
+    discountEnd: { type: Date, default: null },
+    // Wholesale: this price per unit for wholesale customers, or for anyone
+    // buying at least wholesaleMinQty at once (0 = wholesale customers only).
+    wholesalePrice: { type: Number, min: 0, default: 0 },
+    wholesaleMinQty: { type: Number, min: 0, default: 0 },
     // Stock at or below this number is flagged "low stock".
     lowStockAlert: { type: Number, min: 0, default: 5 },
     imageUrl: { type: String },

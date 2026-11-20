@@ -5,6 +5,8 @@ import { useLanguage } from "../i18n/LanguageContext";
 import { formatUSD, approxKHR } from "../utils/currency";
 import { BarChart, HBarList, StatTile } from "../components/MiniCharts";
 import PackagesManager from "../components/PackagesManager";
+import ProductPicker from "../components/ProductPicker";
+import { discountActive, salePrice } from "../utils/pricing";
 
 function stockBadge(p, t) {
   const alertAt = p.lowStockAlert ?? 5;
@@ -22,6 +24,49 @@ function todayStr(offsetDays = 0) {
     month: "2-digit",
     day: "2-digit",
   }).format(d);
+}
+
+// Date → "YYYY-MM-DD" in Phnom Penh time for <input type="date">.
+function dateInput(d) {
+  if (!d) return "";
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Phnom_Penh", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(d));
+}
+
+// Discount % / sale dates / wholesale price & minimum qty inputs, shared by
+// the "add product" form and the edit row. `v` holds the values as strings.
+function PricingFields({ v, set, t, compact }) {
+  return (
+    <div className={compact ? "pricing-fields compact" : "pricing-fields"}>
+      <label>
+        🏷 {t("pricing.discountPercent")}
+        <input type="number" min="0" max="100" step="1" value={v.discountPercent} onChange={set("discountPercent")} placeholder="0" />
+      </label>
+      <label>
+        {t("pricing.from")}
+        <input type="date" value={v.discountStart} onChange={set("discountStart")} />
+      </label>
+      <label>
+        {t("pricing.to")}
+        <input type="date" value={v.discountEnd} onChange={set("discountEnd")} />
+      </label>
+      <label>
+        📦 {t("pricing.wholesalePrice")} ($)
+        <input type="number" min="0" step="0.01" value={v.wholesalePrice} onChange={set("wholesalePrice")} placeholder="0" />
+      </label>
+      <label>
+        {t("pricing.wholesaleMinQty")}
+        <input type="number" min="0" step="1" value={v.wholesaleMinQty} onChange={set("wholesaleMinQty")} placeholder="0" />
+      </label>
+    </div>
+  );
+}
+const emptyPricing = { discountPercent: "", discountStart: "", discountEnd: "", wholesalePrice: "", wholesaleMinQty: "" };
+function appendPricing(data, v) {
+  data.append("discountPercent", v.discountPercent === "" ? "0" : v.discountPercent);
+  data.append("discountStart", v.discountStart || "");
+  data.append("discountEnd", v.discountEnd || "");
+  data.append("wholesalePrice", v.wholesalePrice === "" ? "0" : v.wholesalePrice);
+  data.append("wholesaleMinQty", v.wholesaleMinQty === "" ? "0" : v.wholesaleMinQty);
 }
 
 function shortDate(d) {
@@ -107,6 +152,8 @@ function ProductsTab({ products, reload }) {
   const [stock, setStock] = useState("");
   const [unit, setUnit] = useState("pcs");
   const [lowStockAlert, setLowStockAlert] = useState("5");
+  const [pricing, setPricing] = useState(emptyPricing);
+  const setP = (k) => (e) => setPricing((prev) => ({ ...prev, [k]: e.target.value }));
   const [image, setImage] = useState(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
@@ -126,6 +173,7 @@ function ProductsTab({ products, reload }) {
     setStock("");
     setUnit("pcs");
     setLowStockAlert("5");
+    setPricing(emptyPricing);
     setImage(null);
     const fileInput = document.getElementById("product-image-input");
     if (fileInput) fileInput.value = "";
@@ -148,6 +196,7 @@ function ProductsTab({ products, reload }) {
       data.append("stock", stock === "" ? "0" : stock);
       data.append("unit", unit.trim() || "pcs");
       data.append("lowStockAlert", lowStockAlert === "" ? "5" : lowStockAlert);
+      appendPricing(data, pricing);
       data.append("image", image);
       await api.post("/products", data, { headers: { "Content-Type": "multipart/form-data" } });
       resetCreateForm();
@@ -168,6 +217,11 @@ function ProductsTab({ products, reload }) {
       stock: String(p.stock),
       unit: p.unit || "pcs",
       lowStockAlert: String(p.lowStockAlert ?? 5),
+      discountPercent: p.discountPercent ? String(p.discountPercent) : "",
+      discountStart: dateInput(p.discountStart),
+      discountEnd: dateInput(p.discountEnd),
+      wholesalePrice: p.wholesalePrice ? String(p.wholesalePrice) : "",
+      wholesaleMinQty: p.wholesaleMinQty ? String(p.wholesaleMinQty) : "",
     });
     setEditImage(null);
   };
@@ -192,6 +246,7 @@ function ProductsTab({ products, reload }) {
       data.append("stock", edit.stock);
       data.append("unit", edit.unit.trim() || "pcs");
       data.append("lowStockAlert", edit.lowStockAlert === "" ? "5" : edit.lowStockAlert);
+      appendPricing(data, edit);
       if (editImage) data.append("image", editImage);
       await api.put(`/products/${id}`, data, { headers: { "Content-Type": "multipart/form-data" } });
       cancelEdit();
@@ -252,6 +307,11 @@ function ProductsTab({ products, reload }) {
             <input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required />
           </div>
         </div>
+        <details className="pricing-details">
+          <summary>🏷 {t("pricing.sectionTitle")}</summary>
+          <PricingFields v={pricing} set={setP} t={t} />
+          <p className="mini-empty" style={{ margin: "4px 0 0" }}>{t("pricing.help")}</p>
+        </details>
         {price !== "" && (
           <p className={unitProfit >= 0 ? "profit-hint ok" : "profit-hint bad"}>
             {t("adminShop.profitPerUnit")}: <b>{formatUSD(unitProfit)}</b> <small>{approxKHR(unitProfit)}</small>
@@ -334,12 +394,27 @@ function ProductsTab({ products, reload }) {
                   </td>
                   <td data-label={t("adminShop.priceHeader")}>
                     {isEditing ? (
-                      <input type="number" min="0" step="0.01" value={edit.price} onChange={setE("price")} style={{ maxWidth: 100 }} />
+                      <>
+                        <input type="number" min="0" step="0.01" value={edit.price} onChange={setE("price")} style={{ maxWidth: 100 }} />
+                        <PricingFields v={edit} set={setE} t={t} compact />
+                      </>
+                    ) : discountActive(p) ? (
+                      <>
+                        <s className="pp-old">{formatUSD(p.price)}</s> <b>{formatUSD(salePrice(p))}</b>
+                        <span className="pp-tag sale">-{p.discountPercent}%</span>
+                        <div className="price-khr">{approxKHR(salePrice(p))}</div>
+                      </>
                     ) : (
                       <>
                         {formatUSD(p.price)}
                         <div className="price-khr">{approxKHR(p.price)}</div>
                       </>
+                    )}
+                    {!isEditing && p.wholesalePrice > 0 && (
+                      <div className="ws-line">
+                        📦 {formatUSD(p.wholesalePrice)}
+                        {p.wholesaleMinQty > 0 ? ` (≥${p.wholesaleMinQty})` : ""}
+                      </div>
                     )}
                   </td>
                   <td data-label={t("adminShop.profitHeader")} style={{ color: profit >= 0 ? "var(--ok)" : "var(--bad)" }}>
@@ -451,7 +526,7 @@ function StockTab({ products, reload }) {
   useEffect(() => {
     if (!product) return setUnitPrice("");
     if (type === "IN") setUnitPrice(String(product.costPrice || 0));
-    else if (type === "OUT") setUnitPrice(String(product.price || 0));
+    else if (type === "OUT") setUnitPrice(String(salePrice(product) || 0));
   }, [productId, type]);
 
   const loadRows = async () => {
@@ -543,14 +618,13 @@ function StockTab({ products, reload }) {
 
         <div className="field">
           <label>{t("adminShop.product")}</label>
-          <select value={productId} onChange={(e) => setProductId(e.target.value)} required>
-            <option value="">{t("adminShop.chooseProduct")}</option>
-            {products.map((p) => (
-              <option key={p._id} value={p._id}>
-                {p.name} — {t("adminShop.stock")}: {p.stock} {p.unit || "pcs"}
-              </option>
-            ))}
-          </select>
+          <ProductPicker
+            products={products}
+            value={productId}
+            onChange={setProductId}
+            allowOutOfStock={type !== "OUT"}
+            placeholder={t("adminShop.chooseProduct")}
+          />
         </div>
 
         <div className="filter-row" style={{ marginBottom: 0 }}>

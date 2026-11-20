@@ -112,6 +112,7 @@ exports.createInvoice = async (req, res) => {
           unit: product.unit || "pcs",
           quantity: qty,
           unitPrice: roundUSD(price),
+          listPrice: product.price > roundUSD(price) ? product.price : null,
         });
       } else {
         const name = String(it.name || "").trim();
@@ -151,6 +152,7 @@ exports.createInvoice = async (req, res) => {
       invoiceNo,
       date,
       language: req.body.language === "en" ? "en" : "km",
+      customerType: req.body.customerType === "wholesale" ? "wholesale" : "retail",
       customer: {
         name: String(customer.name || "").trim(),
         phone: String(customer.phone || "").trim(),
@@ -159,6 +161,7 @@ exports.createInvoice = async (req, res) => {
       items: items.map((it) => ({
         product: it.product ? it.product._id : null,
         group: it.group,
+        listPrice: it.listPrice || null,
         name: it.name,
         unit: it.unit,
         quantity: it.quantity,

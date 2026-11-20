@@ -115,7 +115,10 @@ export default function InvoiceView() {
         </header>
 
         <section className="invoice-customer">
-          <div className="invoice-section-label">{L.billTo}</div>
+          <div className="invoice-section-label">
+            {L.billTo}
+            {inv.customerType === "wholesale" && <span className="invoice-ws-tag">{L.wholesaleCustomer}</span>}
+          </div>
           <div><span>{L.customerName}:</span> {inv.customer?.name || "………………………………"}</div>
           <div><span>{L.customerPhone}:</span> {inv.customer?.phone || "………………………"}</div>
           <div><span>{L.customerAddress}:</span> {inv.customer?.address || "………………………………………………"}</div>
@@ -143,7 +146,10 @@ export default function InvoiceView() {
                 <td className="c">{i + 1}</td>
                 <td>{it.name}</td>
                 <td className="c">{fmtQty(it.quantity)}{it.unit ? ` ${it.unit}` : ""}</td>
-                <td className="r">{formatUSD(it.unitPrice)}</td>
+                <td className="r">
+                  {it.listPrice > it.unitPrice && <s className="invoice-old-price">{formatUSD(it.listPrice)}</s>}
+                  {formatUSD(it.unitPrice)}
+                </td>
                 <td className="r">{formatUSD(it.total)}</td>
               </tr>,
             ])}

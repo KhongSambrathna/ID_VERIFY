@@ -15,7 +15,8 @@ function stockBadge(stock) {
 // typed in — buyers just hit send. There's no in-app checkout, orders are
 // handled over Telegram by a person.
 function orderLink(product) {
-  const message = `Hello, I'd like to order: ${product.name} (${formatUSDwithKHR(product.price)})`;
+  const price = product.discountActive ? product.salePrice : product.price;
+  const message = `Hello, I'd like to order: ${product.name} (${formatUSDwithKHR(price)})`;
   return `https://t.me/${TELEGRAM_USERNAME}?text=${encodeURIComponent(message)}`;
 }
 
@@ -119,11 +120,19 @@ export default function ShopPage() {
                 <div className="shop-card-body">
                   <p className="shop-card-name">{p.name}</p>
                   {p.bestSeller && <span className="badge best-seller">🔥 {t("shopPage.bestSeller")}</span>}
+                  {p.discountActive && <span className="badge sale-badge">🏷 -{p.discountPercent}%</span>}
                   <span className={`badge ${badge.cls}`}>{t(badge.key)}</span>
                   <div className="shop-card-footer">
                     <span className="shop-card-price">
-                      {formatUSD(p.price)}
-                      <small className="price-khr">{approxKHR(p.price)}</small>
+                      {p.discountActive && <s className="shop-old-price">{formatUSD(p.price)}</s>}
+                      {formatUSD(p.discountActive ? p.salePrice : p.price)}
+                      <small className="price-khr">{approxKHR(p.discountActive ? p.salePrice : p.price)}</small>
+                      {p.wholesalePrice > 0 && (
+                        <small className="shop-wholesale">
+                          📦 {t("pricing.wholesale")}
+                          {p.wholesaleMinQty > 0 ? ` ≥${p.wholesaleMinQty}` : ""}: {formatUSD(p.wholesalePrice)}
+                        </small>
+                      )}
                     </span>
                     {outOfStock ? (
                       <span className="shop-order-btn disabled">{t("shopPage.order")}</span>

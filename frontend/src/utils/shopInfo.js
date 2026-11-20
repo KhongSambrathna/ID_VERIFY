@@ -15,6 +15,7 @@ export const SHOP_INFO = {
 export const INVOICE_TEXT = {
   km: {
     title: "វិក្កយបត្រ",
+    wholesaleCustomer: "អតិថិជនលក់ដុំ",
     invoiceNo: "លេខវិក្កយបត្រ",
     date: "កាលបរិច្ឆេទ",
     phone: "ទូរស័ព្ទ",
@@ -40,6 +41,7 @@ export const INVOICE_TEXT = {
   },
   en: {
     title: "INVOICE",
+    wholesaleCustomer: "Wholesale customer",
     invoiceNo: "Invoice No.",
     date: "Date",
     phone: "Phone",

@@ -19,6 +19,9 @@ const invoiceItemSchema = new mongoose.Schema(
     group: { type: String, trim: true, default: "" },
     quantity: { type: Number, required: true, min: 0 },
     unitPrice: { type: Number, required: true, min: 0 },
+    // Normal selling price at the time — when higher than unitPrice the
+    // invoice shows it crossed out (product discount or wholesale price).
+    listPrice: { type: Number, default: null },
     total: { type: Number, required: true },
     // The stock-out record created for this line (stock lines only).
     movement: { type: mongoose.Schema.Types.ObjectId, ref: "StockMovement", default: null },
@@ -31,6 +34,8 @@ const invoiceSchema = new mongoose.Schema(
     // "INV-2026-0001" — numbered per year, never reused.
     invoiceNo: { type: String, required: true, unique: true },
     date: { type: Date, default: Date.now },
+    // "wholesale" customers get each product's wholesale price.
+    customerType: { type: String, enum: ["retail", "wholesale"], default: "retail" },
     customer: {
       name: { type: String, trim: true, default: "" },
       phone: { type: String, trim: true, default: "" },

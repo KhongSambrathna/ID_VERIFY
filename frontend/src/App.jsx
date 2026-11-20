@@ -40,6 +40,7 @@ import PlayerRegister from "./pages/PlayerRegister";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminInvoices from "./pages/AdminInvoices";
 import InvoiceView from "./pages/InvoiceView";
+import AdminPurchasePlans from "./pages/AdminPurchasePlans";
 import usePageTracking from "./hooks/usePageTracking";
 
 export default function App() {
@@ -163,6 +164,14 @@ export default function App() {
           element={
             <ProtectedRoute role="ADMIN">
               <AdminInvoices />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/purchase-plans"
+          element={
+            <ProtectedRoute role="ADMIN">
+              <AdminPurchasePlans />
             </ProtectedRoute>
           }
         />

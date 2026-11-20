@@ -21,6 +21,7 @@ const registrationRoutes = require("./routes/registrationRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
 const invoiceRoutes = require("./routes/invoiceRoutes");
 const packageRoutes = require("./routes/packageRoutes");
+const purchasePlanRoutes = require("./routes/purchasePlanRoutes");
 
 const app = express();
 
@@ -61,6 +62,8 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/invoices", invoiceRoutes);
 // Shop packages/bundles (e.g. tournament package: trophy + medals + fees).
 app.use("/api/packages", packageRoutes);
+// Purchase planning — costs, delivery dates and expected profit before buying.
+app.use("/api/purchase-plans", purchasePlanRoutes);
 // Social-media share/preview pages — paste these into Facebook/Telegram
 // instead of the plain frontend links to get a real preview image
 // (see shareController.js for why the SPA can't provide this on its own).

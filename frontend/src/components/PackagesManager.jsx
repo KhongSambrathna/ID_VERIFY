@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import api from "../api/axios";
 import { useLanguage } from "../i18n/LanguageContext";
 import { formatUSD, approxKHR } from "../utils/currency";
+import ProductPicker from "./ProductPicker";
 
 const blankLine = (kind = "stock") => ({ kind, productId: "", name: "", quantity: "1", unitPrice: "" });
 
@@ -149,14 +150,7 @@ export default function PackagesManager({ products }) {
                   </div>
                   <div className="invoice-line-desc">
                     {l.kind === "stock" ? (
-                      <select value={l.productId} onChange={(e) => pickProduct(i, e.target.value)}>
-                        <option value="">{t("invoices.chooseProduct")}</option>
-                        {products.map((x) => (
-                          <option key={x._id} value={x._id}>
-                            {x.name} — {t("invoices.inStock")} {x.stock}
-                          </option>
-                        ))}
-                      </select>
+                      <ProductPicker products={products} value={l.productId} onChange={(id) => pickProduct(i, id)} allowOutOfStock />
                     ) : (
                       <input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} placeholder={t("packages.servicePh")} />
                     )}

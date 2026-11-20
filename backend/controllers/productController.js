@@ -5,6 +5,7 @@ const uploadBufferToCloudinary = require("../utils/uploadToCloudinary");
 const cloudinary = require("../config/cloudinary");
 // Shop prices are in US dollars (rounded to the cent) — see utils/currency.js.
 const { roundUSD } = require("../utils/currency");
+const { discountActive, salePrice } = require("../utils/pricing");
 
 // Reports group sales by day in Cambodia's local time, not UTC — otherwise
 // a sale at 6am Phnom Penh time would land on the previous day.
@@ -37,6 +38,39 @@ function movementDate(str) {
 // ---------------------------------------------------------------------------
 // Products
 // ---------------------------------------------------------------------------
+
+// Reads the discount / wholesale fields from a create or edit form.
+// Returns an error message, or null when everything is valid.
+function applyPricingFields(product, body) {
+  if (body.discountPercent !== undefined && body.discountPercent !== "") {
+    const v = num(body.discountPercent);
+    if (Number.isNaN(v) || v < 0 || v > 100) return "Discount must be between 0 and 100%";
+    product.discountPercent = v;
+  }
+  for (const k of ["discountStart", "discountEnd"]) {
+    if (body[k] === undefined) continue;
+    if (body[k] === "" || body[k] === null || body[k] === "null") product[k] = null;
+    else {
+      const end = k === "discountEnd";
+      const d = /^\d{4}-\d{2}-\d{2}$/.test(body[k])
+        ? new Date(`${body[k]}T${end ? "23:59:59" : "00:00:00"}${TZ_OFFSET}`)
+        : new Date(body[k]);
+      if (Number.isNaN(d.getTime())) return "Invalid discount date";
+      product[k] = d;
+    }
+  }
+  if (body.wholesalePrice !== undefined && body.wholesalePrice !== "") {
+    const v = num(body.wholesalePrice);
+    if (Number.isNaN(v) || v < 0) return "Enter a valid wholesale price";
+    product.wholesalePrice = roundUSD(v);
+  }
+  if (body.wholesaleMinQty !== undefined && body.wholesaleMinQty !== "") {
+    const v = num(body.wholesaleMinQty);
+    if (Number.isNaN(v) || v < 0 || !Number.isInteger(v)) return "Enter a valid wholesale minimum quantity";
+    product.wholesaleMinQty = v;
+  }
+  return null;
+}
 
 // Total units sold per product, all time — { productId: qty }.
 async function soldCounts() {
@@ -79,7 +113,13 @@ exports.listPublicProducts = async (req, res) => {
     ]);
     const sorted = sortBestSellersFirst(products, sold).map((p, i) => {
       const { soldCount, ...rest } = p;
-      return { ...rest, bestSeller: i < 3 && soldCount > 0 };
+      const onSale = discountActive(rest);
+      return {
+        ...rest,
+        bestSeller: i < 3 && soldCount > 0,
+        discountActive: onSale,
+        salePrice: onSale ? salePrice(rest) : rest.price,
+      };
     });
     res.json(sorted);
   } catch (err) {
@@ -110,6 +150,9 @@ exports.createProduct = async (req, res) => {
       return res.status(400).json({ message: "Enter a valid low-stock alert level" });
     }
     if (!req.files?.image?.[0]) return res.status(400).json({ message: "Product photo is required" });
+    const pricingProbe = new Product({ name, price });
+    const pricingErr = applyPricingFields(pricingProbe, req.body);
+    if (pricingErr) return res.status(400).json({ message: pricingErr });
 
     const { url, publicId } = await uploadBufferToCloudinary(req.files.image[0].buffer, {
       folder: "athlete-verify/products",
@@ -123,6 +166,11 @@ exports.createProduct = async (req, res) => {
       stock,
       unit,
       lowStockAlert,
+      discountPercent: pricingProbe.discountPercent,
+      discountStart: pricingProbe.discountStart,
+      discountEnd: pricingProbe.discountEnd,
+      wholesalePrice: pricingProbe.wholesalePrice,
+      wholesaleMinQty: pricingProbe.wholesaleMinQty,
       imageUrl: url,
       imagePublicId: publicId,
     });
@@ -175,6 +223,8 @@ exports.updateProduct = async (req, res) => {
       if (Number.isNaN(v) || v < 0) return res.status(400).json({ message: "Enter a valid low-stock alert level" });
       product.lowStockAlert = v;
     }
+    const pricingErr = applyPricingFields(product, req.body);
+    if (pricingErr) return res.status(400).json({ message: pricingErr });
     let stockDelta = 0;
     if (req.body.stock !== undefined) {
       const stock = num(req.body.stock);
