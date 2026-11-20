@@ -91,6 +91,10 @@ const planSchema = new mongoose.Schema(
     // expense: essential (food, fuel, phone…) vs. can be cut if money is short
     essential: { type: Boolean, default: true },
     note: { type: String, trim: true, default: "" },
+    // One-time (e.g. selling something once): counted only in `month`.
+    oneTime: { type: Boolean, default: false },
+    month: { type: String, default: "" }, // "YYYY-MM"
+    done: { type: Boolean, default: false }, // one-time: already received / paid
     active: { type: Boolean, default: true },
   },
   { timestamps: true }

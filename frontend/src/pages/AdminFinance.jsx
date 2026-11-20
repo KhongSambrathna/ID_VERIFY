@@ -66,7 +66,7 @@ export default function AdminFinance() {
         ))}
       </div>
 
-      {(tab === "overview" || tab === "daily") && (
+      {(tab === "overview" || tab === "daily" || tab === "plan") && (
         <div className="month-switch">
           <button type="button" className="btn btn-outline" onClick={() => setMonth(shiftMonth(month, -1))}>◀</button>
           <input type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} />
@@ -82,7 +82,7 @@ export default function AdminFinance() {
       {tab === "money" && <AccountsTab />}
       {tab === "owed" && <ReceivablesTab onOpenDebts={() => setTab("debts")} />}
       {tab === "debts" && <Debts />}
-      {tab === "plan" && <Plan catLabel={catLabel} />}
+      {tab === "plan" && <Plan catLabel={catLabel} month={month} />}
       {tab === "invest" && <InvestTab />}
     </div>
   );
@@ -808,7 +808,7 @@ function Debts() {
 // ---- Monthly plan ---------------------------------------------------------
 const blankPlan = (kind = "income") => ({
   kind, name: "", category: kind === "income" ? "salary" : "food", amount: "", currency: "USD", timesPerMonth: "1",
-  active: true, sure: true, essential: true, note: "",
+  active: true, sure: true, essential: true, note: "", oneTime: false, month: "",
 });
 // How often → times per month.
 const FREQS = [
@@ -846,7 +846,7 @@ const PLAN_TEMPLATES = {
 };
 const freqKey = (n) => (FREQS.find(([, v]) => Math.abs(v - Number(n)) < 0.01) || [null])[0];
 
-function Plan({ catLabel }) {
+function Plan({ catLabel, month }) {
   const { t } = useLanguage();
   const [list, setList] = useState([]);
   const [debtPay, setDebtPay] = useState(0);
@@ -890,8 +890,16 @@ function Plan({ catLabel }) {
     await api.delete(`/finance/plans/${p._id}`).catch(() => {});
     load();
   };
-  const monthly = (p) => p.amountUSD * (p.timesPerMonth ?? 1);
-  const act = list.filter((p) => p.active);
+  const monthly = (p) => (p.oneTime ? p.amountUSD : p.amountUSD * (p.timesPerMonth ?? 1));
+  // This month: every recurring item + one-time items for this month.
+  const inMonth = (p) => !p.oneTime || p.month === month;
+  const act = list.filter((p) => p.active && inMonth(p));
+  const otherOneTime = list.filter((p) => p.oneTime && p.month !== month).sort((a, b) => a.month.localeCompare(b.month));
+  const fmtYm = (m) => (m ? `${m.slice(5)}/${m.slice(0, 4)}` : "");
+  const toggleDone = async (p) => {
+    await api.put(`/finance/plans/${p._id}`, { done: !p.done }).catch(() => {});
+    load();
+  };
   const sum = (rows) => rows.reduce((s, p) => s + monthly(p), 0);
   const inc = sum(act.filter((p) => p.kind === "income"));
   const incSure = sum(act.filter((p) => p.kind === "income" && p.sure !== false));
@@ -910,7 +918,7 @@ function Plan({ catLabel }) {
     });
   // live "≈ $x / month" in the form
   const formMonthly = form
-    ? (Number(form.amount) || 0) * (Number(form.timesPerMonth) || 0) / (form.currency === "KHR" ? 4000 : 1)
+    ? ((Number(form.amount) || 0) * (form.oneTime ? 1 : Number(form.timesPerMonth) || 0)) / (form.currency === "KHR" ? 4000 : 1)
     : 0;
 
   return (
@@ -977,9 +985,13 @@ function Plan({ catLabel }) {
               </select>
             </div>
           </div>
+          <div className="plan-flags">
+            <button type="button" className={`chip ${!form.oneTime ? "active" : ""}`} onClick={() => setForm((p) => ({ ...p, oneTime: false }))}>🔁 {t("planX.recurring")}</button>
+            <button type="button" className={`chip ${form.oneTime ? "active" : ""}`} onClick={() => setForm((p) => ({ ...p, oneTime: true, month: p.month || month, sure: p.kind === "income" ? false : p.sure }))}>📌 {t("planX.oneTime")}</button>
+          </div>
           <div className="filter-row" style={{ marginBottom: 0 }}>
             <div className="field" style={{ flex: 1, minWidth: 150 }}>
-              <label>{t("finance.amountEachTime")}</label>
+              <label>{form.oneTime ? t("financeX.amount") : t("finance.amountEachTime")}</label>
               <div style={{ display: "flex", gap: 6 }}>
                 <input type="number" min="0" step="any" value={form.amount} onChange={setP("amount")} style={{ flex: 1 }} />
                 <select value={form.currency} onChange={setP("currency")} style={{ width: 70 }}>
@@ -988,20 +1000,27 @@ function Plan({ catLabel }) {
                 </select>
               </div>
             </div>
-            <div className="field" style={{ flex: 1, minWidth: 140 }}>
-              <label>{t("finance.timesPerMonth")}</label>
-              <input type="number" min="0" max="31" step="any" value={form.timesPerMonth} onChange={setP("timesPerMonth")} />
-            </div>
+            {form.oneTime ? (
+              <div className="field" style={{ flex: 1, minWidth: 140 }}>
+                <label>{t("planX.whichMonth")}</label>
+                <input type="month" value={form.month} onChange={setP("month")} />
+              </div>
+            ) : (
+              <div className="field" style={{ flex: 1, minWidth: 140 }}>
+                <label>{t("finance.timesPerMonth")}</label>
+                <input type="number" min="0" max="31" step="any" value={form.timesPerMonth} onChange={setP("timesPerMonth")} />
+              </div>
+            )}
           </div>
-          <div className="plan-freqs">
+          {!form.oneTime && <div className="plan-freqs">
             {FREQS.map(([k, v]) => (
               <button type="button" key={k} className={`chip ${freqKey(form.timesPerMonth) === k ? "active" : ""}`} onClick={() => setForm((p) => ({ ...p, timesPerMonth: String(v) }))}>
                 {t(`planX.freq_${k}`)}
               </button>
             ))}
-          </div>
+          </div>}
           {formMonthly > 0 && (
-            <p className="plan-preview">≈ <b>{formatUSD(formMonthly)}</b> / {t("finance.month")} <small>({approxKHR(formMonthly)})</small></p>
+            <p className="plan-preview">≈ <b>{formatUSD(formMonthly)}</b> {form.oneTime ? `· ${t("planX.onlyIn")} ${fmtYm(form.month)}` : `/ ${t("finance.month")}`} <small>({approxKHR(formMonthly)})</small></p>
           )}
           <div className="plan-flags">
             {form.kind === "income" ? (
@@ -1035,7 +1054,7 @@ function Plan({ catLabel }) {
 
       {["income", "expense"].map((kind) => {
         const rows = list
-          .filter((p) => p.kind === kind)
+          .filter((p) => p.kind === kind && inMonth(p))
           .sort((a, b) =>
             kind === "income"
               ? (b.sure !== false) - (a.sure !== false) || monthly(b) - monthly(a)
@@ -1062,7 +1081,8 @@ function Plan({ catLabel }) {
                   {rows.map((p) => (
                     <tr key={p._id} style={p.active ? undefined : { opacity: 0.5 }}>
                       <td data-label={t("finance.planName")}>
-                        <b>{p.name}</b>
+                        <b style={p.done ? { textDecoration: "line-through" } : undefined}>{p.name}</b>
+                        {p.oneTime && <span className="badge one-time">📌 {t("planX.oneTimeShort")}</span>}
                         {p.note && <div className="mini-empty">{p.note}</div>}
                       </td>
                       <td data-label={kind === "income" ? t("planX.certainty") : t("planX.need")}>
@@ -1074,11 +1094,17 @@ function Plan({ catLabel }) {
                       </td>
                       <td data-label={t("finance.category")}>{catLabel(p.category)}</td>
                       <td data-label={t("finance.amountEachTime")}>{fmtMoney(p.amount, p.currency)}</td>
-                      <td data-label={t("finance.timesPerMonth")}>{freqKey(p.timesPerMonth) ? t(`planX.freq_${freqKey(p.timesPerMonth)}`) : `×${p.timesPerMonth}`}</td>
+                      <td data-label={t("finance.timesPerMonth")}>
+                        {p.oneTime ? `${t("planX.onlyIn")} ${fmtYm(p.month)}` : freqKey(p.timesPerMonth) ? t(`planX.freq_${freqKey(p.timesPerMonth)}`) : `×${p.timesPerMonth}`}
+                      </td>
                       <td data-label={t("finance.perMonth")}><b>{formatUSD(monthly(p))}</b></td>
                       <td data-label={t("common.actions")}>
                         <button className="link-btn" onClick={() => setForm({ ...p, amount: String(p.amount), timesPerMonth: String(p.timesPerMonth) })}>✏️</button>
-                        <button className="link-btn" onClick={() => toggle(p)}>{p.active ? `⏸ ${t("finance.pause")}` : `▶ ${t("finance.resume")}`}</button>
+                        {p.oneTime ? (
+                          <button className="link-btn" onClick={() => toggleDone(p)}>{p.done ? `↩ ${t("planX.notYet")}` : `✅ ${p.kind === "income" ? t("planX.received") : t("planX.paid")}`}</button>
+                        ) : (
+                          <button className="link-btn" onClick={() => toggle(p)}>{p.active ? `⏸ ${t("finance.pause")}` : `▶ ${t("finance.resume")}`}</button>
+                        )}
                         <button className="link-btn" onClick={() => remove(p)}>🗑</button>
                       </td>
                     </tr>
@@ -1090,6 +1116,26 @@ function Plan({ catLabel }) {
         );
       })}
       {list.length === 0 && <p className="mini-empty">{t("finance.noPlans")}</p>}
+      {otherOneTime.length > 0 && (
+        <div className="card" style={{ padding: 14 }}>
+          <h4 style={{ margin: "0 0 8px" }}>📌 {t("planX.otherMonths")}</h4>
+          <ul className="package-items">
+            {otherOneTime.map((p) => (
+              <li key={p._id}>
+                <span>
+                  <b>{fmtYm(p.month)}</b> · {p.kind === "income" ? "⬇" : "⬆"} {p.name}
+                  {p.done && <small className="mini-empty"> · ✅</small>}
+                </span>
+                <span>
+                  <b style={{ color: p.kind === "income" ? "var(--ok)" : "var(--bad)" }}>{fmtMoney(p.amount, p.currency)}</b>{" "}
+                  <button className="link-btn" onClick={() => setForm({ ...p, amount: String(p.amount), timesPerMonth: String(p.timesPerMonth) })}>✏️</button>
+                  <button className="link-btn" onClick={() => remove(p)}>🗑</button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </>
   );
 }

@@ -449,6 +449,10 @@ function readPlan(body, p) {
   if (body.sure !== undefined) p.sure = Boolean(body.sure);
   if (body.essential !== undefined) p.essential = Boolean(body.essential);
   if (body.note !== undefined) p.note = String(body.note).trim().slice(0, 200);
+  if (body.oneTime !== undefined) p.oneTime = Boolean(body.oneTime);
+  if (body.month !== undefined) p.month = String(body.month || "").trim();
+  if (body.done !== undefined) p.done = Boolean(body.done);
+  if (p.oneTime && !/^\d{4}-\d{2}$/.test(p.month || "")) return "Choose the month";
   if (!p.name) return "Enter a name";
   return null;
 }
@@ -523,8 +527,9 @@ exports.summary = wrap(async (req, res) => {
 
   // Plan vs actual, per plan category (actual = this month's entries in
   // the same category).
-  const planRows = plans.map((p) => {
-    const monthly = roundUSD(p.amountUSD * (p.timesPerMonth ?? 1));
+  // One-time items count only in their own month.
+  const planRows = plans.filter((p) => !p.oneTime || p.month === key).map((p) => {
+    const monthly = roundUSD(p.oneTime ? p.amountUSD : p.amountUSD * (p.timesPerMonth ?? 1));
     return { _id: p._id, kind: p.kind, name: p.name, category: p.category, monthly, sure: p.sure !== false, essential: p.essential !== false };
   });
   const plannedIncomeSure = roundUSD(planRows.filter((p) => p.kind === "income" && p.sure).reduce((s, p) => s + p.monthly, 0));

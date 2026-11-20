@@ -3425,3 +3425,4 @@ tr.inv-excluded td:first-child { opacity: 1; }
 .cum-axis { display: flex; justify-content: space-between; font-size: 11px; color: #999; }
 .invest-detail > .card, .invest-detail > ul.card { width: 100%; max-width: none; box-sizing: border-box; }
 .invest-detail > .invest-limit { margin-bottom: 14px; }
+.badge.one-time { background: #e8eefb; color: #2c4a8a; margin-left: 6px; font-size: 11px; }
