@@ -11,6 +11,17 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  // Admin "coach mode" (see context/AuthContext.jsx). A request can opt out
+  // with { noCoachMode: true } — e.g. the team list in the mode picker.
+  try {
+    const coachTeam = localStorage.getItem("coachTeam");
+    const user = JSON.parse(localStorage.getItem("user") || "null");
+    if (coachTeam && (user?.role || "ADMIN") === "ADMIN" && !config.noCoachMode) {
+      config.headers["X-Coach-Team"] = encodeURIComponent(coachTeam);
+    }
+  } catch {
+    /* ignore */
+  }
   return config;
 });
 

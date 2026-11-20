@@ -14,6 +14,32 @@ function readStoredUser() {
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [user, setUser] = useState(readStoredUser());
+  // Coach mode — an Admin working as the Head Coach of this team (see
+  // backend/middleware/auth.js). Kept in localStorage so a refresh keeps it;
+  // api/axios.js sends it as the X-Coach-Team header.
+  const [coachTeam, setCoachTeam] = useState(() => {
+    try {
+      return localStorage.getItem("coachTeam") || null;
+    } catch {
+      return null;
+    }
+  });
+  const enterCoachMode = (team) => {
+    try {
+      localStorage.setItem("coachTeam", team);
+    } catch {
+      /* ignore */
+    }
+    setCoachTeam(team);
+  };
+  const exitCoachMode = () => {
+    try {
+      localStorage.removeItem("coachTeam");
+    } catch {
+      /* ignore */
+    }
+    setCoachTeam(null);
+  };
 
   // login(token, adminInfo) — adminInfo is the `admin` object the API
   // returns on login/register: { id, username, role, team }
@@ -27,11 +53,16 @@ export function AuthProvider({ children }) {
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    localStorage.removeItem("coachTeam");
     setToken(null);
     setUser(null);
+    setCoachTeam(null);
   };
 
-  const role = user?.role || "ADMIN"; // accounts created before roles existed default to ADMIN
+  const realRole = user?.role || "ADMIN"; // accounts created before roles existed default to ADMIN
+  const inCoachMode = realRole === "ADMIN" && !!coachTeam;
+  // Everywhere in the app an Admin in coach mode IS a Head Coach of that team.
+  const role = inCoachMode ? "HEAD_COACH" : realRole;
 
   return (
     <AuthContext.Provider
@@ -39,7 +70,13 @@ export function AuthProvider({ children }) {
         token,
         user,
         role,
-        team: user?.team || null,
+        team: inCoachMode ? coachTeam : user?.team || null,
+        realRole,
+        isRealAdmin: realRole === "ADMIN",
+        coachTeam: inCoachMode ? coachTeam : null,
+        inCoachMode,
+        enterCoachMode,
+        exitCoachMode,
         // Set only on an individual per-athlete Player login (tournament
         // self-registration) — null for every other account, including the
         // older shared team-wide Player login.

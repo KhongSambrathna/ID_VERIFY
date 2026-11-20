@@ -41,6 +41,8 @@ import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminInvoices from "./pages/AdminInvoices";
 import InvoiceView from "./pages/InvoiceView";
 import AdminPurchasePlans from "./pages/AdminPurchasePlans";
+import CoachModePicker from "./pages/CoachModePicker";
+import CoachModeBanner from "./components/CoachModeBanner";
 import usePageTracking from "./hooks/usePageTracking";
 
 export default function App() {
@@ -50,7 +52,16 @@ export default function App() {
   return (
     <LanguageProvider>
       <Navbar />
+      <CoachModeBanner />
       <Routes>
+        <Route
+          path="/admin/coach-mode"
+          element={
+            <ProtectedRoute role={["ADMIN", "HEAD_COACH"]}>
+              <CoachModePicker />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />

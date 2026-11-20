@@ -55,7 +55,8 @@ function NavDropdown({ label, active, align, children }) {
 }
 
 export default function Navbar() {
-  const { isAuthed, isAdmin, isHeadCoach, isPlayer, isReferee, athleteId, user, logout } = useAuth();
+  const { isAuthed, isAdmin, isHeadCoach, isPlayer, isReferee, athleteId, user, logout, isRealAdmin, inCoachMode, coachTeam } =
+    useAuth();
   const { language, toggleLanguage, t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
@@ -117,7 +118,8 @@ export default function Navbar() {
       active={anyActive("/settings", "/player/edit", "/change-password")}
       align="right"
     >
-      {user?.role && <Label>{t(`navbar.role_${user.role}`, user.role)}</Label>}
+      {user?.role && <Label>{t(`navbar.role_${user.role}`, user.role)}{inCoachMode ? ` → 🧢 ${coachTeam}` : ""}</Label>}
+      {isRealAdmin && <L to="/admin/coach-mode">🧢 {t("coachMode.menu")}</L>}
       {isPlayer && athleteId && <L to="/player/edit">✏️ {t("navbar.editProfile")}</L>}
       <L to="/settings">⚙️ {t("navbar.settings")}</L>
       <a href="#" onClick={doLogout} className="nav-logout">
