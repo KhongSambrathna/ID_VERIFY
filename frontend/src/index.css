@@ -3330,3 +3330,11 @@ tr.inv-excluded td:first-child { opacity: 1; }
 .acc-flash.income { color: var(--ok, #2e7d4f); }
 .acc-flash.expense { color: var(--bad, #b33); }
 @keyframes accFlash { 0% { opacity: 0; transform: translateY(6px); } 15% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
+
+/* Debts — auto-pay */
+.auto-pay-box { margin: 10px 0 4px; padding: 10px 12px; border: 1px dashed var(--line, #ddd); border-radius: 10px; background: rgba(46, 125, 79, 0.05); }
+.auto-pay-check { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.auto-pay-check input { margin-top: 4px; width: 18px; height: 18px; flex: none; }
+.auto-pay-check span { display: flex; flex-direction: column; gap: 2px; }
+.auto-pay-line { color: var(--ok, #2e7d4f); }
+.badge.auto-badge { background: #e6f2ea; color: #2e7d4f; font-size: 11px; padding: 1px 6px; }

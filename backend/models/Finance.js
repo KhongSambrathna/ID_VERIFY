@@ -39,6 +39,7 @@ const paymentSchema = new mongoose.Schema(
     ...money,
     // How much of this payment was interest — the rest pays down the debt.
     interest: { type: Number, min: 0, default: 0 },
+    auto: { type: Boolean, default: false }, // recorded automatically after the pay day passed
     note: { type: String, trim: true, default: "" },
     txn: { type: mongoose.Schema.Types.ObjectId, ref: "FinanceTxn", default: null },
   },
@@ -66,6 +67,12 @@ const debtSchema = new mongoose.Schema(
     dueDate: { type: Date, default: null },
     note: { type: String, trim: true, default: "" },
     payments: { type: [paymentSchema], default: [] },
+    // Auto-pay (fixed / interest-only debts I owe): once the pay day has
+    // passed, the month's payment is recorded as paid automatically.
+    autoPay: { type: Boolean, default: true },
+    autoFrom: { type: Date, default: null }, // only months due after this
+    autoDoneThrough: { type: String, default: "" }, // last month handled, "YYYY-MM"
+    payAccount: { type: mongoose.Schema.Types.ObjectId, ref: "FinanceAccount", default: null },
     closed: { type: Boolean, default: false },
   },
   { timestamps: true }

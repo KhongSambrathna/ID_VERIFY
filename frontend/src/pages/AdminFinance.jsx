@@ -427,7 +427,7 @@ function Daily({ month, catLabel }) {
 // ---- Debts ----------------------------------------------------------------
 const blankDebt = () => ({
   direction: "owe", repayType: "fixed", party: "", phone: "", amount: "", currency: "USD", interestRate: "", monthlyPayment: "",
-  paymentDay: "", startDate: ymd(), dueDate: "", note: "",
+  paymentDay: "", startDate: ymd(), dueDate: "", note: "", autoPay: true, payAccount: "",
 });
 
 function Debts() {
@@ -480,6 +480,7 @@ function Debts() {
       interestRate: d.interestRate ? String(d.interestRate) : "", monthlyPayment: d.monthlyPayment ? String(d.monthlyPayment) : "",
       paymentDay: d.paymentDay ? String(d.paymentDay) : "", startDate: d.startDate ? ymd(d.startDate) : "",
       dueDate: d.dueDate ? ymd(d.dueDate) : "", note: d.note || "",
+      autoPay: d.autoPay !== false, payAccount: d.payAccount || "",
     });
   const remove = async (d) => {
     if (!confirm(t("finance.confirmDeleteDebt").replace("{p}", d.party))) return;
@@ -545,6 +546,14 @@ function Debts() {
                 {d.monthsLeft ? ` · ≈ ${d.monthsLeft} ${t("finance.monthsLeft")}` : ""}
               </div>
             )
+          )}
+          {d.nextAutoDate && (
+            <div className="auto-pay-line">
+              🤖 {t("autoPay.next").replace("{d}", fmtDate(d.nextAutoDate)).replace("{amt}", fmtMoney(d.monthlyDue, d.currency))}
+              {d.payAccount && accounts.find((a) => a._id === d.payAccount) && (
+                <> · {ACCOUNT_ICON[accounts.find((a) => a._id === d.payAccount).kind]} {accounts.find((a) => a._id === d.payAccount).name}</>
+              )}
+            </div>
           )}
           {d.dueDate && (
             <div>
@@ -616,7 +625,10 @@ function Debts() {
             {d.payments.length === 0 && <li className="mini-empty">{t("finance.noPayments")}</li>}
             {[...d.payments].reverse().map((p) => (
               <li key={p._id}>
-                <span>{fmtDate(p.date)} {p.note && <small className="mini-empty">· {p.note}</small>}</span>
+                <span>
+                  {fmtDate(p.date)} {p.auto && <span className="badge auto-badge" title={t("autoPay.autoRecorded")}>🤖 {t("autoPay.auto")}</span>}{" "}
+                  {p.note && <small className="mini-empty">· {p.note}</small>}
+                </span>
                 <span>
                   {fmtMoney(p.amount, p.currency)}
                   {p.interest > 0 && (
@@ -722,6 +734,29 @@ function Debts() {
               <input value={form.note} onChange={setD("note")} />
             </div>
           </div>
+          {form.direction === "owe" && form.repayType !== "flexible" && (
+            <div className="auto-pay-box">
+              <label className="auto-pay-check">
+                <input type="checkbox" checked={form.autoPay} onChange={(e) => setForm((p) => ({ ...p, autoPay: e.target.checked }))} />
+                <span>
+                  <b>🤖 {t("autoPay.label")}</b>
+                  <small className="mini-empty">{t("autoPay.help")}</small>
+                </span>
+              </label>
+              {form.autoPay && !(Number(form.paymentDay) > 0) && <div className="mini-empty" style={{ color: "var(--warn, #b7791f)" }}>{t("autoPay.needDay")}</div>}
+              {form.autoPay && accounts.length > 0 && (
+                <div className="field" style={{ maxWidth: 280, marginTop: 8 }}>
+                  <label>{t("autoPay.fromAccount")}</label>
+                  <select value={form.payAccount} onChange={setD("payAccount")}>
+                    <option value="">— {t("financeX.noAccount")} —</option>
+                    {accounts.map((a) => (
+                      <option key={a._id} value={a._id}>{ACCOUNT_ICON[a.kind]} {a.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
           {err && <div className="error-text">{err}</div>}
           <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
             <button className="btn btn-primary">{t("common.save")}</button>

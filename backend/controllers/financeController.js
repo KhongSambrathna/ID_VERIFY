@@ -80,6 +80,7 @@ function debtView(d) {
   const principalPerMonth = Math.max((o.monthlyPayment || 0) - monthlyInterest, 0);
   return {
     ...o,
+    payments: [...o.payments].sort((x, y) => new Date(x.date) - new Date(y.date)),
     repayType,
     paid: r(paid),
     totalPaid: r(totalPaid),
@@ -91,6 +92,8 @@ function debtView(d) {
     monthsLeft:
       repayType === "fixed" && principalPerMonth > 0 && remaining > 0 ? Math.ceil(remaining / principalPerMonth) : null,
     progress: o.amount > 0 ? Math.min(Math.round((paid / o.amount) * 100), 100) : 0,
+    autoPay: o.autoPay !== false,
+    nextAutoDate: nextAutoDate({ ...o, repayType }),
   };
 }
 
@@ -108,6 +111,7 @@ async function ownAccount(req, id) {
 
 // GET /api/finance/txns?month=YYYY-MM&type=&category=
 exports.listTxns = wrap(async (req, res) => {
+  await syncAutoPayments(req);
   const { start, end } = monthRange(req.query.month);
   const filter = { ...own(req), date: { $gte: start, $lt: end } };
   if (["income", "expense"].includes(req.query.type)) filter.type = req.query.type;
@@ -173,6 +177,7 @@ exports.deleteTxn = wrap(async (req, res) => {
 // ---------------- Debts ----------------
 
 exports.listDebts = wrap(async (req, res) => {
+  await syncAutoPayments(req);
   const debts = await FinanceDebt.find(own(req)).sort({ closed: 1, dueDate: 1, createdAt: -1 });
   res.json(debts.map(debtView));
 });
@@ -203,6 +208,15 @@ function readDebt(body, d) {
   if (body.dueDate !== undefined) d.dueDate = day(body.dueDate, false);
   if (body.note !== undefined) d.note = String(body.note).trim();
   if (body.closed !== undefined) d.closed = Boolean(body.closed);
+  if (body.autoPay !== undefined) {
+    const on = Boolean(body.autoPay);
+    // Turning it on (again) starts from now — earlier months aren't filled in.
+    if (on && (!d.autoPay || !d.autoFrom)) {
+      d.autoFrom = new Date();
+      d.autoDoneThrough = "";
+    }
+    d.autoPay = on;
+  }
   if (!d.party) return "Enter who the debt is with";
   return null;
 }
@@ -212,6 +226,8 @@ exports.createDebt = wrap(async (req, res) => {
   const d = new FinanceDebt({ owner: req.adminId, party: "" });
   const err = readDebt(req.body, d);
   if (err) return bad(res, err);
+  if (req.body.payAccount !== undefined) d.payAccount = (await ownAccount(req, req.body.payAccount))?._id || null;
+  if (!d.autoFrom) d.autoFrom = new Date();
   await d.save();
   res.status(201).json(debtView(d));
 });
@@ -221,6 +237,7 @@ exports.updateDebt = wrap(async (req, res) => {
   if (!d) return res.status(404).json({ message: "Not found" });
   const err = readDebt(req.body, d);
   if (err) return bad(res, err);
+  if (req.body.payAccount !== undefined) d.payAccount = (await ownAccount(req, req.body.payAccount))?._id || null;
   await d.save();
   res.json(debtView(d));
 });
@@ -237,51 +254,152 @@ exports.deleteDebt = wrap(async (req, res) => {
 // POST /api/finance/debts/:id/payments  { amount, date?, note?, recordTxn? }
 // A repayment. By default it's also written to the daily log — as an
 // expense when I'm paying my debt, as income when someone pays me back.
-exports.addPayment = wrap(async (req, res) => {
-  const d = await FinanceDebt.findOne({ _id: req.params.id, ...own(req) });
-  if (!d) return res.status(404).json({ message: "Not found" });
-  const p = { date: day(req.body.date), note: String(req.body.note || "").trim() };
-  const err = readMoney({ amount: req.body.amount, currency: d.currency }, p);
-  if (err) return bad(res, err);
-  if (!(p.amount > 0)) return bad(res, "Enter an amount greater than 0");
+// Adds one repayment to debt d (not saved). Returns an error string or null.
+// opts: { amount, date, note, split, interest, account, recordTxn, method, auto }
+async function recordPayment(req, d, opts) {
+  const p = { date: opts.date || new Date(), note: String(opts.note || "").trim(), auto: Boolean(opts.auto) };
+  const err = readMoney({ amount: opts.amount, currency: d.currency }, p);
+  if (err) return err;
+  if (!(p.amount > 0)) return "Enter an amount greater than 0";
   // Split into interest / principal. split: "auto" (default - this month's
   // interest first, the rest pays down the debt), "interest" (all interest),
   // "principal" (all off the debt), or an explicit interest amount.
   const view = debtView(d);
   const r = d.currency === "KHR" ? Math.round : roundUSD;
-  const split = req.body.split || "auto";
+  const split = opts.split || "auto";
   if (split === "interest") p.interest = p.amount;
   else if (split === "principal") p.interest = 0;
-  else if (req.body.interest !== undefined && req.body.interest !== "") {
-    const v = num(req.body.interest);
-    if (Number.isNaN(v) || v < 0 || v > p.amount) return bad(res, "Interest part must be between 0 and the payment");
+  else if (opts.interest !== undefined && opts.interest !== "") {
+    const v = num(opts.interest);
+    if (Number.isNaN(v) || v < 0 || v > p.amount) return "Interest part must be between 0 and the payment";
     p.interest = r(v);
   } else p.interest = r(Math.min(p.amount, view.monthlyInterest));
   // never pay off more principal than is left
   if (p.amount - p.interest > view.remaining) p.interest = r(p.amount - view.remaining);
-  if (req.body.recordTxn !== false) {
-    const acc = await ownAccount(req, req.body.account);
+  if (opts.recordTxn !== false) {
+    const acc = await ownAccount(req, opts.account);
     const t = await FinanceTxn.create({
       account: acc ? acc._id : null,
-      owner: req.adminId,
+      owner: d.owner,
       type: d.direction === "owe" ? "expense" : "income",
       amount: p.amount,
       currency: p.currency,
       amountUSD: p.amountUSD,
       category: "debt",
-      method: String(req.body.method || "cash"),
+      method: acc ? (acc.kind === "cash" ? "cash" : "bank") : String(opts.method || "cash"),
       date: p.date,
-      note: `${d.direction === "owe" ? "💳 →" : "🤝 ←"} ${d.party}${p.interest > 0 ? (p.interest >= p.amount ? " (%)" : ` (% ${p.interest})`) : ""}${p.note ? ` · ${p.note}` : ""}`,
+      note: `${d.direction === "owe" ? "💳 →" : "🤝 ←"} ${d.party}${p.interest > 0 ? (p.interest >= p.amount ? " (%)" : ` (% ${p.interest})`) : ""}${p.auto ? " · 🤖" : ""}${p.note ? ` · ${p.note}` : ""}`,
       debt: d._id,
     });
     p.txn = t._id;
   }
   d.payments.push(p);
-  const v = debtView(d);
-  if (v.remaining <= 0) d.closed = true;
+  if (debtView(d).remaining <= 0) d.closed = true;
+  return null;
+}
+
+// POST /api/finance/debts/:id/payments  { amount, date?, note?, split?, interest?, account?, recordTxn? }
+// A repayment. By default it's also written to the daily log — as an
+// expense when I'm paying my debt, as income when someone pays me back.
+exports.addPayment = wrap(async (req, res) => {
+  const d = await FinanceDebt.findOne({ _id: req.params.id, ...own(req) });
+  if (!d) return res.status(404).json({ message: "Not found" });
+  const err = await recordPayment(req, d, { ...req.body, date: day(req.body.date) });
+  if (err) return bad(res, err);
   await d.save();
   res.status(201).json(debtView(d));
 });
+
+// ---------------- Auto-pay ----------------
+// For fixed / interest-only debts I owe with a pay day: once the pay day of a
+// month has passed, that month counts as paid — a payment (interest first)
+// is recorded on the pay day, from the chosen account. Months that already
+// have a payment I entered myself are skipped. Runs whenever finance data
+// is read, so there's no background job.
+const ymKey = (date) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit" }).format(date);
+function nextYm(key) {
+  let [y, m] = key.split("-").map(Number);
+  m += 1;
+  if (m > 12) { m = 1; y += 1; }
+  return `${y}-${String(m).padStart(2, "0")}`;
+}
+// The pay day inside month `key` (12:00 Phnom Penh), clamped to month length.
+function dueInMonth(key, payDay) {
+  const { daysInMonth } = monthRange(key);
+  const dd = Math.min(payDay, daysInMonth);
+  return new Date(`${key}-${String(dd).padStart(2, "0")}T12:00:00${TZ_OFFSET}`);
+}
+// The pay day counts as "passed" from the start of the next day.
+const dueHasPassed = (due, now) => now.getTime() >= due.getTime() + 12 * 3600000;
+
+function nextAutoDate(o, now = new Date()) {
+  if (!autoEligible(o)) return null;
+  let key = ymKey(now);
+  for (let i = 0; i < 3; i++) {
+    const due = dueInMonth(key, o.paymentDay);
+    if (!dueHasPassed(due, now) && (!o.autoFrom || due >= o.autoFrom)) return due;
+    key = nextYm(key);
+  }
+  return null;
+}
+function autoEligible(o) {
+  return (
+    o.autoPay !== false &&
+    o.direction === "owe" &&
+    !o.closed &&
+    ["fixed", "interest_only"].includes(o.repayType || "fixed") &&
+    o.paymentDay > 0
+  );
+}
+
+async function syncAutoPayments(req) {
+  const now = new Date();
+  const nowKey = ymKey(now);
+  const debts = await FinanceDebt.find({
+    ...own(req),
+    direction: "owe",
+    closed: false,
+    autoPay: { $ne: false },
+    paymentDay: { $gt: 0 },
+    repayType: { $in: ["fixed", "interest_only", null] },
+  });
+  for (const d of debts) {
+    if (!d.autoFrom) {
+      // Older debts: start auto-pay from today, never back-fill the past.
+      await FinanceDebt.updateOne({ _id: d._id, autoFrom: null }, { $set: { autoFrom: now } });
+      continue;
+    }
+    let key = d.autoDoneThrough ? nextYm(d.autoDoneThrough) : ymKey(d.autoFrom);
+    let doneThrough = d.autoDoneThrough;
+    let changed = false;
+    for (let guard = 0; key <= nowKey && guard < 36; guard++, key = nextYm(key)) {
+      const due = dueInMonth(key, d.paymentDay);
+      if (!dueHasPassed(due, now)) break;
+      // Claim this month first so two requests at once can't both pay it.
+      const claim = await FinanceDebt.updateOne(
+        { _id: d._id, autoDoneThrough: doneThrough || { $in: ["", null] } },
+        { $set: { autoDoneThrough: key } }
+      );
+      if (!claim.modifiedCount) break;
+      d.autoDoneThrough = doneThrough = key;
+      if (due < d.autoFrom || (d.startDate && due < d.startDate) || d.closed) continue;
+      if (d.payments.some((p) => ymKey(p.date) === key)) continue; // I already paid it myself
+      const v = debtView(d);
+      const amount =
+        d.repayType === "interest_only" ? v.monthlyDue : Math.min(v.monthlyDue, v.remaining + v.monthlyInterest);
+      if (!(amount > 0)) continue;
+      const acc = d.payAccount ? await FinanceAccount.findOne({ _id: d.payAccount, ...own(req) }) : null;
+      const err = await recordPayment(req, d, { amount, date: due, account: acc ? acc._id : null, auto: true, split: "auto" });
+      if (!err) changed = true;
+    }
+    if (changed) {
+      d.autoDoneThrough = doneThrough;
+      await d.save();
+    }
+  }
+}
+exports.syncAutoPayments = syncAutoPayments;
 
 exports.deletePayment = wrap(async (req, res) => {
   const d = await FinanceDebt.findOne({ _id: req.params.id, ...own(req) });
@@ -352,6 +470,7 @@ exports.deletePlan = wrap(async (req, res) => {
 // Actual income/expense for the month (by category and by day), the
 // monthly plan vs actual, debt totals, and a month-end projection.
 exports.summary = wrap(async (req, res) => {
+  await syncAutoPayments(req);
   const { start, end, key, daysInMonth } = monthRange(req.query.month);
   const owner = new mongoose.Types.ObjectId(String(req.adminId));
   // Moving money between my own accounts isn't income or spending.
@@ -492,6 +611,7 @@ async function accountsWithBalance(req) {
 }
 
 exports.listAccounts = wrap(async (req, res) => {
+  await syncAutoPayments(req);
   const list = await accountsWithBalance(req);
   const active = list.filter((a) => !a.archived);
   res.json({ accounts: list, totalUSD: roundUSD(active.reduce((s, a) => s + a.balanceUSD, 0)) });
