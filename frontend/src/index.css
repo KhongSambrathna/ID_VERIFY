@@ -3338,3 +3338,4 @@ tr.inv-excluded td:first-child { opacity: 1; }
 .auto-pay-check span { display: flex; flex-direction: column; gap: 2px; }
 .auto-pay-line { color: var(--ok, #2e7d4f); }
 .badge.auto-badge { background: #e6f2ea; color: #2e7d4f; font-size: 11px; padding: 1px 6px; }
+.rate-note { margin: 2px 0 14px; }

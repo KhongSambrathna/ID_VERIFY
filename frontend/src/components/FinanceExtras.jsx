@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/axios";
 import { useLanguage } from "../i18n/LanguageContext";
-import { formatUSD, formatKHR, approxKHR } from "../utils/currency";
+import { formatUSD, formatKHR, approxKHR, USD_TO_KHR } from "../utils/currency";
 import { StatTile } from "./MiniCharts";
 
 const TZ = "Asia/Phnom_Penh";
@@ -341,10 +341,11 @@ export function ReceivablesTab({ onOpenDebts }) {
     <>
       <div className="stat-grid">
         <StatTile label={t("financeX.owedTotal")} value={formatUSD(data.totals.allUSD)} sub={approxKHR(data.totals.allUSD)} tone="ok" />
-        <StatTile label={`🎓 ${t("financeX.students")}`} value={formatKHR(data.totals.studentsKHR)} sub={`${data.students.length} ${t("finance.people")} · ≈ ${formatUSD(data.totals.studentsUSD)}`} />
+        <StatTile label={`🎓 ${t("financeX.students")}`} value={formatKHR(data.totals.studentsKHR)} sub={`${data.students.length} ${t("finance.people")} · ${formatUSD(data.totals.studentsUSD)}`} />
         <StatTile label={`🧾 ${t("financeX.unpaidInvoices")}`} value={formatUSD(data.totals.invoicesUSD)} sub={`${data.totals.invoicesCounted ?? data.invoices.length}/${data.invoices.length} ${t("financeX.invoicesCount")}`} />
         <StatTile label={`🤝 ${t("financeX.lent")}`} value={formatUSD(data.totals.lentUSD)} sub={`${data.lent.length} ${t("finance.people")}`} />
       </div>
+      <p className="mini-empty rate-note">💱 {t("financeX.rateNote").replace("{r}", (data.rate || USD_TO_KHR).toLocaleString("en-US"))}</p>
 
       {/* Which teams count */}
       <div className="card" style={{ padding: 16, marginBottom: 16 }}>
@@ -423,10 +424,13 @@ export function ReceivablesTab({ onOpenDebts }) {
                     <td data-label={t("common.team")}>{s.team}</td>
                     <td data-label={t("financeX.forWhat")} style={{ fontSize: 13 }}>
                       {s.fees.map((f, i) => (
-                        <div key={i}>{f.note || "—"}: {formatKHR(f.amount)}</div>
+                        <div key={i}>{f.note || "—"}: {formatKHR(f.amountKHR)} <small className="mini-empty">({formatUSD(f.amount)})</small></div>
                       ))}
                     </td>
-                    <td data-label={t("financeX.owes")}><b style={{ color: "var(--bad)" }}>{formatKHR(s.totalKHR)}</b></td>
+                    <td data-label={t("financeX.owes")}>
+                      <b style={{ color: "var(--bad)" }}>{formatKHR(s.totalKHR)}</b>
+                      <div className="mini-empty">{formatUSD(s.totalUSD)}</div>
+                    </td>
                   </tr>
                 ))}
                 {students.length === 0 && (

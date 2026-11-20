@@ -9,6 +9,8 @@ const TZ = "Asia/Phnom_Penh";
 const TZ_OFFSET = "+07:00";
 
 const num = (v, fb = NaN) => (v === undefined || v === null || v === "" ? fb : Number.isFinite(Number(v)) ? Number(v) : NaN);
+// Dollars → Riel, rounded to the nearest ៛100 (smallest note in use).
+const KHR_ROUND = (usd) => Math.round(((Number(usd) || 0) * KHR_PER_USD) / 100) * 100;
 const toUSD = (amount, currency) => roundUSD(currency === "KHR" ? amount / KHR_PER_USD : amount);
 function day(str, fallbackNow = true) {
   if (str && /^\d{4}-\d{2}-\d{2}$/.test(str)) return new Date(`${str}T12:00:00${TZ_OFFSET}`);
@@ -705,7 +707,9 @@ exports.updateSettings = wrap(async (req, res) => {
 // GET /api/finance/receivables
 // Everything people owe me, in one place:
 //   • students' unpaid fees on the teams I chose (settings.receivableTeams)
-//     — read from the athletes' fee rows (fees are in Riel); payments are
+//     — read from the athletes' fee rows. Fee amounts are entered in US
+//     dollars (the Debt report shows "$10 — Uniform fee"); here they're also
+//     shown in Riel at KHR_PER_USD. Payments are
 //     still collected through the Debt report as before
 //   • unpaid / part-paid shop invoices (USD)
 //   • money I lent that I recorded myself (Debts → owed to me)
@@ -731,9 +735,9 @@ exports.receivables = wrap(async (req, res) => {
           photoUrl: a.photoUrl || null,
           team: as.team,
           role: as.role,
-          fees: (as.fees || []).map((f) => ({ amount: f.amount, note: f.note, createdAt: f.createdAt })),
-          totalKHR: Math.round(total),
-          totalUSD: toUSD(total, "KHR"),
+          fees: (as.fees || []).map((f) => ({ amount: f.amount, amountKHR: KHR_ROUND(f.amount), note: f.note, createdAt: f.createdAt })),
+          totalKHR: KHR_ROUND(total),
+          totalUSD: roundUSD(total),
         });
       }
     }
@@ -760,6 +764,7 @@ exports.receivables = wrap(async (req, res) => {
   const invoicesUSD = roundUSD(countedInvoices.reduce((s, r) => s + r.balanceUSD, 0));
   const lentUSD = roundUSD(lent.reduce((s, d) => s + d.remainingUSD, 0));
   res.json({
+    rate: KHR_PER_USD,
     settings: st,
     students,
     byTeam,
