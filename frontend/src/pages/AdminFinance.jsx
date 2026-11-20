@@ -222,7 +222,19 @@ function Daily({ month, catLabel }) {
   const [filter, setFilter] = useState("");
   const [accounts, setAccounts] = useState([]);
   useEffect(() => {
-    api.get("/finance/accounts").then(({ data }) => setAccounts(data.accounts.filter((a) => !a.archived))).catch(() => {});
+    api
+      .get("/finance/accounts")
+      .then(({ data }) => {
+        const list = data.accounts.filter((a) => !a.archived);
+        setAccounts(list);
+        // Pre-pick the account used last time (or the first one) so new
+        // income/expenses move a balance unless I choose "no account".
+        let last = "";
+        try { last = localStorage.getItem("fin.lastAccount") || ""; } catch { /* ignore */ }
+        const pick = list.find((x) => x._id === last) || list[0];
+        if (pick && last !== "none") setF((p) => (p.account || editId ? p : { ...p, account: pick._id }));
+      })
+      .catch(() => {});
   }, []);
   const accName = (id) => {
     const a = accounts.find((x) => x._id === id);
@@ -255,6 +267,7 @@ function Daily({ month, catLabel }) {
     try {
       if (editId) await api.put(`/finance/txns/${editId}`, f);
       else await api.post("/finance/txns", f);
+      try { localStorage.setItem("fin.lastAccount", f.account || "none"); } catch { /* ignore */ }
       setF({ ...blankTxn(), type: f.type, category: f.type === "income" ? "salary" : f.category, currency: f.currency, date: f.date, account: f.account });
       setEditId(null);
       load();

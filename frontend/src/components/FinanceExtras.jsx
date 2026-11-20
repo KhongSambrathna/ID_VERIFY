@@ -14,6 +14,10 @@ export function fmtMoney(amount, currency) {
   return formatUSD(amount);
 }
 export const ACCOUNT_ICON = { cash: "💵", bank: "🏦", wallet: "📲", other: "💼" };
+const QUICK_CATS = {
+  income: ["salary", "football", "shop", "bonus", "gift", "other"],
+  expense: ["food", "transport", "phone", "rent", "utilities", "family", "health", "education", "shopping", "fun", "football", "debt", "other"],
+};
 
 // ---------------------------------------------------------------------------
 // 💼 My money — where it is right now (cash, ABA, ACLEDA, Wing…)
@@ -30,6 +34,8 @@ export function AccountsTab() {
   const [balVal, setBalVal] = useState("");
   const [tr, setTr] = useState(null); // transfer form
   const [showArchived, setShowArchived] = useState(false);
+  const [quick, setQuick] = useState(null); // { account, type, amount, category, date, note }
+  const [flash, setFlash] = useState(null); // { id, text } — shows "+$20" after saving
 
   const load = async () => {
     try {
@@ -76,6 +82,24 @@ export function AccountsTab() {
     await api.delete(`/finance/accounts/${a._id}`).catch(() => {});
     load();
   };
+  // ➕ income / ➖ expense straight into one account — it is saved in the
+  // daily log too, and the balance goes up / down right away.
+  const openQuick = (a, type) =>
+    setQuick({ account: a._id, type, amount: "", category: type === "income" ? "salary" : "food", date: ymd(), note: "" });
+  const saveQuick = async (e, a) => {
+    e.preventDefault();
+    const amt = Number(quick.amount);
+    if (!(amt > 0)) return;
+    try {
+      await api.post("/finance/txns", { ...quick, amount: amt, currency: a.currency });
+      setFlash({ id: a._id, text: `${quick.type === "income" ? "+" : "−"}${fmtMoney(amt, a.currency)}`, type: quick.type });
+      setTimeout(() => setFlash(null), 2500);
+      setQuick(null);
+      load();
+    } catch (e2) {
+      alert(e2.response?.data?.message || t("finance.failedToSave"));
+    }
+  };
   const doTransfer = async (e) => {
     e.preventDefault();
     try {
@@ -95,6 +119,7 @@ export function AccountsTab() {
       <div className="package-card-head">
         <h3>{ACCOUNT_ICON[a.kind]} {a.name}</h3>
         <div className="package-price" style={{ color: a.balance < 0 ? "var(--bad)" : undefined }}>
+          {flash?.id === a._id && <span className={`acc-flash ${flash.type}`}>{flash.text}</span>}
           {fmtMoney(a.balance, a.currency)}
           {a.currency === "KHR" ? <small className="price-khr">≈ {formatUSD(a.balanceUSD)}</small> : <small className="price-khr">{approxKHR(a.balance)}</small>}
         </div>
@@ -103,7 +128,26 @@ export function AccountsTab() {
       <p className="mini-empty" style={{ margin: "6px 0 0" }}>
         {t("financeX.countedFrom").replace("{d}", fmtDate(a.openingDate)).replace("{amt}", fmtMoney(a.openingBalance, a.currency))}
       </p>
-      {balFor === a._id ? (
+      {quick?.account === a._id ? (
+        <form className="acc-quick" onSubmit={(e) => saveQuick(e, a)}>
+          <b className={quick.type}>{quick.type === "income" ? `➕ ${t("finance.income")}` : `➖ ${t("finance.expense")}`}</b>
+          <input type="number" min="0" step="any" value={quick.amount} onChange={(e) => setQuick((q) => ({ ...q, amount: e.target.value }))} placeholder={a.currency === "KHR" ? "៛" : "$"} autoFocus required />
+          <select value={quick.category} onChange={(e) => setQuick((q) => ({ ...q, category: e.target.value }))}>
+            {QUICK_CATS[quick.type].map((c) => <option key={c} value={c}>{t(`finance.cat_${c}`, c)}</option>)}
+          </select>
+          <input type="date" value={quick.date} onChange={(e) => setQuick((q) => ({ ...q, date: e.target.value }))} />
+          <input value={quick.note} onChange={(e) => setQuick((q) => ({ ...q, note: e.target.value }))} placeholder={t("finance.note")} />
+          {Number(quick.amount) > 0 && (
+            <small className="mini-empty">
+              {fmtMoney(a.balance, a.currency)} → <b>{fmtMoney(a.balance + (quick.type === "income" ? 1 : -1) * Number(quick.amount), a.currency)}</b>
+            </small>
+          )}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn btn-primary">{t("common.save")}</button>
+            <button type="button" className="link-btn" onClick={() => setQuick(null)}>{t("common.cancel")}</button>
+          </div>
+        </form>
+      ) : balFor === a._id ? (
         <div className="fin-pay">
           <input type="number" step="any" value={balVal} onChange={(e) => setBalVal(e.target.value)} placeholder={a.currency === "KHR" ? "៛" : "$"} autoFocus />
           <button className="btn btn-primary" onClick={() => setBalance(a)}>{t("common.save")}</button>
@@ -112,6 +156,12 @@ export function AccountsTab() {
         </div>
       ) : (
         <div className="package-actions">
+          {!a.archived && (
+            <>
+              <button className="btn btn-primary acc-in" onClick={() => openQuick(a, "income")}>➕ {t("finance.income")}</button>
+              <button className="btn btn-outline acc-out" onClick={() => openQuick(a, "expense")}>➖ {t("finance.expense")}</button>
+            </>
+          )}
           <button className="btn btn-outline" onClick={() => { setBalFor(a._id); setBalVal(String(a.balance)); }}>🔄 {t("financeX.setBalance")}</button>
           <button className="link-btn" onClick={() => setForm({ ...a, openingBalance: "" })}>✏️</button>
           <button className="link-btn" onClick={() => archive(a)}>{a.archived ? t("finance.resume") : t("financeX.archive")}</button>

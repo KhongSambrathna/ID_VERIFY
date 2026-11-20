@@ -473,13 +473,16 @@ function inAccountCurrency(t, currency) {
 async function accountsWithBalance(req) {
   const accounts = await FinanceAccount.find(own(req)).sort({ archived: 1, kind: 1, name: 1 }).lean();
   const txns = await FinanceTxn.find({ ...own(req), account: { $in: accounts.map((a) => a._id) } })
-    .select("account type amount currency amountUSD date")
+    .select("account type amount currency amountUSD date createdAt")
     .lean();
   return accounts.map((a) => {
     let bal = a.openingBalance || 0;
     for (const t of txns) {
       if (String(t.account) !== String(a._id)) continue;
-      if (a.openingDate && t.date < a.openingDate) continue;
+      // The balance I typed in already includes everything before that
+      // moment. Count an entry if it's dated after it OR I recorded it after
+      // it (e.g. today's income entered this evening, dated today 12:00).
+      if (a.openingDate && t.date < a.openingDate && !(t.createdAt && t.createdAt >= a.openingDate)) continue;
       const v = inAccountCurrency(t, a.currency);
       bal += t.type === "income" ? v : -v;
     }

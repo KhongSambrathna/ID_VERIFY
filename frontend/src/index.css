@@ -3320,3 +3320,13 @@ label.fin-cat { user-select: none; }
 tr.inv-excluded td { opacity: 0.45; }
 tr.inv-excluded td:first-child { opacity: 1; }
 .inv-pick-bar .btn { padding: 6px 12px; font-size: 13px; }
+
+/* My money — quick income / expense on an account */
+.acc-quick { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line, #ddd); }
+.acc-quick b.income { color: var(--ok, #2e7d4f); }
+.acc-quick b.expense { color: var(--bad, #b33); }
+.btn.acc-out { color: var(--bad, #b33); }
+.acc-flash { display: inline-block; margin-right: 8px; font-size: 0.8em; font-weight: 700; animation: accFlash 2.5s ease forwards; }
+.acc-flash.income { color: var(--ok, #2e7d4f); }
+.acc-flash.expense { color: var(--bad, #b33); }
+@keyframes accFlash { 0% { opacity: 0; transform: translateY(6px); } 15% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
