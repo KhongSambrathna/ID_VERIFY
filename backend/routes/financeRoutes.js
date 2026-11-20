@@ -32,6 +32,7 @@ router.put("/settings", c.updateSettings);
 router.get("/receivables", c.receivables);
 
 router.get("/plans", c.listPlans);
+router.get("/plan-invoices", c.planInvoices);
 router.post("/plans", c.createPlan);
 router.put("/plans/:id", c.updatePlan);
 router.delete("/plans/:id", c.deletePlan);

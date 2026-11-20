@@ -14,7 +14,7 @@ function todayStr() {
     day: "2-digit",
   }).format(new Date());
 }
-const STATUS_BADGE = { PAID: "verified", PARTIAL: "pending", UNPAID: "rejected", VOID: "" };
+const STATUS_BADGE = { PAID: "verified", PARTIAL: "pending", UNPAID: "rejected", VOID: "", PLANNED: "planned" };
 const blankLine = (kind = "stock") => ({ kind, productId: "", name: "", quantity: "1", unitPrice: "", group: "" });
 
 // Admin shop invoices: list + "new invoice" form. Each line is either
@@ -46,6 +46,9 @@ export default function AdminInvoices() {
   const [discount, setDiscount] = useState("");
   const [paid, setPaid] = useState("");
   const [note, setNote] = useState("");
+  // Planned sale (quotation): stock isn't cut until it's sold for real.
+  const [planned, setPlanned] = useState(false);
+  const [expectedDate, setExpectedDate] = useState(todayStr());
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -140,6 +143,15 @@ export default function AdminInvoices() {
     return m;
   }, [lines]);
 
+  const finalize = async (inv) => {
+    if (!confirm(t("invoicesPlan.confirmFinalize").replace("{no}", inv.invoiceNo))) return;
+    try {
+      const { data } = await api.post(`/invoices/${inv._id}/finalize`, {});
+      navigate(`/admin/invoices/${data._id}`);
+    } catch (err) {
+      alert(err.response?.data?.message || t("invoices.failedToSave"));
+    }
+  };
   const resetForm = () => {
     setDate(todayStr());
     setCName("");
@@ -151,6 +163,8 @@ export default function AdminInvoices() {
     setPaid("");
     setNote("");
     setFormError("");
+    setPlanned(false);
+    setExpectedDate(todayStr());
   };
 
   const submit = async (e) => {
@@ -171,7 +185,7 @@ export default function AdminInvoices() {
     }
     for (const [pid, need] of Object.entries(needByProduct)) {
       const p = products.find((x) => x._id === pid);
-      if (p && need > p.stock) return setFormError(`${p.name}: ${t("invoices.notEnoughStock")} (${p.stock})`);
+      if (!planned && p && need > p.stock) return setFormError(`${p.name}: ${t("invoices.notEnoughStock")} (${p.stock})`);
     }
     setSaving(true);
     try {
@@ -184,6 +198,8 @@ export default function AdminInvoices() {
         discount: Number(discount) || 0,
         paidAmount: paid === "" ? 0 : Number(paid),
         note,
+        planned,
+        expectedDate: planned ? expectedDate : undefined,
       });
       resetForm();
       navigate(`/admin/invoices/${data._id}`);
@@ -202,16 +218,21 @@ export default function AdminInvoices() {
           <p>{t("invoices.intro")}</p>
         </div>
         {!showForm && (
-          <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-            ➕ {t("invoices.newInvoice")}
-          </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn btn-primary" onClick={() => { setPlanned(false); setShowForm(true); }}>
+              ➕ {t("invoices.newInvoice")}
+            </button>
+            <button className="btn btn-outline" onClick={() => { setPlanned(true); setShowForm(true); }}>
+              📝 {t("invoicesPlan.newPlanned")}
+            </button>
+          </div>
         )}
       </div>
 
       {showForm && (
         <form className="card invoice-form" onSubmit={submit}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <h3 style={{ margin: 0 }}>{t("invoices.newInvoice")}</h3>
+            <h3 style={{ margin: 0 }}>{planned ? t("invoicesPlan.newPlanned") : t("invoices.newInvoice")}</h3>
             <div className="seg-toggle">
               <button type="button" className={invLang === "km" ? "active" : ""} onClick={() => setInvLang("km")}>
                 ខ្មែរ
@@ -222,6 +243,19 @@ export default function AdminInvoices() {
             </div>
           </div>
           <p className="mini-empty" style={{ margin: "4px 0 12px" }}>{t("invoices.langHint")}</p>
+          <div className="seg-toggle fin-type invoice-kind">
+            <button type="button" className={!planned ? "active income" : ""} onClick={() => setPlanned(false)}>🧾 {t("invoicesPlan.sellNow")}</button>
+            <button type="button" className={planned ? "active planned" : ""} onClick={() => setPlanned(true)}>📝 {t("invoicesPlan.planSale")}</button>
+          </div>
+          {planned && (
+            <div className="invoice-plan-box">
+              <div className="field" style={{ maxWidth: 220, margin: 0 }}>
+                <label>{t("invoicesPlan.expectedDate")}</label>
+                <input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
+              </div>
+              <p className="mini-empty" style={{ margin: 0 }}>{t("invoicesPlan.planHelp")}</p>
+            </div>
+          )}
 
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 14 }}>
             <h4 className="invoice-form-h" style={{ margin: 0 }}>{t("invoices.customer")}</h4>
@@ -378,7 +412,7 @@ export default function AdminInvoices() {
           {formError && <div className="error-text">{formError}</div>}
           <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
             <button className="btn btn-primary" disabled={saving}>
-              {saving ? t("common.saving") : t("invoices.saveInvoice")}
+              {saving ? t("common.saving") : planned ? t("invoicesPlan.savePlanned") : t("invoices.saveInvoice")}
             </button>
             <button type="button" className="btn btn-outline" onClick={() => { resetForm(); setShowForm(false); }}>
               {t("common.cancel")}
@@ -391,7 +425,7 @@ export default function AdminInvoices() {
         <input placeholder={t("invoices.searchPh")} value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 280 }} />
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="">{t("invoices.allStatuses")}</option>
-          {["UNPAID", "PARTIAL", "PAID", "VOID"].map((s) => (
+          {["PLANNED", "UNPAID", "PARTIAL", "PAID", "VOID"].map((s) => (
             <option key={s} value={s}>{t(`invoices.status_${s}`)}</option>
           ))}
         </select>
@@ -417,7 +451,12 @@ export default function AdminInvoices() {
               {list.map((inv) => (
                 <tr key={inv._id} style={inv.voided ? { opacity: 0.55 } : undefined}>
                   <td data-label={t("invoices.invoiceNo")}><b>{inv.invoiceNo}</b></td>
-                  <td data-label={t("invoices.date")}>{new Date(inv.date).toLocaleDateString("en-GB")}</td>
+                  <td data-label={t("invoices.date")}>
+                    {new Date(inv.date).toLocaleDateString("en-GB")}
+                    {inv.planned && inv.expectedDate && (
+                      <div className="mini-empty">📅 {t("invoicesPlan.expectedShort")} {new Date(inv.expectedDate).toLocaleDateString("en-GB")}</div>
+                    )}
+                  </td>
                   <td data-label={t("invoices.customer")}>
                     {inv.customer?.name || "—"}
                     {inv.customer?.phone && <div style={{ fontSize: 12, color: "#888" }}>{inv.customer.phone}</div>}
@@ -432,6 +471,9 @@ export default function AdminInvoices() {
                   </td>
                   <td data-label={t("common.actions")}>
                     <Link className="link-btn" to={`/admin/invoices/${inv._id}`}>🧾 {t("invoices.openPrint")}</Link>
+                    {inv.planned && !inv.voided && (
+                      <button className="link-btn" style={{ marginLeft: 10 }} onClick={() => finalize(inv)}>✅ {t("invoicesPlan.finalize")}</button>
+                    )}
                   </td>
                 </tr>
               ))}

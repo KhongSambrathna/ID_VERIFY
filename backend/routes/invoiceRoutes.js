@@ -8,6 +8,7 @@ const {
   updateInvoice,
   voidInvoice,
   deleteInvoice,
+  finalizeInvoice,
 } = require("../controllers/invoiceController");
 
 // Shop invoices — Admin only.
@@ -18,6 +19,7 @@ router.post("/", createInvoice);
 router.get("/:id", getInvoice);
 router.patch("/:id", updateInvoice);
 router.patch("/:id/void", voidInvoice);
+router.post("/:id/finalize", finalizeInvoice);
 router.delete("/:id", deleteInvoice);
 
 module.exports = router;

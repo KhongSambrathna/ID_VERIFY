@@ -37,7 +37,10 @@ export const INVOICE_TEXT = {
     customerSign: "ហត្ថលេខាអតិថិជន",
     sellerSign: "ហត្ថលេខាអ្នកលក់",
     thanks: "សូមអរគុណសម្រាប់ការគាំទ្រ!",
-    status: { PAID: "បានបង់រួច", PARTIAL: "បង់ខ្លះ", UNPAID: "មិនទាន់បង់", VOID: "បានលុបចោល" },
+    status: { PAID: "បានបង់រួច", PARTIAL: "បង់ខ្លះ", UNPAID: "មិនទាន់បង់", VOID: "បានលុបចោល", PLANNED: "គ្រោងលក់" },
+    quoteTitle: "សម្រង់តម្លៃ / គ្រោងលក់",
+    quoteNo: "លេខសម្រង់",
+    expectedDate: "ថ្ងៃរំពឹងលក់",
   },
   en: {
     title: "INVOICE",
@@ -63,6 +66,9 @@ export const INVOICE_TEXT = {
     customerSign: "Customer signature",
     sellerSign: "Seller signature",
     thanks: "Thank you for your support!",
-    status: { PAID: "PAID", PARTIAL: "PARTLY PAID", UNPAID: "UNPAID", VOID: "VOID" },
+    status: { PAID: "PAID", PARTIAL: "PARTLY PAID", UNPAID: "UNPAID", VOID: "VOID", PLANNED: "PLANNED" },
+    quoteTitle: "QUOTATION",
+    quoteNo: "Quote No.",
+    expectedDate: "Expected",
   },
 };

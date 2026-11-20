@@ -52,6 +52,11 @@ const invoiceSchema = new mongoose.Schema(
     // Cancelled invoices stay on record (number isn't reused) but their
     // stock lines are returned to the shelf and they're left out of totals.
     voided: { type: Boolean, default: false },
+    // A planned sale (quotation, "QT-2026-0001"): stock is NOT cut yet. It
+    // shows as expected income in my monthly plan for expectedDate's month.
+    // "Sell for real" turns it into a normal invoice (INV number, stock cut).
+    planned: { type: Boolean, default: false },
+    expectedDate: { type: Date, default: null },
     voidedAt: { type: Date, default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
   },
@@ -62,6 +67,7 @@ invoiceSchema.index({ date: -1 });
 
 invoiceSchema.virtual("status").get(function () {
   if (this.voided) return "VOID";
+  if (this.planned) return "PLANNED";
   if (this.paidAmount >= this.total - 0.001) return "PAID";
   if (this.paidAmount > 0) return "PARTIAL";
   return "UNPAID";

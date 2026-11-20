@@ -3426,3 +3426,14 @@ tr.inv-excluded td:first-child { opacity: 1; }
 .invest-detail > .card, .invest-detail > ul.card { width: 100%; max-width: none; box-sizing: border-box; }
 .invest-detail > .invest-limit { margin-bottom: 14px; }
 .badge.one-time { background: #e8eefb; color: #2c4a8a; margin-left: 6px; font-size: 11px; }
+
+/* Planned sales (quotations) + invoices in the monthly plan */
+.badge.planned { background: #e6ecf8; color: #2c4a8a; }
+.seg-toggle button.active.planned { background: #2c4a8a; color: #fff; }
+.invoice-kind { margin: 0 0 12px; }
+.invoice-plan-box { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; background: #eef2fa; border: 1px dashed #b9c6e4; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+.invoice-plan-box p { flex: 1 1 260px; }
+.plan-inv { padding: 14px; margin-bottom: 16px; width: 100%; max-width: none; box-sizing: border-box; }
+.plan-inv.off { opacity: 0.6; }
+.plan-inv-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.plan-inv-toggle { display: flex; gap: 6px; align-items: center; font-size: 14px; cursor: pointer; }

@@ -33,6 +33,44 @@ async function nextInvoiceNo(date) {
   return `INV-${year}-${String(c.seq).padStart(4, "0")}`;
 }
 
+async function nextQuoteNo(date) {
+  const year = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Phnom_Penh", year: "numeric" }).format(date);
+  const c = await Counter.findOneAndUpdate({ name: `quote-${year}` }, { $inc: { seq: 1 } }, { new: true, upsert: true });
+  return `QT-${year}-${String(c.seq).padStart(4, "0")}`;
+}
+
+// Cuts stock for every stock line of a (non-planned) invoice and records a
+// sale linked to it. The invoice discount is spread over the lines, so the
+// profit in the shop report matches what was really charged.
+async function cutStock(invoice, adminId) {
+  const discountRatio = invoice.subtotal > 0 ? invoice.total / invoice.subtotal : 1;
+  for (const item of invoice.items) {
+    if (!item.product) continue;
+    const product = await Product.findById(item.product);
+    if (!product) continue;
+    const unitCost = product.costPrice || 0;
+    const netUnit = roundUSD(item.unitPrice * discountRatio);
+    product.stock -= item.quantity;
+    await product.save();
+    const m = await StockMovement.create({
+      product: product._id,
+      productName: product.name,
+      type: "OUT",
+      quantity: item.quantity,
+      unitPrice: netUnit,
+      unitCost,
+      totalAmount: roundUSD(item.quantity * netUnit),
+      profit: roundUSD(item.quantity * (netUnit - unitCost)),
+      party: invoice.customer.name,
+      note: `Invoice ${invoice.invoiceNo}`,
+      date: invoice.date,
+      invoice: invoice._id,
+      createdBy: adminId,
+    });
+    item.movement = m._id;
+  }
+}
+
 // Gives every line its stock back and deletes its stock-out record.
 async function returnStock(invoice) {
   for (const item of invoice.items) {
@@ -128,8 +166,9 @@ exports.createInvoice = async (req, res) => {
         });
       }
     }
+    const planned = Boolean(req.body.planned);
     for (const it of items) {
-      if (!it.product) continue;
+      if (!it.product || planned) continue;
       const need = needByProduct.get(String(it.product._id));
       if (need > it.product.stock) {
         return res.status(400).json({
@@ -146,7 +185,7 @@ exports.createInvoice = async (req, res) => {
     paidAmount = roundUSD(Math.min(paidAmount, total));
 
     const date = invoiceDate(req.body.date);
-    const invoiceNo = await nextInvoiceNo(date);
+    const invoiceNo = planned ? await nextQuoteNo(date) : await nextInvoiceNo(date);
     const customer = req.body.customer || {};
 
     const invoice = new Invoice({
@@ -175,40 +214,15 @@ exports.createInvoice = async (req, res) => {
       paidAmount,
       note: String(req.body.note || "").trim(),
       createdBy: req.adminId,
+      planned,
+      expectedDate: planned ? invoiceDate(req.body.expectedDate || req.body.date) : null,
     });
 
-    // 2) Cut stock for each stock line, recording a sale linked to this
-    //    invoice. The invoice discount is spread over the lines in proportion,
-    //    so the profit in the shop report matches what was really charged.
-    const discountRatio = subtotal > 0 ? total / subtotal : 1;
-    for (let i = 0; i < items.length; i++) {
-      const it = items[i];
-      if (!it.product) continue;
-      const product = await Product.findById(it.product._id);
-      const unitCost = product.costPrice || 0;
-      const netUnit = roundUSD(it.unitPrice * discountRatio);
-      product.stock -= it.quantity;
-      await product.save();
-      const m = await StockMovement.create({
-        product: product._id,
-        productName: product.name,
-        type: "OUT",
-        quantity: it.quantity,
-        unitPrice: netUnit,
-        unitCost,
-        totalAmount: roundUSD(it.quantity * netUnit),
-        profit: roundUSD(it.quantity * (netUnit - unitCost)),
-        party: invoice.customer.name,
-        note: `Invoice ${invoiceNo}`,
-        date,
-        invoice: invoice._id,
-        createdBy: req.adminId,
-      });
-      invoice.items[i].movement = m._id;
-    }
+    // 2) Cut stock (not for a planned sale — that happens when it's sold).
+    if (!planned) await cutStock(invoice, req.adminId);
 
     await invoice.save();
-    require("../utils/telegramAlerts").stockChanged(items.filter((it) => it.product).map((it) => it.product._id));
+    if (!planned) require("../utils/telegramAlerts").stockChanged(items.filter((it) => it.product).map((it) => it.product._id));
     res.status(201).json(invoice);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -234,6 +248,7 @@ exports.updateInvoice = async (req, res) => {
     }
     if (req.body.note !== undefined) inv.note = String(req.body.note).trim();
     if (req.body.language === "km" || req.body.language === "en") inv.language = req.body.language;
+    if (inv.planned && req.body.expectedDate !== undefined) inv.expectedDate = invoiceDate(req.body.expectedDate);
     await inv.save();
     res.json(inv);
   } catch (err) {
@@ -266,6 +281,39 @@ exports.deleteInvoice = async (req, res) => {
     await returnStock(inv);
     await inv.deleteOne();
     res.json({ message: "Invoice deleted" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// POST /api/invoices/:id/finalize  { date?, paidAmount? }
+// A planned sale happened: give it a real invoice number, cut the stock.
+exports.finalizeInvoice = async (req, res) => {
+  try {
+    const inv = await Invoice.findById(req.params.id);
+    if (!inv) return res.status(404).json({ message: "Invoice not found" });
+    if (!inv.planned) return res.status(400).json({ message: "This invoice is already a real sale" });
+    if (inv.voided) return res.status(400).json({ message: "This invoice is void" });
+    const need = new Map();
+    for (const it of inv.items) if (it.product) need.set(String(it.product), (need.get(String(it.product)) || 0) + it.quantity);
+    for (const [id, qty] of need) {
+      const p = await Product.findById(id);
+      if (!p) return res.status(400).json({ message: "A product on this invoice no longer exists" });
+      if (qty > p.stock) return res.status(400).json({ message: `Not enough stock for "${p.name}" — only ${p.stock} ${p.unit || "pcs"} left` });
+    }
+    const quoteNo = inv.invoiceNo;
+    inv.date = invoiceDate(req.body.date);
+    inv.invoiceNo = await nextInvoiceNo(inv.date);
+    inv.planned = false;
+    inv.note = [inv.note, `(${quoteNo})`].filter(Boolean).join(" ");
+    if (req.body.paidAmount !== undefined) {
+      const p = num(req.body.paidAmount);
+      if (!Number.isNaN(p) && p >= 0) inv.paidAmount = roundUSD(Math.min(p, inv.total));
+    }
+    await cutStock(inv, req.adminId);
+    await inv.save();
+    require("../utils/telegramAlerts").stockChanged([...need.keys()]);
+    res.json(inv);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

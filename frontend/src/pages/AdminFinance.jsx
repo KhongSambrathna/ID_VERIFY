@@ -1,6 +1,6 @@
 import InvestTab from "../components/InvestTab";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useLanguage } from "../i18n/LanguageContext";
 import { formatUSD, approxKHR } from "../utils/currency";
@@ -850,21 +850,27 @@ function Plan({ catLabel, month }) {
   const { t } = useLanguage();
   const [list, setList] = useState([]);
   const [debtPay, setDebtPay] = useState(0);
+  const [invInc, setInvInc] = useState({ include: true, items: [], totalUSD: 0 });
   const [form, setForm] = useState(null);
   const [err, setErr] = useState("");
 
   const load = async () => {
     try {
-      const [{ data: plans }, { data: s }] = await Promise.all([api.get("/finance/plans"), api.get("/finance/summary")]);
+      const [{ data: plans }, { data: s }, { data: ii }] = await Promise.all([
+        api.get("/finance/plans"),
+        api.get("/finance/summary"),
+        api.get(`/finance/plan-invoices?month=${month}`),
+      ]);
       setList(plans);
       setDebtPay(s.monthlyDebtPayments || 0);
+      setInvInc(ii);
     } catch {
       /* ignore */
     }
   };
   useEffect(() => {
     load();
-  }, []);
+  }, [month]);
 
   const setP = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
   const save = async (e) => {
@@ -901,7 +907,12 @@ function Plan({ catLabel, month }) {
     load();
   };
   const sum = (rows) => rows.reduce((s, p) => s + monthly(p), 0);
-  const inc = sum(act.filter((p) => p.kind === "income"));
+  const invUSD = invInc.include ? invInc.totalUSD : 0; // shop invoices → hoped-for income
+  const inc = sum(act.filter((p) => p.kind === "income")) + invUSD;
+  const toggleInvInc = async () => {
+    setInvInc((x) => ({ ...x, include: !x.include }));
+    await api.put("/finance/settings", { planIncludeInvoices: !invInc.include }).catch(() => {});
+  };
   const incSure = sum(act.filter((p) => p.kind === "income" && p.sure !== false));
   const exp = sum(act.filter((p) => p.kind === "expense"));
   const expEssential = sum(act.filter((p) => p.kind === "expense" && p.essential !== false));
@@ -928,7 +939,7 @@ function Plan({ catLabel, month }) {
         <StatTile
           label={t("finance.expectedIncome")}
           value={formatUSD(inc)}
-          sub={`✅ ${t("planX.sure")} ${formatUSD(incSure)} · 🤞 ${t("planX.maybe")} ${formatUSD(inc - incSure)}`}
+          sub={`✅ ${t("planX.sure")} ${formatUSD(incSure)} · 🤞 ${t("planX.maybe")} ${formatUSD(inc - incSure)}${invUSD ? ` (🧾 ${formatUSD(invUSD)})` : ""}`}
           tone="ok"
         />
         <StatTile
@@ -1116,6 +1127,32 @@ function Plan({ catLabel, month }) {
         );
       })}
       {list.length === 0 && <p className="mini-empty">{t("finance.noPlans")}</p>}
+      {invInc.items.length > 0 && (
+        <div className={`card plan-inv ${invInc.include ? "" : "off"}`}>
+          <div className="plan-inv-head">
+            <h4 style={{ margin: 0 }}>🧾 {t("planX.fromInvoices")} · <span style={{ color: "var(--ok)" }}>{formatUSD(invInc.totalUSD)}</span></h4>
+            <label className="plan-inv-toggle">
+              <input type="checkbox" checked={invInc.include} onChange={toggleInvInc} /> {t("planX.countInPlan")}
+            </label>
+          </div>
+          <p className="mini-empty" style={{ margin: "4px 0 8px" }}>{t("planX.fromInvoicesHelp")}</p>
+          <ul className="package-items">
+            {invInc.items.map((i) => (
+              <li key={i._id}>
+                <span>
+                  <Link to={`/admin/invoices/${i._id}`}>{i.invoiceNo}</Link>{" "}
+                  <span className={`badge ${i.kind === "planned" ? "planned" : "rejected"}`}>
+                    {i.kind === "planned" ? `📝 ${t("invoices.status_PLANNED")}` : `⏳ ${t("planX.unpaidBalance")}`}
+                  </span>
+                  {i.customer && <small className="mini-empty"> · {i.customer}</small>}
+                  {i.kind === "planned" && <small className="mini-empty"> · 📅 {new Date(i.date).toLocaleDateString("en-GB", { timeZone: "Asia/Phnom_Penh" })}</small>}
+                </span>
+                <b>{formatUSD(i.amountUSD)}</b>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {otherOneTime.length > 0 && (
         <div className="card" style={{ padding: 14 }}>
           <h4 style={{ margin: "0 0 8px" }}>📌 {t("planX.otherMonths")}</h4>

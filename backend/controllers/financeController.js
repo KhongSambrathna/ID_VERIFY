@@ -425,6 +425,50 @@ exports.deletePayment = wrap(async (req, res) => {
 
 // ---------------- Monthly plan (expected income / expenses) ----------------
 
+// Shop invoices that should bring money in, for the monthly plan:
+//   • planned sales (QT-…) in the month of their expected date (overdue
+//     ones in the current month)
+//   • real invoices not fully paid yet — their unpaid balance, this month
+//     (only those I count in "Owed to me")
+// All of it is hoped-for income (not sure until paid). Amounts are USD.
+async function invoiceIncome(req, key) {
+  const st = await getSettings(req);
+  const { start, end } = monthRange(key);
+  const nowKey = monthRange().key;
+  const thisMonthStart = monthRange(nowKey).start;
+  const items = [];
+  if (key >= nowKey) {
+    const planned = await Invoice.find({ voided: false, planned: true }).select("invoiceNo customer total expectedDate date").lean();
+    for (const i of planned) {
+      const d = i.expectedDate || i.date;
+      const inMonth = key === nowKey ? d < end : d >= start && d < end; // overdue → this month
+      if (inMonth) items.push({ _id: i._id, kind: "planned", invoiceNo: i.invoiceNo, customer: i.customer?.name || "", date: d, amountUSD: roundUSD(i.total) });
+    }
+    if (key === nowKey) {
+      const excluded = new Set((st.excludedInvoices || []).map(String));
+      const unpaid = await Invoice.find({ voided: false, planned: { $ne: true } }).select("invoiceNo customer total paidAmount date").lean();
+      for (const i of unpaid) {
+        const bal = roundUSD(i.total - (i.paidAmount || 0));
+        if (bal > 0.004 && !excluded.has(String(i._id))) {
+          items.push({ _id: i._id, kind: "unpaid", invoiceNo: i.invoiceNo, customer: i.customer?.name || "", date: i.date, amountUSD: bal });
+        }
+      }
+    }
+  }
+  items.sort((a, b) => new Date(a.date) - new Date(b.date));
+  return {
+    include: st.planIncludeInvoices !== false,
+    items,
+    totalUSD: roundUSD(items.reduce((s, i) => s + i.amountUSD, 0)),
+    thisMonthStart,
+  };
+}
+exports.planInvoices = wrap(async (req, res) => {
+  const { key } = monthRange(req.query.month);
+  const r = await invoiceIncome(req, key);
+  res.json({ include: r.include, items: r.items, totalUSD: r.totalUSD, month: key });
+});
+
 exports.listPlans = wrap(async (req, res) => {
   res.json(await FinancePlan.find(own(req)).sort({ kind: -1, active: -1, name: 1 }));
 });
@@ -534,7 +578,9 @@ exports.summary = wrap(async (req, res) => {
   });
   const plannedIncomeSure = roundUSD(planRows.filter((p) => p.kind === "income" && p.sure).reduce((s, p) => s + p.monthly, 0));
   const plannedEssential = roundUSD(planRows.filter((p) => p.kind === "expense" && p.essential).reduce((s, p) => s + p.monthly, 0));
-  const plannedIncome = roundUSD(planRows.filter((p) => p.kind === "income").reduce((s, p) => s + p.monthly, 0));
+  const invInc = await invoiceIncome(req, key);
+  const invoiceIncomeUSD = invInc.include ? invInc.totalUSD : 0;
+  const plannedIncome = roundUSD(planRows.filter((p) => p.kind === "income").reduce((s, p) => s + p.monthly, 0) + invoiceIncomeUSD);
   const plannedExpense = roundUSD(planRows.filter((p) => p.kind === "expense").reduce((s, p) => s + p.monthly, 0));
 
   // Category list with plan amounts next to actuals.
@@ -585,6 +631,7 @@ exports.summary = wrap(async (req, res) => {
     plannedNet: roundUSD(plannedIncome - plannedExpense - monthlyDebtPayments),
     plannedIncomeSure,
     plannedEssential,
+    invoiceIncomeUSD,
     investMonthPnlUSD: roundUSD(
       (
         await FinanceInvestEntry.aggregate([
@@ -726,6 +773,7 @@ exports.updateSettings = wrap(async (req, res) => {
   const st = await getSettings(req);
   if (Array.isArray(req.body.receivableTeams)) st.receivableTeams = req.body.receivableTeams.map((x) => String(x).trim()).filter(Boolean);
   if (req.body.includeInvoices !== undefined) st.includeInvoices = Boolean(req.body.includeInvoices);
+  if (req.body.planIncludeInvoices !== undefined) st.planIncludeInvoices = Boolean(req.body.planIncludeInvoices);
   if (Array.isArray(req.body.excludedInvoices)) {
     st.excludedInvoices = [...new Set(req.body.excludedInvoices.map(String))].filter((x) => mongoose.Types.ObjectId.isValid(x));
   }
@@ -784,7 +832,7 @@ async function computeReceivables(req) {
   let invoices = [];
   const excluded = new Set((st.excludedInvoices || []).map(String));
   if (st.includeInvoices) {
-    const list = await Invoice.find({ voided: false }).select("invoiceNo date customer total paidAmount").sort({ date: -1 }).lean();
+    const list = await Invoice.find({ voided: false, planned: { $ne: true } }).select("invoiceNo date customer total paidAmount").sort({ date: -1 }).lean();
     invoices = list
       .filter((i) => i.total - (i.paidAmount || 0) > 0.004)
       .map((i) => ({ _id: i._id, invoiceNo: i.invoiceNo, date: i.date, customer: i.customer, total: i.total, paid: i.paidAmount || 0, balanceUSD: roundUSD(i.total - (i.paidAmount || 0)), included: !excluded.has(String(i._id)) }));

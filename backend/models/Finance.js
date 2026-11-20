@@ -125,6 +125,7 @@ const settingsSchema = new mongoose.Schema(
     owner: { ...ref, unique: true },
     receivableTeams: { type: [String], default: [] },
     includeInvoices: { type: Boolean, default: true },
+    planIncludeInvoices: { type: Boolean, default: true }, // invoices → expected income in the plan
     // Unpaid invoices I chose NOT to count (new invoices count by default)
     excludedInvoices: [{ type: mongoose.Schema.Types.ObjectId, ref: "Invoice" }],
     // Telegram alerts — sent only to this Admin's own linked Telegram chat.

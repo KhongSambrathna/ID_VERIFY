@@ -55,6 +55,19 @@ export default function InvoiceView() {
       setBusy(false);
     }
   };
+  // Planned sale happened → real invoice (INV number, stock cut).
+  const doFinalize = async () => {
+    if (!confirm(t("invoicesPlan.confirmFinalize").replace("{no}", inv.invoiceNo))) return;
+    setBusy(true);
+    try {
+      const { data } = await api.post(`/invoices/${id}/finalize`, {});
+      setInv(data);
+    } catch (err) {
+      alert(err.response?.data?.message || t("invoices.failedToSave"));
+    } finally {
+      setBusy(false);
+    }
+  };
   const doVoid = async () => {
     if (!confirm(t("invoices.confirmVoid").replace("{no}", inv.invoiceNo))) return;
     setBusy(true);
@@ -104,11 +117,12 @@ export default function InvoiceView() {
             </div>
           </div>
           <div className="invoice-title-box">
-            <div className="invoice-title">{L.title}</div>
+            <div className="invoice-title">{inv.planned ? L.quoteTitle : L.title}</div>
             <table>
               <tbody>
-                <tr><td>{L.invoiceNo}</td><td><b>{inv.invoiceNo}</b></td></tr>
+                <tr><td>{inv.planned ? L.quoteNo : L.invoiceNo}</td><td><b>{inv.invoiceNo}</b></td></tr>
                 <tr><td>{L.date}</td><td>{fmtDate(inv.date)}</td></tr>
+                {inv.planned && inv.expectedDate && <tr><td>{L.expectedDate}</td><td>{fmtDate(inv.expectedDate)}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -209,6 +223,9 @@ export default function InvoiceView() {
           </div>
         )}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {inv.planned && !inv.voided && (
+            <button type="button" className="btn btn-primary" disabled={busy} onClick={doFinalize}>✅ {t("invoicesPlan.finalize")}</button>
+          )}
           {!inv.voided && (
             <button type="button" className="btn btn-outline" disabled={busy} onClick={doVoid}>⊘ {t("invoices.void")}</button>
           )}

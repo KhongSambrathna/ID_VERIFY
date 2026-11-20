@@ -208,7 +208,7 @@ async function dailySummary(a, now) {
   const start = dayStart(t.ymd);
   const end = new Date(start.getTime() + 86400000);
   const [invoices, sales, txns, accounts, pending, low] = await Promise.all([
-    Invoice.find({ voided: false, date: { $gte: start, $lt: end } }).select("total paidAmount").lean(),
+    Invoice.find({ voided: false, planned: { $ne: true }, date: { $gte: start, $lt: end } }).select("total paidAmount").lean(),
     StockMovement.find({ type: "OUT", date: { $gte: start, $lt: end } }).select("totalAmount profit").lean(),
     FinanceTxn.find({ owner: a._id, date: { $gte: start, $lt: end }, category: { $nin: ["transfer", "invest"] } }).select("type amountUSD").lean(),
     helpers.accountsWithBalance({ adminId: a._id }),
