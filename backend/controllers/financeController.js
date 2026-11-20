@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const { FinanceTxn, FinanceDebt, FinancePlan, FinanceAccount, FinanceSettings } = require("../models/Finance");
+const { FinanceTxn, FinanceDebt, FinancePlan, FinanceAccount, FinanceSettings, FinanceInvestEntry } = require("../models/Finance");
 const Athlete = require("../models/Athlete");
 const Invoice = require("../models/Invoice");
 const { roundUSD } = require("../utils/currency");
@@ -487,7 +487,7 @@ exports.summary = wrap(async (req, res) => {
   const { start, end, key, daysInMonth } = monthRange(req.query.month);
   const owner = new mongoose.Types.ObjectId(String(req.adminId));
   // Moving money between my own accounts isn't income or spending.
-  const match = { owner, date: { $gte: start, $lt: end }, category: { $ne: "transfer" } };
+  const match = { owner, date: { $gte: start, $lt: end }, category: { $nin: ["transfer", "invest"] } };
 
   const [byCat, byDay, plans, debts] = await Promise.all([
     FinanceTxn.aggregate([
@@ -580,6 +580,15 @@ exports.summary = wrap(async (req, res) => {
     plannedNet: roundUSD(plannedIncome - plannedExpense - monthlyDebtPayments),
     plannedIncomeSure,
     plannedEssential,
+    investMonthPnlUSD: roundUSD(
+      (
+        await FinanceInvestEntry.aggregate([
+          { $match: { owner, type: "result", date: { $gte: start, $lt: end } } },
+          { $group: { _id: null, t: { $sum: "$amountUSD" } } },
+        ])
+      )[0]?.t || 0
+    ),
+    investCount: await require("../models/Finance").FinanceInvestment.countDocuments({ owner, archived: false }),
     // Worst case: only the sure income comes in, only essentials are paid.
     plannedSafeNet: roundUSD(plannedIncomeSure - plannedEssential - monthlyDebtPayments),
     projectedIncome,

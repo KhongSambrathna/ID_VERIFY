@@ -115,6 +115,7 @@ export const km = {
   "finance.cat_ceremony": "បុណ្យ/ការ/ពិធី",
   "finance.cat_business": "ចំណាយអាជីវកម្ម",
   "finance.cat_savings": "សន្សំ",
+  "finance.cat_invest": "វិនិយោគ (ដាក់/ដក)",
 };
 
 export const en = {
@@ -233,4 +234,5 @@ export const en = {
   "finance.cat_ceremony": "Weddings / ceremonies",
   "finance.cat_business": "Business costs",
   "finance.cat_savings": "Savings",
+  "finance.cat_invest": "Investment (in/out)",
 };

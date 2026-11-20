@@ -136,7 +136,46 @@ const settingsSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Investments / betting: each "pot" (e.g. "Sport betting", "Gold") has
+// entries — a day's result (win + / loss −), or money moved in / out.
+//   balance     = deposits − withdrawals + results
+//   profit/loss = sum of results only
+const investmentSchema = new mongoose.Schema(
+  {
+    owner: ref,
+    name: { type: String, required: true, trim: true },
+    kind: { type: String, enum: ["betting", "gold", "crypto", "stock", "business", "other"], default: "other" },
+    currency: { type: String, enum: ["USD", "KHR"], default: "USD" },
+    note: { type: String, trim: true, default: "" },
+    // My own limits (0 = none): stop when this month's loss reaches X,
+    // and the most I stake in one day.
+    monthlyLossLimit: { type: Number, min: 0, default: 0 },
+    dailyStakeLimit: { type: Number, min: 0, default: 0 },
+    archived: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
+
+const investEntrySchema = new mongoose.Schema(
+  {
+    owner: ref,
+    investment: { type: mongoose.Schema.Types.ObjectId, ref: "FinanceInvestment", required: true, index: true },
+    type: { type: String, enum: ["result", "deposit", "withdraw"], required: true },
+    // result: + win / − loss; deposit / withdraw: always positive
+    amount: { type: Number, required: true },
+    amountUSD: { type: Number, default: 0 },
+    stake: { type: Number, min: 0, default: 0 }, // how much was bet (result only)
+    date: { type: Date, required: true },
+    note: { type: String, trim: true, default: "" },
+    txn: { type: mongoose.Schema.Types.ObjectId, ref: "FinanceTxn", default: null }, // money in/out of an account
+  },
+  { timestamps: true }
+);
+investEntrySchema.index({ investment: 1, date: -1 });
+
 module.exports = {
+  FinanceInvestment: mongoose.model("FinanceInvestment", investmentSchema),
+  FinanceInvestEntry: mongoose.model("FinanceInvestEntry", investEntrySchema),
   FinanceAccount: mongoose.model("FinanceAccount", accountSchema),
   FinanceSettings: mongoose.model("FinanceSettings", settingsSchema),
   FinanceTxn: mongoose.model("FinanceTxn", txnSchema),

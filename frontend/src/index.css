@@ -3391,3 +3391,37 @@ tr.inv-excluded td:first-child { opacity: 1; }
 .plan-safe.ok { background: #eef6f0; border-color: #cfe5d6; }
 .plan-safe.bad { background: #fbeeeb; border-color: #efcfc8; }
 .plan-safe-warn { color: var(--bad, #b33); margin-top: 4px; font-size: 14px; }
+
+/* ---------- Investments / betting ---------- */
+.pnl.ok { color: var(--ok, #2e7d4f); }
+.pnl.bad { color: var(--bad, #b3392b); }
+.invest-card { cursor: pointer; }
+.invest-card.over { border-top: 4px solid var(--bad, #b3392b); }
+.invest-mini { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; font-size: 14px; margin-top: 6px; }
+.invest-kinds { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.invest-limit { margin: 10px 0 4px; font-size: 13.5px; }
+.invest-limit-text { margin-bottom: 4px; }
+.fin-progress { height: 8px; background: #ece6d8; border-radius: 6px; overflow: hidden; }
+.fin-progress > div { height: 100%; background: var(--ok, #2e7d4f); border-radius: 6px; }
+.invest-limit.near .fin-progress > div { background: #c58a1b; }
+.invest-limit.over .fin-progress > div { background: var(--bad, #b3392b); }
+.invest-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.invest-head h3 { margin: 0; flex: 1; }
+.invest-head-actions { display: flex; gap: 10px; }
+.invest-suggest { background: #f6f1e4; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; font-size: 14px; }
+.invest-warn { background: #fbeeeb; color: var(--bad, #b3392b); border: 1px solid #efcfc8; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; font-weight: 600; }
+.invest-warn.near { background: #fdf5e4; color: #8a5a00; border-color: #f0dcae; font-weight: 500; }
+.invest-entry { max-width: none; margin-bottom: 14px; }
+.pnl-bars { display: flex; gap: 2px; height: 160px; align-items: stretch; }
+.pnl-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.pnl-half { flex: 1; display: flex; }
+.pnl-half.up { align-items: flex-end; border-bottom: 1px solid #ccc; }
+.pnl-half.down { align-items: flex-start; }
+.pnl-half > div { width: 100%; border-radius: 2px; }
+.pnl-half.up > div { background: var(--ok, #2e7d4f); }
+.pnl-half.down > div { background: var(--bad, #b3392b); }
+.pnl-col small { font-size: 10px; color: #999; text-align: center; height: 12px; }
+.cum-line { width: 100%; height: 140px; display: block; }
+.cum-axis { display: flex; justify-content: space-between; font-size: 11px; color: #999; }
+.invest-detail > .card, .invest-detail > ul.card { width: 100%; max-width: none; box-sizing: border-box; }
+.invest-detail > .invest-limit { margin-bottom: 14px; }

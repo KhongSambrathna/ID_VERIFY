@@ -1,3 +1,4 @@
+import InvestTab from "../components/InvestTab";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import api from "../api/axios";
@@ -28,7 +29,7 @@ const INCOME_CATS = ["salary", "service", "sales", "shop", "football", "tutoring
 const CAT_ICON = {
   food: "🍚", transport: "⛽", phone: "📱", rent: "🏠", utilities: "💡", family: "👨‍👩‍👧", health: "💊", education: "📚",
   shopping: "🛍", fun: "🎉", football: "⚽", debt: "💳", other: "📦", salary: "💼", shop: "🏪", bonus: "⭐", gift: "🎁", transfer: "🔁",
-  service: "🛠", sales: "🛒", tutoring: "📖", vehicle: "🏍", ceremony: "💒", business: "📦", savings: "🐷",
+  invest: "📈", service: "🛠", sales: "🛒", tutoring: "📖", vehicle: "🏍", ceremony: "💒", business: "📦", savings: "🐷",
 };
 
 // Personal money for the Admin: daily income & expenses, debts, and the
@@ -37,7 +38,7 @@ const CAT_ICON = {
 export default function AdminFinance() {
   const { t } = useLanguage();
   const [params, setParams] = useSearchParams();
-  const tab = ["overview", "daily", "money", "owed", "debts", "plan"].includes(params.get("tab")) ? params.get("tab") : "overview";
+  const tab = ["overview", "daily", "money", "owed", "debts", "plan", "invest"].includes(params.get("tab")) ? params.get("tab") : "overview";
   const setTab = (k) => setParams(k === "overview" ? {} : { tab: k }, { replace: true });
   const [month, setMonth] = useState(thisMonth());
   const catLabel = (c) => `${CAT_ICON[c] || "📦"} ${t(`finance.cat_${c}`, c)}`;
@@ -57,6 +58,7 @@ export default function AdminFinance() {
           ["owed", `🤝 ${t("financeX.tabOwed")}`],
           ["debts", `💳 ${t("finance.tabDebts")}`],
           ["plan", `🗓 ${t("finance.tabPlan")}`],
+          ["invest", `📈 ${t("invest.tab")}`],
         ].map(([k, label]) => (
           <button key={k} className={`tab-btn ${tab === k ? "active" : ""}`} onClick={() => setTab(k)}>
             {label}
@@ -81,6 +83,7 @@ export default function AdminFinance() {
       {tab === "owed" && <ReceivablesTab onOpenDebts={() => setTab("debts")} />}
       {tab === "debts" && <Debts />}
       {tab === "plan" && <Plan catLabel={catLabel} />}
+      {tab === "invest" && <InvestTab />}
     </div>
   );
 }
@@ -108,6 +111,14 @@ function Overview({ month, catLabel }) {
         <StatTile label={t("finance.income")} value={formatUSD(s.income)} sub={`${t("finance.planned")} ${formatUSD(s.plannedIncome)}`} tone="ok" />
         <StatTile label={t("finance.expense")} value={formatUSD(s.expense)} sub={`${t("finance.planned")} ${formatUSD(s.plannedExpense + s.monthlyDebtPayments)}`} tone="bad" />
         <StatTile label={t("finance.net")} value={formatUSD(s.net)} sub={approxKHR(s.net)} tone={tone(s.net)} />
+        {s.investCount > 0 && (
+          <StatTile
+            label={`📈 ${t("invest.monthPnl")}`}
+            value={`${s.investMonthPnlUSD > 0 ? "+" : s.investMonthPnlUSD < 0 ? "−" : ""}${formatUSD(Math.abs(s.investMonthPnlUSD))}`}
+            sub={t("invest.notInNet")}
+            tone={tone(s.investMonthPnlUSD)}
+          />
+        )}
         <StatTile
           label={t("finance.projectedNet")}
           value={formatUSD(s.projectedNet)}
@@ -310,7 +321,7 @@ function Daily({ month, catLabel }) {
     return [...m.entries()];
   }, [shown]);
   // Transfers between my own accounts aren't income or spending.
-  const real = rows.filter((r) => r.category !== "transfer");
+  const real = rows.filter((r) => !["transfer", "invest"].includes(r.category));
   const totIn = real.filter((r) => r.type === "income").reduce((s, r) => s + r.amountUSD, 0);
   const totOut = real.filter((r) => r.type === "expense").reduce((s, r) => s + r.amountUSD, 0);
 
@@ -395,8 +406,8 @@ function Daily({ month, catLabel }) {
         <p className="mini-empty">{t("finance.noEntries")}</p>
       ) : (
         byDay.map(([d, list]) => {
-          const inc = list.filter((r) => r.type === "income" && r.category !== "transfer").reduce((s, r) => s + r.amountUSD, 0);
-          const exp = list.filter((r) => r.type === "expense" && r.category !== "transfer").reduce((s, r) => s + r.amountUSD, 0);
+          const inc = list.filter((r) => r.type === "income" && !["transfer", "invest"].includes(r.category)).reduce((s, r) => s + r.amountUSD, 0);
+          const exp = list.filter((r) => r.type === "expense" && !["transfer", "invest"].includes(r.category)).reduce((s, r) => s + r.amountUSD, 0);
           return (
             <div className="fin-day" key={d}>
               <div className="fin-day-head">
@@ -418,7 +429,7 @@ function Daily({ month, catLabel }) {
                     {fmtMoney(r.amount, r.currency)}
                   </b>
                   <span className="fin-row-actions">
-                    {!r.debt && r.category !== "transfer" && <button className="link-btn" onClick={() => startEdit(r)}>✏️</button>}
+                    {!r.debt && !["transfer", "invest"].includes(r.category) && <button className="link-btn" onClick={() => startEdit(r)}>✏️</button>}
                     <button className="link-btn" onClick={() => remove(r)}>🗑</button>
                   </span>
                 </div>

@@ -36,4 +36,14 @@ router.post("/plans", c.createPlan);
 router.put("/plans/:id", c.updatePlan);
 router.delete("/plans/:id", c.deletePlan);
 
+// Investments / betting — daily profit & loss
+const inv = require("../controllers/investController");
+router.get("/invest", inv.list);
+router.post("/invest", inv.create);
+router.put("/invest/:id", inv.update);
+router.delete("/invest/:id", inv.remove);
+router.get("/invest/:id/entries", inv.entries);
+router.post("/invest/:id/entries", inv.addEntry);
+router.delete("/invest/:id/entries/:entryId", inv.removeEntry);
+
 module.exports = router;

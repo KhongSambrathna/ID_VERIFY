@@ -210,7 +210,7 @@ async function dailySummary(a, now) {
   const [invoices, sales, txns, accounts, pending, low] = await Promise.all([
     Invoice.find({ voided: false, date: { $gte: start, $lt: end } }).select("total paidAmount").lean(),
     StockMovement.find({ type: "OUT", date: { $gte: start, $lt: end } }).select("totalAmount profit").lean(),
-    FinanceTxn.find({ owner: a._id, date: { $gte: start, $lt: end }, category: { $ne: "transfer" } }).select("type amountUSD").lean(),
+    FinanceTxn.find({ owner: a._id, date: { $gte: start, $lt: end }, category: { $nin: ["transfer", "invest"] } }).select("type amountUSD").lean(),
     helpers.accountsWithBalance({ adminId: a._id }),
     BotOrder.countDocuments({ status: "pending" }),
     Product.find({ $expr: { $lte: ["$stock", { $ifNull: ["$lowStockAlert", 5] }] } }).select("name stock").lean(),
@@ -226,6 +226,12 @@ async function dailySummary(a, now) {
   text += `⬇️ ចំណូល: ${usd(inc)}\n⬆️ ចំណាយ: ${usd(exp)}\n`;
   text += `${inc - exp >= 0 ? "✅" : "🔻"} នៅសល់ថ្ងៃនេះ: <b>${usd(inc - exp)}</b>\n`;
   if (accounts.length) text += `💼 លុយបច្ចុប្បន្ន: <b>${usd(moneyNow)}</b> (${approx(moneyNow)})\n`;
+  const { FinanceInvestEntry } = require("../models/Finance");
+  const inv = await FinanceInvestEntry.find({ owner: a._id, type: "result", date: { $gte: start, $lt: end } }).select("amountUSD").lean();
+  if (inv.length) {
+    const p = inv.reduce((s, x) => s + x.amountUSD, 0);
+    text += `📈 វិនិយោគ/ភ្នាល់ថ្ងៃនេះ: <b>${p >= 0 ? "+" : "−"}${usd(Math.abs(p))}</b>\n`;
+  }
   if (pending) text += `\n🛒 ការកម្មង់ពី bot កំពុងរង់ចាំ: <b>${pending}</b>`;
   if (low.length) text += `\n📦 ទំនិញជិតអស់: ${low.slice(0, 6).map((p) => `${esc(p.name)} (${p.stock})`).join(", ")}${low.length > 6 ? "…" : ""}`;
   await send(a.telegramChatId, text);
