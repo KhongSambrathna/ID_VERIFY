@@ -413,7 +413,7 @@ function Daily({ month, catLabel }) {
 
 // ---- Debts ----------------------------------------------------------------
 const blankDebt = () => ({
-  direction: "owe", party: "", phone: "", amount: "", currency: "USD", interestRate: "", monthlyPayment: "",
+  direction: "owe", repayType: "fixed", party: "", phone: "", amount: "", currency: "USD", interestRate: "", monthlyPayment: "",
   paymentDay: "", startDate: ymd(), dueDate: "", note: "",
 });
 
@@ -463,7 +463,7 @@ function Debts() {
   };
   const edit = (d) =>
     setForm({
-      _id: d._id, direction: d.direction, party: d.party, phone: d.phone || "", amount: String(d.amount), currency: d.currency,
+      _id: d._id, direction: d.direction, repayType: d.repayType || "fixed", party: d.party, phone: d.phone || "", amount: String(d.amount), currency: d.currency,
       interestRate: d.interestRate ? String(d.interestRate) : "", monthlyPayment: d.monthlyPayment ? String(d.monthlyPayment) : "",
       paymentDay: d.paymentDay ? String(d.paymentDay) : "", startDate: d.startDate ? ymd(d.startDate) : "",
       dueDate: d.dueDate ? ymd(d.dueDate) : "", note: d.note || "",
@@ -512,14 +512,26 @@ function Debts() {
           <div className="hbar-fill" style={{ width: `${d.progress}%`, background: "var(--ok)" }} />
         </div>
         <div className="plan-meta">
-          <div>✅ {t("finance.paidSoFar")} {fmtMoney(d.paid, d.currency)} ({d.progress}%)</div>
-          {d.interestRate > 0 && <div>📈 {d.interestRate}%/{t("finance.month")} ≈ {fmtMoney(d.monthlyInterest, d.currency)}</div>}
-          {d.monthlyPayment > 0 && (
+          <div>
+            <span className={`badge repay-${d.repayType}`}>{t(`debtType.${d.repayType}`)}</span>
+          </div>
+          <div>✅ {t("debtType.principalPaid")} {fmtMoney(d.paid, d.currency)} ({d.progress}%)</div>
+          {d.interestPaid > 0 && <div>💸 {t("debtType.interestPaid")} {fmtMoney(d.interestPaid, d.currency)}</div>}
+          {d.interestRate > 0 && <div>📈 {d.interestRate}%/{t("finance.month")} ≈ {fmtMoney(d.monthlyInterest, d.currency)}/{t("finance.month")}</div>}
+          {d.repayType === "interest_only" ? (
             <div>
-              🗓 {fmtMoney(d.monthlyPayment, d.currency)}/{t("finance.month")}
+              🗓 {t("debtType.payInterestMonthly").replace("{amt}", fmtMoney(d.monthlyDue, d.currency))}
               {d.paymentDay > 0 && ` · ${t("finance.everyDay").replace("{d}", d.paymentDay)}`}
-              {d.monthlyPayment > 0 && d.remaining > 0 && ` · ≈ ${Math.ceil(d.remaining / d.monthlyPayment)} ${t("finance.monthsLeft")}`}
+              <div className="mini-empty">{t("debtType.principalAtEnd").replace("{amt}", fmtMoney(d.remaining, d.currency))}</div>
             </div>
+          ) : (
+            d.monthlyPayment > 0 && (
+              <div>
+                🗓 {fmtMoney(d.monthlyPayment, d.currency)}/{t("finance.month")}
+                {d.paymentDay > 0 && ` · ${t("finance.everyDay").replace("{d}", d.paymentDay)}`}
+                {d.monthsLeft ? ` · ≈ ${d.monthsLeft} ${t("finance.monthsLeft")}` : ""}
+              </div>
+            )
           )}
           {d.dueDate && (
             <div>
@@ -549,6 +561,23 @@ function Debts() {
                 ))}
               </select>
             )}
+            <select value={pay.split || "auto"} onChange={(e) => setPay((p) => ({ ...p, split: e.target.value }))}>
+              <option value="auto">{t("debtType.splitAuto")}</option>
+              <option value="interest">{t("debtType.splitInterest")}</option>
+              <option value="principal">{t("debtType.splitPrincipal")}</option>
+            </select>
+            {(() => {
+              const amt = Number(pay.amount) || 0;
+              const r = (n) => (d.currency === "KHR" ? Math.round(n) : Math.round(n * 100) / 100);
+              let i = pay.split === "interest" ? amt : pay.split === "principal" ? 0 : Math.min(amt, d.monthlyInterest || 0);
+              if (amt - i > d.remaining) i = amt - d.remaining;
+              if (!amt) return null;
+              return (
+                <small className="mini-empty" style={{ flexBasis: "100%" }}>
+                  = 💸 {t("debtType.interest")} {fmtMoney(r(i), d.currency)} + ✅ {t("debtType.principal")} {fmtMoney(r(amt - i), d.currency)}
+                </small>
+              );
+            })()}
             <button className="btn btn-primary" onClick={() => savePay(d)}>{t("common.save")}</button>
             <button className="link-btn" onClick={() => setPayFor(null)}>{t("common.cancel")}</button>
             <small className="mini-empty" style={{ flexBasis: "100%" }}>
@@ -558,7 +587,7 @@ function Debts() {
         ) : (
           <div className="package-actions">
             {!d.closed && (
-              <button className="btn btn-primary" onClick={() => { setPayFor(d._id); setPay({ amount: d.monthlyPayment ? String(d.monthlyPayment) : "", date: ymd(), note: "", account: "" }); }}>
+              <button className="btn btn-primary" onClick={() => { setPayFor(d._id); setPay({ amount: d.monthlyDue ? String(d.monthlyDue) : "", date: ymd(), note: "", account: "", split: "auto" }); }}>
                 {d.direction === "owe" ? `💸 ${t("finance.recordPayment")}` : `💰 ${t("finance.recordRepaid")}`}
               </button>
             )}
@@ -576,7 +605,13 @@ function Debts() {
               <li key={p._id}>
                 <span>{fmtDate(p.date)} {p.note && <small className="mini-empty">· {p.note}</small>}</span>
                 <span>
-                  {fmtMoney(p.amount, p.currency)} <button className="link-btn" onClick={() => delPay(d, p)}>✕</button>
+                  {fmtMoney(p.amount, p.currency)}
+                  {p.interest > 0 && (
+                    <small className="mini-empty">
+                      {" "}({p.interest >= p.amount ? t("debtType.interest") : `${t("debtType.interest")} ${fmtMoney(p.interest, p.currency)}`})
+                    </small>
+                  )}{" "}
+                  <button className="link-btn" onClick={() => delPay(d, p)}>✕</button>
                 </span>
               </li>
             ))}
@@ -599,6 +634,19 @@ function Debts() {
           <div className="seg-toggle" style={{ marginBottom: 10 }}>
             <button type="button" className={form.direction === "owe" ? "active" : ""} onClick={() => setForm((p) => ({ ...p, direction: "owe" }))}>💳 {t("finance.iOwe")}</button>
             <button type="button" className={form.direction === "lend" ? "active" : ""} onClick={() => setForm((p) => ({ ...p, direction: "lend" }))}>🤝 {t("finance.owedToMe")}</button>
+          </div>
+          <div className="repay-types">
+            {["fixed", "interest_only", "flexible"].map((k) => (
+              <button
+                type="button"
+                key={k}
+                className={`repay-type ${form.repayType === k ? "active" : ""}`}
+                onClick={() => setForm((p) => ({ ...p, repayType: k, ...(k === "flexible" && !p._id ? { interestRate: "" } : {}) }))}
+              >
+                <b>{t(`debtType.${k}`)}</b>
+                <small>{t(`debtType.${k}_help`)}</small>
+              </button>
+            ))}
           </div>
           <div className="filter-row" style={{ marginBottom: 0 }}>
             <div className="field" style={{ flex: 2, minWidth: 180 }}>
@@ -626,8 +674,21 @@ function Debts() {
               <input type="number" min="0" step="0.1" value={form.interestRate} onChange={setD("interestRate")} placeholder="0" />
             </div>
             <div className="field" style={{ flex: 1, minWidth: 120 }}>
-              <label>{t("finance.monthlyPayment")}</label>
-              <input type="number" min="0" step="any" value={form.monthlyPayment} onChange={setD("monthlyPayment")} placeholder="0" />
+              <label>{form.repayType === "interest_only" ? t("debtType.monthlyInterestPay") : t("finance.monthlyPayment")}</label>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={form.monthlyPayment}
+                onChange={setD("monthlyPayment")}
+                placeholder={
+                  form.repayType === "interest_only" && form.amount && form.interestRate
+                    ? String(Math.round(((Number(form.amount) * Number(form.interestRate)) / 100) * 100) / 100)
+                    : form.repayType === "flexible"
+                      ? t("debtType.optional")
+                      : "0"
+                }
+              />
             </div>
             <div className="field" style={{ flex: 1, minWidth: 100 }}>
               <label>{t("finance.paymentDay")}</label>

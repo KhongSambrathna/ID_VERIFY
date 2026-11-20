@@ -61,17 +61,35 @@ function wrap(fn) {
 }
 
 // Debt balance: amount minus repayments (in the debt's own currency).
+// Debt balance: amount minus the principal part of every repayment (the
+// interest part of a payment doesn't reduce the debt).
 function debtView(d) {
   const o = d.toObject ? d.toObject() : d;
-  const paid = o.payments.reduce((s, p) => s + p.amount, 0);
-  const remaining = Math.max(o.amount - paid, 0);
   const r = o.currency === "KHR" ? Math.round : roundUSD;
+  const totalPaid = o.payments.reduce((s, p) => s + p.amount, 0);
+  const interestPaid = o.payments.reduce((s, p) => s + (p.interest || 0), 0);
+  const paid = totalPaid - interestPaid; // principal repaid
+  const remaining = Math.max(o.amount - paid, 0);
+  const monthlyInterest = r((remaining * (o.interestRate || 0)) / 100);
+  const repayType = o.repayType || "fixed";
+  // What has to be paid each month for planning:
+  //   fixed -> the set monthly payment; interest-only -> at least the interest;
+  //   flexible -> only if a monthly amount was set.
+  const monthlyDue =
+    repayType === "interest_only" ? r(Math.max(o.monthlyPayment || 0, monthlyInterest)) : r(o.monthlyPayment || 0);
+  const principalPerMonth = Math.max((o.monthlyPayment || 0) - monthlyInterest, 0);
   return {
     ...o,
+    repayType,
     paid: r(paid),
+    totalPaid: r(totalPaid),
+    interestPaid: r(interestPaid),
     remaining: r(remaining),
     remainingUSD: toUSD(remaining, o.currency),
-    monthlyInterest: r((remaining * (o.interestRate || 0)) / 100),
+    monthlyInterest,
+    monthlyDue,
+    monthsLeft:
+      repayType === "fixed" && principalPerMonth > 0 && remaining > 0 ? Math.ceil(remaining / principalPerMonth) : null,
     progress: o.amount > 0 ? Math.min(Math.round((paid / o.amount) * 100), 100) : 0,
   };
 }
@@ -161,6 +179,9 @@ exports.listDebts = wrap(async (req, res) => {
 
 function readDebt(body, d) {
   if (body.direction !== undefined) d.direction = body.direction === "lend" ? "lend" : "owe";
+  if (body.repayType !== undefined) {
+    d.repayType = ["fixed", "interest_only", "flexible"].includes(body.repayType) ? body.repayType : "fixed";
+  }
   if (body.party !== undefined) d.party = String(body.party).trim();
   if (body.phone !== undefined) d.phone = String(body.phone).trim();
   if (body.amount !== undefined) {
@@ -223,6 +244,21 @@ exports.addPayment = wrap(async (req, res) => {
   const err = readMoney({ amount: req.body.amount, currency: d.currency }, p);
   if (err) return bad(res, err);
   if (!(p.amount > 0)) return bad(res, "Enter an amount greater than 0");
+  // Split into interest / principal. split: "auto" (default - this month's
+  // interest first, the rest pays down the debt), "interest" (all interest),
+  // "principal" (all off the debt), or an explicit interest amount.
+  const view = debtView(d);
+  const r = d.currency === "KHR" ? Math.round : roundUSD;
+  const split = req.body.split || "auto";
+  if (split === "interest") p.interest = p.amount;
+  else if (split === "principal") p.interest = 0;
+  else if (req.body.interest !== undefined && req.body.interest !== "") {
+    const v = num(req.body.interest);
+    if (Number.isNaN(v) || v < 0 || v > p.amount) return bad(res, "Interest part must be between 0 and the payment");
+    p.interest = r(v);
+  } else p.interest = r(Math.min(p.amount, view.monthlyInterest));
+  // never pay off more principal than is left
+  if (p.amount - p.interest > view.remaining) p.interest = r(p.amount - view.remaining);
   if (req.body.recordTxn !== false) {
     const acc = await ownAccount(req, req.body.account);
     const t = await FinanceTxn.create({
@@ -235,7 +271,7 @@ exports.addPayment = wrap(async (req, res) => {
       category: "debt",
       method: String(req.body.method || "cash"),
       date: p.date,
-      note: `${d.direction === "owe" ? "💳 →" : "🤝 ←"} ${d.party}${p.note ? ` · ${p.note}` : ""}`,
+      note: `${d.direction === "owe" ? "💳 →" : "🤝 ←"} ${d.party}${p.interest > 0 ? (p.interest >= p.amount ? " (%)" : ` (% ${p.interest})`) : ""}${p.note ? ` · ${p.note}` : ""}`,
       debt: d._id,
     });
     p.txn = t._id;
@@ -375,10 +411,19 @@ exports.summary = wrap(async (req, res) => {
   const views = debts.map(debtView);
   const openOwe = views.filter((d) => d.direction === "owe" && !d.closed);
   const openLend = views.filter((d) => d.direction === "lend" && !d.closed);
-  const monthlyDebtPayments = roundUSD(openOwe.reduce((s, d) => s + toUSD(d.monthlyPayment || 0, d.currency), 0));
+  const monthlyDebtPayments = roundUSD(openOwe.reduce((s, d) => s + toUSD(d.monthlyDue || 0, d.currency), 0));
   const upcoming = openOwe
     .filter((d) => d.paymentDay > 0 || d.dueDate)
-    .map((d) => ({ _id: d._id, party: d.party, paymentDay: d.paymentDay, dueDate: d.dueDate, monthlyPayment: d.monthlyPayment, currency: d.currency, remaining: d.remaining }))
+    .map((d) => ({
+      _id: d._id,
+      party: d.party,
+      repayType: d.repayType,
+      paymentDay: d.paymentDay,
+      dueDate: d.dueDate,
+      monthlyPayment: d.monthlyDue,
+      currency: d.currency,
+      remaining: d.remaining,
+    }))
     .sort((a, b) => (a.paymentDay || 99) - (b.paymentDay || 99));
 
   // Month-end projection: what's happened so far + what's still planned.

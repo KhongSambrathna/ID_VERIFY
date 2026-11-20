@@ -37,6 +37,8 @@ const paymentSchema = new mongoose.Schema(
   {
     date: { type: Date, required: true },
     ...money,
+    // How much of this payment was interest — the rest pays down the debt.
+    interest: { type: Number, min: 0, default: 0 },
     note: { type: String, trim: true, default: "" },
     txn: { type: mongoose.Schema.Types.ObjectId, ref: "FinanceTxn", default: null },
   },
@@ -50,6 +52,13 @@ const debtSchema = new mongoose.Schema(
     party: { type: String, required: true, trim: true },
     phone: { type: String, trim: true, default: "" },
     ...money,
+    // How it's paid back:
+    //   fixed         — a set amount each month (interest first, rest off the debt)
+    //   interest_only — pay just the interest each month; the full amount is
+    //                   repaid in one go at the end (or whenever)
+    //   flexible      — informal (friends/family): pay whatever, whenever,
+    //                   usually no interest
+    repayType: { type: String, enum: ["fixed", "interest_only", "flexible"], default: "fixed" },
     interestRate: { type: Number, min: 0, default: 0 }, // % per month
     monthlyPayment: { type: Number, min: 0, default: 0 }, // in the debt's currency
     paymentDay: { type: Number, min: 0, max: 31, default: 0 }, // day of month, 0 = none
