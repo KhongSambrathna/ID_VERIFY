@@ -1,5 +1,7 @@
 const mongoose = require("mongoose");
-const { FinanceTxn, FinanceDebt, FinancePlan } = require("../models/Finance");
+const { FinanceTxn, FinanceDebt, FinancePlan, FinanceAccount, FinanceSettings } = require("../models/Finance");
+const Athlete = require("../models/Athlete");
+const Invoice = require("../models/Invoice");
 const { roundUSD } = require("../utils/currency");
 
 const KHR_PER_USD = 4000;
@@ -52,6 +54,7 @@ function wrap(fn) {
     try {
       await fn(req, res);
     } catch (err) {
+      if (err && err.status) return res.status(err.status).json({ message: err.message });
       res.status(500).json({ message: err.message });
     }
   };
@@ -71,6 +74,16 @@ function debtView(d) {
     monthlyInterest: r((remaining * (o.interestRate || 0)) / 100),
     progress: o.amount > 0 ? Math.min(Math.round((paid / o.amount) * 100), 100) : 0,
   };
+}
+
+// Checks an account id belongs to this Admin. Returns the account, null for
+// "no account", or throws a 400.
+async function ownAccount(req, id) {
+  if (!id) return null;
+  if (!mongoose.isValidObjectId(id)) throw { status: 400, message: "Invalid account" };
+  const a = await FinanceAccount.findOne({ _id: id, ...own(req) });
+  if (!a) throw { status: 400, message: "Account not found" };
+  return a;
 }
 
 // ---------------- Transactions ----------------
@@ -106,6 +119,9 @@ exports.createTxn = wrap(async (req, res) => {
   const err = readTxn({ type: "expense", ...req.body }, t);
   if (err) return bad(res, err);
   if (req.body.amount === undefined) return bad(res, "Enter an amount");
+  const acc = await ownAccount(req, req.body.account);
+  t.account = acc ? acc._id : null;
+  if (acc) t.method = acc.kind === "cash" ? "cash" : "bank";
   await t.save();
   res.status(201).json(t);
 });
@@ -116,6 +132,11 @@ exports.updateTxn = wrap(async (req, res) => {
   if (t.debt) return bad(res, "This entry is a debt repayment — change it from the Debts tab");
   const err = readTxn(req.body, t);
   if (err) return bad(res, err);
+  if (req.body.account !== undefined) {
+    const acc = await ownAccount(req, req.body.account);
+    t.account = acc ? acc._id : null;
+    if (acc) t.method = acc.kind === "cash" ? "cash" : "bank";
+  }
   await t.save();
   res.json(t);
 });
@@ -203,7 +224,9 @@ exports.addPayment = wrap(async (req, res) => {
   if (err) return bad(res, err);
   if (!(p.amount > 0)) return bad(res, "Enter an amount greater than 0");
   if (req.body.recordTxn !== false) {
+    const acc = await ownAccount(req, req.body.account);
     const t = await FinanceTxn.create({
+      account: acc ? acc._id : null,
       owner: req.adminId,
       type: d.direction === "owe" ? "expense" : "income",
       amount: p.amount,
@@ -295,7 +318,8 @@ exports.deletePlan = wrap(async (req, res) => {
 exports.summary = wrap(async (req, res) => {
   const { start, end, key, daysInMonth } = monthRange(req.query.month);
   const owner = new mongoose.Types.ObjectId(String(req.adminId));
-  const match = { owner, date: { $gte: start, $lt: end } };
+  // Moving money between my own accounts isn't income or spending.
+  const match = { owner, date: { $gte: start, $lt: end }, category: { $ne: "transfer" } };
 
   const [byCat, byDay, plans, debts] = await Promise.all([
     FinanceTxn.aggregate([
@@ -363,8 +387,11 @@ exports.summary = wrap(async (req, res) => {
   const projectedIncome = roundUSD(Math.max(income, plannedIncome));
   const projectedExpense = roundUSD(Math.max(expense, plannedExpense + monthlyDebtPayments, elapsed > 0 ? expense / elapsed : 0));
 
+  const accounts = (await accountsWithBalance(req)).filter((a) => !a.archived);
   res.json({
     month: key,
+    moneyNowUSD: roundUSD(accounts.reduce((s, a) => s + a.balanceUSD, 0)),
+    accountCount: accounts.length,
     income,
     expense,
     net: roundUSD(income - expense),
@@ -385,6 +412,192 @@ exports.summary = wrap(async (req, res) => {
       openLend: openLend.length,
       monthlyInterestUSD: roundUSD(openOwe.reduce((s, d) => s + toUSD(d.monthlyInterest, d.currency), 0)),
       upcoming,
+    },
+  });
+});
+
+// ---------------- Accounts (where my money is) ----------------
+
+const KHR = (usd) => Math.round(usd * KHR_PER_USD);
+// Converts a transaction's amount into the account's currency.
+function inAccountCurrency(t, currency) {
+  if (t.currency === currency) return t.amount;
+  return currency === "KHR" ? KHR(t.amountUSD) : t.amountUSD;
+}
+
+async function accountsWithBalance(req) {
+  const accounts = await FinanceAccount.find(own(req)).sort({ archived: 1, kind: 1, name: 1 }).lean();
+  const txns = await FinanceTxn.find({ ...own(req), account: { $in: accounts.map((a) => a._id) } })
+    .select("account type amount currency amountUSD date")
+    .lean();
+  return accounts.map((a) => {
+    let bal = a.openingBalance || 0;
+    for (const t of txns) {
+      if (String(t.account) !== String(a._id)) continue;
+      if (a.openingDate && t.date < a.openingDate) continue;
+      const v = inAccountCurrency(t, a.currency);
+      bal += t.type === "income" ? v : -v;
+    }
+    bal = a.currency === "KHR" ? Math.round(bal) : roundUSD(bal);
+    return { ...a, balance: bal, balanceUSD: toUSD(bal, a.currency) };
+  });
+}
+
+exports.listAccounts = wrap(async (req, res) => {
+  const list = await accountsWithBalance(req);
+  const active = list.filter((a) => !a.archived);
+  res.json({ accounts: list, totalUSD: roundUSD(active.reduce((s, a) => s + a.balanceUSD, 0)) });
+});
+
+function readAccount(body, a) {
+  if (body.name !== undefined) a.name = String(body.name).trim();
+  if (body.kind !== undefined) a.kind = ["cash", "bank", "wallet", "other"].includes(body.kind) ? body.kind : "other";
+  if (body.currency !== undefined) a.currency = body.currency === "KHR" ? "KHR" : "USD";
+  if (body.note !== undefined) a.note = String(body.note).trim();
+  if (body.archived !== undefined) a.archived = Boolean(body.archived);
+  if (body.openingBalance !== undefined) {
+    const v = num(body.openingBalance, 0);
+    if (Number.isNaN(v)) return "Enter a valid balance";
+    a.openingBalance = a.currency === "KHR" ? Math.round(v) : roundUSD(v);
+    a.openingDate = new Date();
+  }
+  if (!a.name) return "Enter the account name";
+  return null;
+}
+
+exports.createAccount = wrap(async (req, res) => {
+  const a = new FinanceAccount({ owner: req.adminId, name: "" });
+  const err = readAccount(req.body, a);
+  if (err) return bad(res, err);
+  await a.save();
+  res.status(201).json(a);
+});
+
+// PUT /api/finance/accounts/:id — openingBalance here means "the real
+// balance right now" (counting restarts from this moment).
+exports.updateAccount = wrap(async (req, res) => {
+  const a = await FinanceAccount.findOne({ _id: req.params.id, ...own(req) });
+  if (!a) return res.status(404).json({ message: "Not found" });
+  const err = readAccount(req.body, a);
+  if (err) return bad(res, err);
+  await a.save();
+  res.json(a);
+});
+
+exports.deleteAccount = wrap(async (req, res) => {
+  const a = await FinanceAccount.findOne({ _id: req.params.id, ...own(req) });
+  if (!a) return res.status(404).json({ message: "Not found" });
+  await FinanceTxn.updateMany({ account: a._id, ...own(req) }, { $set: { account: null } });
+  await a.deleteOne();
+  res.json({ message: "Deleted" });
+});
+
+// POST /api/finance/accounts/transfer { from, to, amount, date?, note? }
+// e.g. withdrawing cash from ABA. Recorded as two "transfer" entries that
+// move the balances but don't count as income or spending.
+exports.transfer = wrap(async (req, res) => {
+  const from = await ownAccount(req, req.body.from);
+  const to = await ownAccount(req, req.body.to);
+  if (!from || !to || String(from._id) === String(to._id)) return bad(res, "Choose two different accounts");
+  const amount = num(req.body.amount);
+  if (Number.isNaN(amount) || amount <= 0) return bad(res, "Enter an amount greater than 0");
+  const date = day(req.body.date);
+  const note = String(req.body.note || "").trim();
+  const outAmt = from.currency === "KHR" ? Math.round(amount) : roundUSD(amount);
+  const usd = toUSD(outAmt, from.currency);
+  const inAmt = to.currency === from.currency ? outAmt : to.currency === "KHR" ? KHR(usd) : usd;
+  await FinanceTxn.create([
+    { owner: req.adminId, type: "expense", amount: outAmt, currency: from.currency, amountUSD: usd, category: "transfer", method: from.kind === "cash" ? "cash" : "bank", date, note: `→ ${to.name}${note ? ` · ${note}` : ""}`, account: from._id },
+    { owner: req.adminId, type: "income", amount: inAmt, currency: to.currency, amountUSD: usd, category: "transfer", method: to.kind === "cash" ? "cash" : "bank", date, note: `← ${from.name}${note ? ` · ${note}` : ""}`, account: to._id },
+  ]);
+  res.status(201).json(await accountsWithBalance(req));
+});
+
+// ---------------- Settings ----------------
+
+async function getSettings(req) {
+  let st = await FinanceSettings.findOne(own(req));
+  if (!st) st = await FinanceSettings.create({ owner: req.adminId });
+  return st;
+}
+exports.getSettings = wrap(async (req, res) => res.json(await getSettings(req)));
+exports.updateSettings = wrap(async (req, res) => {
+  const st = await getSettings(req);
+  if (Array.isArray(req.body.receivableTeams)) st.receivableTeams = req.body.receivableTeams.map((x) => String(x).trim()).filter(Boolean);
+  if (req.body.includeInvoices !== undefined) st.includeInvoices = Boolean(req.body.includeInvoices);
+  await st.save();
+  res.json(st);
+});
+
+// ---------------- Owed to me (receivables) ----------------
+
+// GET /api/finance/receivables
+// Everything people owe me, in one place:
+//   • students' unpaid fees on the teams I chose (settings.receivableTeams)
+//     — read from the athletes' fee rows (fees are in Riel); payments are
+//     still collected through the Debt report as before
+//   • unpaid / part-paid shop invoices (USD)
+//   • money I lent that I recorded myself (Debts → owed to me)
+exports.receivables = wrap(async (req, res) => {
+  const st = await getSettings(req);
+  const teams = st.receivableTeams || [];
+
+  let students = [];
+  if (teams.length) {
+    const athletes = await Athlete.find({ "assignments.team": { $in: teams }, "assignments.fees.0": { $exists: true } })
+      .select("fullName khmerName photoUrl verifyId assignments")
+      .lean();
+    for (const a of athletes) {
+      for (const as of a.assignments || []) {
+        if (!teams.includes(as.team)) continue;
+        const total = (as.fees || []).reduce((s, f) => s + (f.amount || 0), 0);
+        if (total <= 0) continue;
+        students.push({
+          athleteId: a._id,
+          assignmentId: as._id,
+          fullName: a.fullName,
+          khmerName: a.khmerName || "",
+          photoUrl: a.photoUrl || null,
+          team: as.team,
+          role: as.role,
+          fees: (as.fees || []).map((f) => ({ amount: f.amount, note: f.note, createdAt: f.createdAt })),
+          totalKHR: Math.round(total),
+          totalUSD: toUSD(total, "KHR"),
+        });
+      }
+    }
+    students.sort((x, y) => y.totalKHR - x.totalKHR);
+  }
+  const byTeam = teams.map((tm) => {
+    const rows = students.filter((s) => s.team === tm);
+    return { team: tm, count: rows.length, totalKHR: rows.reduce((s, r) => s + r.totalKHR, 0) };
+  });
+
+  let invoices = [];
+  if (st.includeInvoices) {
+    const list = await Invoice.find({ voided: false }).select("invoiceNo date customer total paidAmount").sort({ date: -1 }).lean();
+    invoices = list
+      .filter((i) => i.total - (i.paidAmount || 0) > 0.004)
+      .map((i) => ({ _id: i._id, invoiceNo: i.invoiceNo, date: i.date, customer: i.customer, total: i.total, paid: i.paidAmount || 0, balanceUSD: roundUSD(i.total - (i.paidAmount || 0)) }));
+  }
+
+  const lent = (await FinanceDebt.find({ ...own(req), direction: "lend", closed: false })).map(debtView);
+
+  const studentsUSD = roundUSD(students.reduce((s, r) => s + r.totalUSD, 0));
+  const invoicesUSD = roundUSD(invoices.reduce((s, r) => s + r.balanceUSD, 0));
+  const lentUSD = roundUSD(lent.reduce((s, d) => s + d.remainingUSD, 0));
+  res.json({
+    settings: st,
+    students,
+    byTeam,
+    invoices,
+    lent,
+    totals: {
+      studentsKHR: students.reduce((s, r) => s + r.totalKHR, 0),
+      studentsUSD,
+      invoicesUSD,
+      lentUSD,
+      allUSD: roundUSD(studentsUSD + invoicesUSD + lentUSD),
     },
   });
 });

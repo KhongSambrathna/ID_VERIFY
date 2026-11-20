@@ -21,6 +21,16 @@ router.delete("/debts/:id", c.deleteDebt);
 router.post("/debts/:id/payments", c.addPayment);
 router.delete("/debts/:id/payments/:paymentId", c.deletePayment);
 
+router.get("/accounts", c.listAccounts);
+router.post("/accounts", c.createAccount);
+router.post("/accounts/transfer", c.transfer);
+router.put("/accounts/:id", c.updateAccount);
+router.delete("/accounts/:id", c.deleteAccount);
+
+router.get("/settings", c.getSettings);
+router.put("/settings", c.updateSettings);
+router.get("/receivables", c.receivables);
+
 router.get("/plans", c.listPlans);
 router.post("/plans", c.createPlan);
 router.put("/plans/:id", c.updatePlan);

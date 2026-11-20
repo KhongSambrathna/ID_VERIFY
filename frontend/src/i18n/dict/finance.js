@@ -107,6 +107,7 @@ export const km = {
   "finance.cat_shop": "ហាង",
   "finance.cat_bonus": "ប្រាក់រង្វាន់",
   "finance.cat_gift": "អំណោយ",
+  "finance.cat_transfer": "ផ្ទេររវាងគណនី",
 };
 
 export const en = {
@@ -217,4 +218,5 @@ export const en = {
   "finance.cat_shop": "Shop",
   "finance.cat_bonus": "Bonus",
   "finance.cat_gift": "Gift",
+  "finance.cat_transfer": "Transfer",
 };

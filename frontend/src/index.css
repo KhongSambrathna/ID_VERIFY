@@ -3301,3 +3301,8 @@ html:lang(km) body {
 .fin-debt.closed { opacity: 0.6; }
 .fin-pay { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; }
 .fin-pay input { width: 130px; }
+.fin-account { border-top: 4px solid var(--gold); margin: 0; }
+.fin-account.bank { border-top-color: var(--navy); }
+.fin-account.cash { border-top-color: var(--ok); }
+.fin-account.closed { opacity: 0.6; }
+label.fin-cat { user-select: none; }

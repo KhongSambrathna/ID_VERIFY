@@ -4,6 +4,7 @@ import api from "../api/axios";
 import { useLanguage } from "../i18n/LanguageContext";
 import { formatUSD, approxKHR } from "../utils/currency";
 import { BarChart, StatTile } from "../components/MiniCharts";
+import { AccountsTab, ReceivablesTab, ACCOUNT_ICON } from "../components/FinanceExtras";
 
 // ---- helpers --------------------------------------------------------------
 const TZ = "Asia/Phnom_Penh";
@@ -26,7 +27,7 @@ const EXPENSE_CATS = ["food", "transport", "phone", "rent", "utilities", "family
 const INCOME_CATS = ["salary", "football", "shop", "bonus", "gift", "other"];
 const CAT_ICON = {
   food: "🍚", transport: "⛽", phone: "📱", rent: "🏠", utilities: "💡", family: "👨‍👩‍👧", health: "💊", education: "📚",
-  shopping: "🛍", fun: "🎉", football: "⚽", debt: "💳", other: "📦", salary: "💼", shop: "🏪", bonus: "⭐", gift: "🎁",
+  shopping: "🛍", fun: "🎉", football: "⚽", debt: "💳", other: "📦", salary: "💼", shop: "🏪", bonus: "⭐", gift: "🎁", transfer: "🔁",
 };
 
 // Personal money for the Admin: daily income & expenses, debts, and the
@@ -35,7 +36,7 @@ const CAT_ICON = {
 export default function AdminFinance() {
   const { t } = useLanguage();
   const [params, setParams] = useSearchParams();
-  const tab = ["overview", "daily", "debts", "plan"].includes(params.get("tab")) ? params.get("tab") : "overview";
+  const tab = ["overview", "daily", "money", "owed", "debts", "plan"].includes(params.get("tab")) ? params.get("tab") : "overview";
   const setTab = (k) => setParams(k === "overview" ? {} : { tab: k }, { replace: true });
   const [month, setMonth] = useState(thisMonth());
   const catLabel = (c) => `${CAT_ICON[c] || "📦"} ${t(`finance.cat_${c}`, c)}`;
@@ -51,6 +52,8 @@ export default function AdminFinance() {
         {[
           ["overview", `📊 ${t("finance.tabOverview")}`],
           ["daily", `📝 ${t("finance.tabDaily")}`],
+          ["money", `💼 ${t("financeX.tabMoney")}`],
+          ["owed", `🤝 ${t("financeX.tabOwed")}`],
           ["debts", `💳 ${t("finance.tabDebts")}`],
           ["plan", `🗓 ${t("finance.tabPlan")}`],
         ].map(([k, label]) => (
@@ -73,6 +76,8 @@ export default function AdminFinance() {
 
       {tab === "overview" && <Overview month={month} catLabel={catLabel} />}
       {tab === "daily" && <Daily month={month} catLabel={catLabel} />}
+      {tab === "money" && <AccountsTab />}
+      {tab === "owed" && <ReceivablesTab onOpenDebts={() => setTab("debts")} />}
       {tab === "debts" && <Debts />}
       {tab === "plan" && <Plan catLabel={catLabel} />}
     </div>
@@ -98,6 +103,7 @@ function Overview({ month, catLabel }) {
   return (
     <>
       <div className="stat-grid">
+        {s.accountCount > 0 && <StatTile label={`💼 ${t("financeX.moneyNow")}`} value={formatUSD(s.moneyNowUSD)} sub={approxKHR(s.moneyNowUSD)} tone="ok" />}
         <StatTile label={t("finance.income")} value={formatUSD(s.income)} sub={`${t("finance.planned")} ${formatUSD(s.plannedIncome)}`} tone="ok" />
         <StatTile label={t("finance.expense")} value={formatUSD(s.expense)} sub={`${t("finance.planned")} ${formatUSD(s.plannedExpense + s.monthlyDebtPayments)}`} tone="bad" />
         <StatTile label={t("finance.net")} value={formatUSD(s.net)} sub={approxKHR(s.net)} tone={tone(s.net)} />
@@ -203,7 +209,7 @@ function Overview({ month, catLabel }) {
 }
 
 // ---- Daily log ------------------------------------------------------------
-const blankTxn = () => ({ type: "expense", amount: "", currency: "USD", category: "food", method: "cash", date: ymd(), note: "" });
+const blankTxn = () => ({ type: "expense", amount: "", currency: "USD", category: "food", method: "cash", account: "", date: ymd(), note: "" });
 
 function Daily({ month, catLabel }) {
   const { t } = useLanguage();
@@ -214,6 +220,14 @@ function Daily({ month, catLabel }) {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
   const [filter, setFilter] = useState("");
+  const [accounts, setAccounts] = useState([]);
+  useEffect(() => {
+    api.get("/finance/accounts").then(({ data }) => setAccounts(data.accounts.filter((a) => !a.archived))).catch(() => {});
+  }, []);
+  const accName = (id) => {
+    const a = accounts.find((x) => x._id === id);
+    return a ? `${ACCOUNT_ICON[a.kind]} ${a.name}` : "";
+  };
 
   const load = async () => {
     setLoading(true);
@@ -241,7 +255,7 @@ function Daily({ month, catLabel }) {
     try {
       if (editId) await api.put(`/finance/txns/${editId}`, f);
       else await api.post("/finance/txns", f);
-      setF({ ...blankTxn(), type: f.type, category: f.type === "income" ? "salary" : f.category, currency: f.currency, date: f.date });
+      setF({ ...blankTxn(), type: f.type, category: f.type === "income" ? "salary" : f.category, currency: f.currency, date: f.date, account: f.account });
       setEditId(null);
       load();
     } catch (e2) {
@@ -252,7 +266,7 @@ function Daily({ month, catLabel }) {
   };
   const startEdit = (r) => {
     setEditId(r._id);
-    setF({ type: r.type, amount: String(r.amount), currency: r.currency, category: r.category, method: r.method, date: ymd(r.date), note: r.note });
+    setF({ type: r.type, amount: String(r.amount), currency: r.currency, category: r.category, method: r.method, account: r.account || "", date: ymd(r.date), note: r.note });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const remove = async (r) => {
@@ -275,8 +289,10 @@ function Daily({ month, catLabel }) {
     });
     return [...m.entries()];
   }, [shown]);
-  const totIn = rows.filter((r) => r.type === "income").reduce((s, r) => s + r.amountUSD, 0);
-  const totOut = rows.filter((r) => r.type === "expense").reduce((s, r) => s + r.amountUSD, 0);
+  // Transfers between my own accounts aren't income or spending.
+  const real = rows.filter((r) => r.category !== "transfer");
+  const totIn = real.filter((r) => r.type === "income").reduce((s, r) => s + r.amountUSD, 0);
+  const totOut = real.filter((r) => r.type === "expense").reduce((s, r) => s + r.amountUSD, 0);
 
   return (
     <>
@@ -308,14 +324,26 @@ function Daily({ month, catLabel }) {
             <label>{t("finance.date")}</label>
             <input type="date" value={f.date} onChange={set("date")} />
           </div>
-          <div className="field" style={{ flex: 1, minWidth: 120 }}>
-            <label>{t("finance.method")}</label>
-            <select value={f.method} onChange={set("method")}>
-              <option value="cash">💵 {t("finance.method_cash")}</option>
-              <option value="bank">🏦 {t("finance.method_bank")}</option>
-              <option value="other">{t("finance.method_other")}</option>
-            </select>
-          </div>
+          {accounts.length > 0 ? (
+            <div className="field" style={{ flex: 1, minWidth: 150 }}>
+              <label>{f.type === "income" ? t("financeX.intoAccount") : t("financeX.fromAccount")}</label>
+              <select value={f.account} onChange={set("account")}>
+                <option value="">— {t("financeX.noAccount")} —</option>
+                {accounts.map((a) => (
+                  <option key={a._id} value={a._id}>{ACCOUNT_ICON[a.kind]} {a.name}</option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="field" style={{ flex: 1, minWidth: 120 }}>
+              <label>{t("finance.method")}</label>
+              <select value={f.method} onChange={set("method")}>
+                <option value="cash">💵 {t("finance.method_cash")}</option>
+                <option value="bank">🏦 {t("finance.method_bank")}</option>
+                <option value="other">{t("finance.method_other")}</option>
+              </select>
+            </div>
+          )}
           <div className="field" style={{ flex: 2, minWidth: 180 }}>
             <label>{t("finance.note")}</label>
             <input value={f.note} onChange={set("note")} placeholder={t("finance.notePh")} />
@@ -347,8 +375,8 @@ function Daily({ month, catLabel }) {
         <p className="mini-empty">{t("finance.noEntries")}</p>
       ) : (
         byDay.map(([d, list]) => {
-          const inc = list.filter((r) => r.type === "income").reduce((s, r) => s + r.amountUSD, 0);
-          const exp = list.filter((r) => r.type === "expense").reduce((s, r) => s + r.amountUSD, 0);
+          const inc = list.filter((r) => r.type === "income" && r.category !== "transfer").reduce((s, r) => s + r.amountUSD, 0);
+          const exp = list.filter((r) => r.type === "expense" && r.category !== "transfer").reduce((s, r) => s + r.amountUSD, 0);
           return (
             <div className="fin-day" key={d}>
               <div className="fin-day-head">
@@ -363,14 +391,14 @@ function Daily({ month, catLabel }) {
                   <span className="fin-row-cat">{catLabel(r.category)}</span>
                   <span className="fin-row-note">
                     {r.note}
-                    {r.method === "bank" && <small> 🏦</small>}
+                    {r.account ? <small className="mini-empty"> · {accName(r.account)}</small> : r.method === "bank" && <small> 🏦</small>}
                   </span>
                   <b className={r.type === "income" ? "fin-in" : "fin-out"}>
                     {r.type === "income" ? "+" : "−"}
                     {fmtMoney(r.amount, r.currency)}
                   </b>
                   <span className="fin-row-actions">
-                    {!r.debt && <button className="link-btn" onClick={() => startEdit(r)}>✏️</button>}
+                    {!r.debt && r.category !== "transfer" && <button className="link-btn" onClick={() => startEdit(r)}>✏️</button>}
                     <button className="link-btn" onClick={() => remove(r)}>🗑</button>
                   </span>
                 </div>
@@ -396,7 +424,11 @@ function Debts() {
   const [form, setForm] = useState(null); // null | { ...fields, _id? }
   const [err, setErr] = useState("");
   const [payFor, setPayFor] = useState(null);
-  const [pay, setPay] = useState({ amount: "", date: ymd(), note: "" });
+  const [pay, setPay] = useState({ amount: "", date: ymd(), note: "", account: "" });
+  const [accounts, setAccounts] = useState([]);
+  useEffect(() => {
+    api.get("/finance/accounts").then(({ data }) => setAccounts(data.accounts.filter((a) => !a.archived))).catch(() => {});
+  }, []);
   const [openHist, setOpenHist] = useState(null);
   const [showClosed, setShowClosed] = useState(false);
 
@@ -446,7 +478,7 @@ function Debts() {
     try {
       await api.post(`/finance/debts/${d._id}/payments`, pay);
       setPayFor(null);
-      setPay({ amount: "", date: ymd(), note: "" });
+      setPay({ amount: "", date: ymd(), note: "", account: "" });
       load();
     } catch (e2) {
       alert(e2.response?.data?.message || t("finance.failedToSave"));
@@ -509,6 +541,14 @@ function Debts() {
               placeholder={d.currency === "KHR" ? "៛" : "$"} autoFocus />
             <input type="date" value={pay.date} onChange={(e) => setPay((p) => ({ ...p, date: e.target.value }))} />
             <input value={pay.note} onChange={(e) => setPay((p) => ({ ...p, note: e.target.value }))} placeholder={t("finance.note")} />
+            {accounts.length > 0 && (
+              <select value={pay.account} onChange={(e) => setPay((p) => ({ ...p, account: e.target.value }))}>
+                <option value="">— {t("financeX.noAccount")} —</option>
+                {accounts.map((a) => (
+                  <option key={a._id} value={a._id}>{ACCOUNT_ICON[a.kind]} {a.name}</option>
+                ))}
+              </select>
+            )}
             <button className="btn btn-primary" onClick={() => savePay(d)}>{t("common.save")}</button>
             <button className="link-btn" onClick={() => setPayFor(null)}>{t("common.cancel")}</button>
             <small className="mini-empty" style={{ flexBasis: "100%" }}>
@@ -518,7 +558,7 @@ function Debts() {
         ) : (
           <div className="package-actions">
             {!d.closed && (
-              <button className="btn btn-primary" onClick={() => { setPayFor(d._id); setPay({ amount: d.monthlyPayment ? String(d.monthlyPayment) : "", date: ymd(), note: "" }); }}>
+              <button className="btn btn-primary" onClick={() => { setPayFor(d._id); setPay({ amount: d.monthlyPayment ? String(d.monthlyPayment) : "", date: ymd(), note: "", account: "" }); }}>
                 {d.direction === "owe" ? `💸 ${t("finance.recordPayment")}` : `💰 ${t("finance.recordRepaid")}`}
               </button>
             )}

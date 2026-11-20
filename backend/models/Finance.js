@@ -26,6 +26,8 @@ const txnSchema = new mongoose.Schema(
     date: { type: Date, required: true },
     note: { type: String, trim: true, default: "" },
     debt: { type: mongoose.Schema.Types.ObjectId, ref: "FinanceDebt", default: null },
+    // Which money account it went into / came out of (cash, ABA, ACLEDA…).
+    account: { type: mongoose.Schema.Types.ObjectId, ref: "FinanceAccount", default: null },
   },
   { timestamps: true }
 );
@@ -73,7 +75,38 @@ const planSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Where my money is: cash in hand, each bank account, e-wallets…
+// Current balance = openingBalance (counted on openingDate) + income − expenses
+// recorded on this account since then. "Update balance" just sets a fresh
+// openingBalance/openingDate to the real amount.
+const accountSchema = new mongoose.Schema(
+  {
+    owner: ref,
+    name: { type: String, required: true, trim: true }, // e.g. "ABA", "ACLEDA", "Cash"
+    kind: { type: String, enum: ["cash", "bank", "wallet", "other"], default: "bank" },
+    currency: { type: String, enum: ["USD", "KHR"], default: "USD" },
+    openingBalance: { type: Number, default: 0 },
+    openingDate: { type: Date, default: Date.now },
+    note: { type: String, trim: true, default: "" },
+    archived: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
+
+// Per-Admin finance settings — which teams' student fee debts count as
+// "owed to me" (some teams aren't managed by me).
+const settingsSchema = new mongoose.Schema(
+  {
+    owner: { ...ref, unique: true },
+    receivableTeams: { type: [String], default: [] },
+    includeInvoices: { type: Boolean, default: true },
+  },
+  { timestamps: true }
+);
+
 module.exports = {
+  FinanceAccount: mongoose.model("FinanceAccount", accountSchema),
+  FinanceSettings: mongoose.model("FinanceSettings", settingsSchema),
   FinanceTxn: mongoose.model("FinanceTxn", txnSchema),
   FinanceDebt: mongoose.model("FinanceDebt", debtSchema),
   FinancePlan: mongoose.model("FinancePlan", planSchema),
