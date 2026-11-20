@@ -38,6 +38,8 @@ import PaymentReturn from "./pages/PaymentReturn";
 import RefereeSchedulePage from "./pages/RefereeSchedulePage";
 import PlayerRegister from "./pages/PlayerRegister";
 import AdminAnalytics from "./pages/AdminAnalytics";
+import AdminInvoices from "./pages/AdminInvoices";
+import InvoiceView from "./pages/InvoiceView";
 import usePageTracking from "./hooks/usePageTracking";
 
 export default function App() {
@@ -153,6 +155,22 @@ export default function App() {
           element={
             <ProtectedRoute role="ADMIN">
               <AdminShop />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/invoices"
+          element={
+            <ProtectedRoute role="ADMIN">
+              <AdminInvoices />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/invoices/:id"
+          element={
+            <ProtectedRoute role="ADMIN">
+              <InvoiceView />
             </ProtectedRoute>
           }
         />

@@ -26,6 +26,9 @@ const stockMovementSchema = new mongoose.Schema(
     party: { type: String, trim: true, default: "" },
     note: { type: String, trim: true, default: "" },
     date: { type: Date, default: Date.now },
+    // Set when this sale was created by an invoice — it's then managed from
+    // the invoice (void/delete the invoice to undo it), not deleted directly.
+    invoice: { type: mongoose.Schema.Types.ObjectId, ref: "Invoice", default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
   },
   { timestamps: true }

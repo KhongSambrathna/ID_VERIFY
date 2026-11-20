@@ -349,6 +349,11 @@ exports.deleteMovement = async (req, res) => {
   try {
     const m = await StockMovement.findById(req.params.id);
     if (!m) return res.status(404).json({ message: "Record not found" });
+    if (m.invoice) {
+      return res.status(400).json({
+        message: "This sale belongs to an invoice — cancel (void) or delete the invoice instead, so the invoice and stock stay in step.",
+      });
+    }
     const product = await Product.findById(m.product);
 
     if (product) {

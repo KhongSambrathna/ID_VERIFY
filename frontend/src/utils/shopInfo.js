@@ -1,0 +1,66 @@
+// Shop details printed on every invoice. Edit here if anything changes.
+export const SHOP_INFO = {
+  name: "BRATHNA SPORT SHOP",
+  phone: "085 925 752",
+  address: {
+    km: "ភូមិនគរភាស២ ឃុំនគរភាស ស្រុកអង្គរជុំ ខេត្តសៀមរាប",
+    en: "Nokor Pheas Pir Village, Nokor Pheas Commune, Angkor Chum District, Siem Reap Province",
+  },
+  logo: "/icon-192.png",
+};
+
+// Invoice wording in both languages — kept separate from the app's own
+// language switch, so an invoice can be printed in Khmer or English
+// whatever language the admin is using the site in.
+export const INVOICE_TEXT = {
+  km: {
+    title: "វិក្កយបត្រ",
+    invoiceNo: "លេខវិក្កយបត្រ",
+    date: "កាលបរិច្ឆេទ",
+    phone: "ទូរស័ព្ទ",
+    billTo: "ព័ត៌មានអតិថិជន",
+    customerName: "ឈ្មោះ",
+    customerPhone: "ទូរស័ព្ទ",
+    customerAddress: "អាសយដ្ឋាន",
+    no: "ល.រ",
+    description: "បរិយាយ",
+    qty: "ចំនួន",
+    unitPrice: "តម្លៃឯកតា",
+    amount: "ទឹកប្រាក់",
+    subtotal: "សរុបរង",
+    discount: "បញ្ចុះតម្លៃ",
+    total: "សរុប",
+    paid: "បានបង់",
+    balance: "នៅខ្វះ",
+    note: "កំណត់ចំណាំ",
+    customerSign: "ហត្ថលេខាអតិថិជន",
+    sellerSign: "ហត្ថលេខាអ្នកលក់",
+    thanks: "សូមអរគុណសម្រាប់ការគាំទ្រ!",
+    status: { PAID: "បានបង់រួច", PARTIAL: "បង់ខ្លះ", UNPAID: "មិនទាន់បង់", VOID: "បានលុបចោល" },
+  },
+  en: {
+    title: "INVOICE",
+    invoiceNo: "Invoice No.",
+    date: "Date",
+    phone: "Phone",
+    billTo: "Bill to",
+    customerName: "Name",
+    customerPhone: "Phone",
+    customerAddress: "Address",
+    no: "No.",
+    description: "Description",
+    qty: "Qty",
+    unitPrice: "Unit price",
+    amount: "Amount",
+    subtotal: "Subtotal",
+    discount: "Discount",
+    total: "Total",
+    paid: "Paid",
+    balance: "Balance due",
+    note: "Note",
+    customerSign: "Customer signature",
+    sellerSign: "Seller signature",
+    thanks: "Thank you for your support!",
+    status: { PAID: "PAID", PARTIAL: "PARTLY PAID", UNPAID: "UNPAID", VOID: "VOID" },
+  },
+};
