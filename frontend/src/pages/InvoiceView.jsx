@@ -132,15 +132,21 @@ export default function InvoiceView() {
             </tr>
           </thead>
           <tbody>
-            {inv.items.map((it, i) => (
-              <tr key={it._id || i}>
+            {inv.items.map((it, i) => [
+              it.group && (i === 0 || inv.items[i - 1].group !== it.group) ? (
+                <tr key={`g${i}`} className="invoice-group-row">
+                  <td></td>
+                  <td colSpan={4}>🎁 {it.group}</td>
+                </tr>
+              ) : null,
+              <tr key={it._id || i} className={it.group ? "in-group" : ""}>
                 <td className="c">{i + 1}</td>
                 <td>{it.name}</td>
                 <td className="c">{fmtQty(it.quantity)}{it.unit ? ` ${it.unit}` : ""}</td>
                 <td className="r">{formatUSD(it.unitPrice)}</td>
                 <td className="r">{formatUSD(it.total)}</td>
-              </tr>
-            ))}
+              </tr>,
+            ])}
           </tbody>
         </table>
 

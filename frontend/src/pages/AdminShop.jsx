@@ -4,6 +4,7 @@ import api from "../api/axios";
 import { useLanguage } from "../i18n/LanguageContext";
 import { formatUSD, approxKHR } from "../utils/currency";
 import { BarChart, HBarList, StatTile } from "../components/MiniCharts";
+import PackagesManager from "../components/PackagesManager";
 
 function stockBadge(p, t) {
   const alertAt = p.lowStockAlert ?? 5;
@@ -38,7 +39,7 @@ function shortDate(d) {
 export default function AdminShop() {
   const { t } = useLanguage();
   const [params, setParams] = useSearchParams();
-  const tab = ["products", "stock", "report"].includes(params.get("tab")) ? params.get("tab") : "products";
+  const tab = ["products", "stock", "packages", "report"].includes(params.get("tab")) ? params.get("tab") : "products";
   const setTab = (next) => setParams(next === "products" ? {} : { tab: next }, { replace: true });
 
   const [products, setProducts] = useState([]);
@@ -75,6 +76,9 @@ export default function AdminShop() {
         <button className={`tab-btn ${tab === "stock" ? "active" : ""}`} onClick={() => setTab("stock")}>
           {t("adminShop.tabStock")}
         </button>
+        <button className={`tab-btn ${tab === "packages" ? "active" : ""}`} onClick={() => setTab("packages")}>
+          🎁 {t("packages.tab")}
+        </button>
         <button className={`tab-btn ${tab === "report" ? "active" : ""}`} onClick={() => setTab("report")}>
           {t("adminShop.tabReport")}
         </button>
@@ -85,6 +89,7 @@ export default function AdminShop() {
 
       {!loading && !error && tab === "products" && <ProductsTab products={products} reload={loadProducts} />}
       {!loading && !error && tab === "stock" && <StockTab products={products} reload={loadProducts} />}
+      {!loading && !error && tab === "packages" && <PackagesManager products={products} />}
       {!loading && !error && tab === "report" && <ReportTab />}
     </div>
   );

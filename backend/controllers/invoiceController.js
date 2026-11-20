@@ -107,6 +107,7 @@ exports.createInvoice = async (req, res) => {
         needByProduct.set(String(product._id), (needByProduct.get(String(product._id)) || 0) + qty);
         items.push({
           product,
+          group: String(it.group || "").trim(),
           name: (it.name || "").trim() || product.name,
           unit: product.unit || "pcs",
           quantity: qty,
@@ -115,7 +116,14 @@ exports.createInvoice = async (req, res) => {
       } else {
         const name = String(it.name || "").trim();
         if (!name) return res.status(400).json({ message: `Line ${i + 1}: enter a description` });
-        items.push({ product: null, name, unit: String(it.unit || "").trim(), quantity: qty, unitPrice: roundUSD(price) });
+        items.push({
+          product: null,
+          group: String(it.group || "").trim(),
+          name,
+          unit: String(it.unit || "").trim(),
+          quantity: qty,
+          unitPrice: roundUSD(price),
+        });
       }
     }
     for (const it of items) {
@@ -150,6 +158,7 @@ exports.createInvoice = async (req, res) => {
       },
       items: items.map((it) => ({
         product: it.product ? it.product._id : null,
+        group: it.group,
         name: it.name,
         unit: it.unit,
         quantity: it.quantity,

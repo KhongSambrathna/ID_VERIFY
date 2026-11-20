@@ -19,6 +19,13 @@ function orderLink(product) {
   return `https://t.me/${TELEGRAM_USERNAME}?text=${encodeURIComponent(message)}`;
 }
 
+// Same, for a package — lists what's inside so the order is clear.
+function packageOrderLink(pkg) {
+  const contents = pkg.items.map((it) => `- ${it.quantity} ${it.unit || "x"} ${it.name}`).join("\n");
+  const message = `Hello, I'd like to order the package: ${pkg.name} (${formatUSDwithKHR(pkg.finalPrice)})\n${contents}`;
+  return `https://t.me/${TELEGRAM_USERNAME}?text=${encodeURIComponent(message)}`;
+}
+
 // Public storefront — no login required. Reads GET /api/products/public.
 export default function ShopPage() {
   const { t } = useLanguage();
@@ -26,6 +33,7 @@ export default function ShopPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [packages, setPackages] = useState([]);
 
   useEffect(() => {
     api
@@ -33,6 +41,8 @@ export default function ShopPage() {
       .then(({ data }) => setProducts(data))
       .catch((err) => setError(err.response?.data?.message || t("shopPage.failedToLoad")))
       .finally(() => setLoading(false));
+    // Packages (e.g. tournament package) — optional, ignore errors.
+    api.get("/packages/public").then(({ data }) => setPackages(data)).catch(() => {});
   }, []);
 
   const q = search.trim().toLowerCase();
@@ -52,6 +62,44 @@ export default function ShopPage() {
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
+
+      {packages.length > 0 && !q && (
+        <section className="shop-packages">
+          <h3>🎁 {t("packages.shopTitle")}</h3>
+          <div className="package-grid">
+            {packages.map((pkg) => (
+              <div key={pkg._id} className="card package-card">
+                <div className="package-card-head">
+                  <h3>{pkg.name}</h3>
+                  <div className="package-price">
+                    {formatUSD(pkg.finalPrice)}
+                    <small className="price-khr">{approxKHR(pkg.finalPrice)}</small>
+                  </div>
+                </div>
+                {pkg.description && <p className="package-desc">{pkg.description}</p>}
+                <div className="package-label">{t("packages.includes")}:</div>
+                <ul className="package-items">
+                  {pkg.items.map((it) => (
+                    <li key={it._id}>
+                      <span>✔ {it.quantity}{it.unit ? ` ${it.unit}` : "×"} {it.name}</span>
+                    </li>
+                  ))}
+                </ul>
+                {pkg.saving > 0 && (
+                  <div className="package-meta">
+                    <span className="badge verified">
+                      {t("packages.youSave")} {formatUSD(pkg.saving)}
+                    </span>
+                  </div>
+                )}
+                <a className="btn btn-primary" href={packageOrderLink(pkg)} target="_blank" rel="noopener noreferrer" style={{ marginTop: 10 }}>
+                  {t("shopPage.order")}
+                </a>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {loading && <p>{t("common.loading")}</p>}
       {error && <p className="error-text">{error}</p>}

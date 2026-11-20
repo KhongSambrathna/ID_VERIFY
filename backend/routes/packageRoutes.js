@@ -1,0 +1,22 @@
+const express = require("express");
+const router = express.Router();
+const { requireAuth, requireRole } = require("../middleware/auth");
+const {
+  listPackages,
+  listPublicPackages,
+  createPackage,
+  updatePackage,
+  deletePackage,
+} = require("../controllers/packageController");
+
+// Public — shown on the /shop page.
+router.get("/public", listPublicPackages);
+
+// Admin only.
+router.use(requireAuth, requireRole("ADMIN"));
+router.get("/", listPackages);
+router.post("/", createPackage);
+router.put("/:id", updatePackage);
+router.delete("/:id", deletePackage);
+
+module.exports = router;

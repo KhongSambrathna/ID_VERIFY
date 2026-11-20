@@ -15,6 +15,8 @@ const invoiceItemSchema = new mongoose.Schema(
     product: { type: mongoose.Schema.Types.ObjectId, ref: "Product", default: null },
     name: { type: String, required: true, trim: true },
     unit: { type: String, trim: true, default: "" },
+    // Package name when this line came from a package (printed as a group).
+    group: { type: String, trim: true, default: "" },
     quantity: { type: Number, required: true, min: 0 },
     unitPrice: { type: Number, required: true, min: 0 },
     total: { type: Number, required: true },

@@ -176,13 +176,14 @@ export default function Navbar() {
               <NavDropdown
                 label={t("navbar.shop")}
                 active={
-                  anyActive("/admin/shop", "/admin/shop?tab=stock", "/admin/shop?tab=report", "/admin/invoices") ||
+                  anyActive("/admin/shop", "/admin/shop?tab=stock", "/admin/shop?tab=report", "/admin/shop?tab=packages", "/admin/invoices") ||
                   location.pathname.startsWith("/admin/invoices/")
                 }
               >
                 <L to="/admin/invoices">🧾 {t("navbar.invoices")}</L>
                 <L to="/admin/shop">📦 {t("navbar.shopProducts")}</L>
                 <L to="/admin/shop?tab=stock">🔄 {t("navbar.shopStock")}</L>
+                <L to="/admin/shop?tab=packages">🎁 {t("navbar.packages")}</L>
                 <L to="/admin/shop?tab=report">📈 {t("navbar.shopReport")}</L>
                 <L to="/shop">🛒 {t("navbar.viewPublicShop")}</L>
               </NavDropdown>

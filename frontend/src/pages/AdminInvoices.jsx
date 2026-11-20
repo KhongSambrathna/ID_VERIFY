@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useLanguage } from "../i18n/LanguageContext";
 import { formatUSD, approxKHR } from "../utils/currency";
@@ -13,7 +13,7 @@ function todayStr() {
   }).format(new Date());
 }
 const STATUS_BADGE = { PAID: "verified", PARTIAL: "pending", UNPAID: "rejected", VOID: "" };
-const blankLine = (kind = "stock") => ({ kind, productId: "", name: "", quantity: "1", unitPrice: "" });
+const blankLine = (kind = "stock") => ({ kind, productId: "", name: "", quantity: "1", unitPrice: "", group: "" });
 
 // Admin shop invoices: list + "new invoice" form. Each line is either
 //   • from stock — pick a product; saving the invoice cuts its stock
@@ -23,6 +23,8 @@ const blankLine = (kind = "stock") => ({ kind, productId: "", name: "", quantity
 export default function AdminInvoices() {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const [packages, setPackages] = useState([]);
   const [list, setList] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -65,7 +67,36 @@ export default function AdminInvoices() {
 
   useEffect(() => {
     api.get("/products").then(({ data }) => setProducts(data)).catch(() => {});
+    api.get("/packages").then(({ data }) => setPackages(data.filter((p) => p.active))).catch(() => {});
   }, []);
+
+  // Add a whole package: its stock items + service/fee lines, grouped under
+  // the package name; a cheaper package price is added to the discount.
+  const addPackage = (pkg) => {
+    if (!pkg) return;
+    const newLines = pkg.items.map((it) => ({
+      kind: it.product ? "stock" : "manual",
+      productId: it.product ? String(it.product) : "",
+      name: it.product ? "" : it.name,
+      quantity: String(it.quantity),
+      unitPrice: String(it.unitPrice),
+      group: pkg.name,
+    }));
+    setLines((ls) => {
+      const kept = ls.filter((l) => l.productId || l.name.trim() || l.group);
+      return [...kept, ...newLines];
+    });
+    if (pkg.saving > 0) setDiscount((d) => String(Math.round(((Number(d) || 0) + pkg.saving) * 100) / 100));
+    setShowForm(true);
+  };
+
+  // "Sell" button on a package → /admin/invoices?package=<id>
+  useEffect(() => {
+    const id = params.get("package");
+    if (!id || packages.length === 0) return;
+    addPackage(packages.find((p) => p._id === id));
+    setParams({}, { replace: true });
+  }, [packages]);
 
   const setLine = (i, patch) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const pickProduct = (i, id) => {
@@ -112,6 +143,7 @@ export default function AdminInvoices() {
           ? { productId: l.productId, quantity: Number(l.quantity), unitPrice: Number(l.unitPrice) }
           : { name: l.name.trim(), quantity: Number(l.quantity), unitPrice: Number(l.unitPrice) }
       );
+      items[items.length - 1].group = l.group || "";
     }
     for (const [pid, need] of Object.entries(needByProduct)) {
       const p = products.find((x) => x._id === pid);
@@ -192,7 +224,10 @@ export default function AdminInvoices() {
               const p = products.find((x) => x._id === l.productId);
               const over = p && needByProduct[p._id] > p.stock;
               return (
-                <div className="invoice-line" key={i}>
+                <div className={`invoice-line ${l.group ? "in-package" : ""}`} key={i}>
+                  {l.group && (i === 0 || lines[i - 1].group !== l.group) && (
+                    <div className="invoice-line-group">🎁 {l.group}</div>
+                  )}
                   <div className="invoice-line-kind">
                     <span>{i + 1}.</span>
                     <select value={l.kind} onChange={(e) => setLine(i, { ...blankLine(e.target.value), quantity: l.quantity })}>
@@ -256,6 +291,21 @@ export default function AdminInvoices() {
             <button type="button" className="btn btn-outline" onClick={() => setLines((ls) => [...ls, blankLine("manual")])}>
               + ✍️ {t("invoices.addManualLine")}
             </button>
+            {packages.length > 0 && (
+              <select
+                className="package-picker"
+                value=""
+                onChange={(e) => addPackage(packages.find((p) => p._id === e.target.value))}
+              >
+                <option value="">🎁 {t("packages.addToInvoice")}</option>
+                {packages.map((p) => (
+                  <option key={p._id} value={p._id} disabled={p.canMake === 0}>
+                    {p.name} — {formatUSD(p.finalPrice)}
+                    {p.canMake === 0 ? ` (${t("invoices.notEnoughStock")})` : ""}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div className="invoice-form-bottom">
