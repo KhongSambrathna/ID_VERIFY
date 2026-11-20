@@ -264,6 +264,16 @@ export function ReceivablesTab({ onOpenDebts }) {
     setPicking(false);
     load();
   };
+  const saveExcluded = async (ids) => {
+    setData((d) => ({ ...d, invoices: d.invoices.map((i) => ({ ...i, included: !ids.includes(String(i._id)) })) }));
+    await api.put("/finance/settings", { excludedInvoices: ids }).catch(() => {});
+    load();
+  };
+  const currentExcluded = () => data.invoices.filter((i) => !i.included).map((i) => String(i._id));
+  const toggleInvoice = (id) => {
+    const ex = currentExcluded();
+    saveExcluded(ex.includes(String(id)) ? ex.filter((x) => x !== String(id)) : [...ex, String(id)]);
+  };
   const toggleInvoices = async () => {
     await api.put("/finance/settings", { includeInvoices: !data.settings.includeInvoices }).catch(() => {});
     load();
@@ -282,7 +292,7 @@ export function ReceivablesTab({ onOpenDebts }) {
       <div className="stat-grid">
         <StatTile label={t("financeX.owedTotal")} value={formatUSD(data.totals.allUSD)} sub={approxKHR(data.totals.allUSD)} tone="ok" />
         <StatTile label={`🎓 ${t("financeX.students")}`} value={formatKHR(data.totals.studentsKHR)} sub={`${data.students.length} ${t("finance.people")} · ≈ ${formatUSD(data.totals.studentsUSD)}`} />
-        <StatTile label={`🧾 ${t("financeX.unpaidInvoices")}`} value={formatUSD(data.totals.invoicesUSD)} sub={`${data.invoices.length} ${t("financeX.invoicesCount")}`} />
+        <StatTile label={`🧾 ${t("financeX.unpaidInvoices")}`} value={formatUSD(data.totals.invoicesUSD)} sub={`${data.totals.invoicesCounted ?? data.invoices.length}/${data.invoices.length} ${t("financeX.invoicesCount")}`} />
         <StatTile label={`🤝 ${t("financeX.lent")}`} value={formatUSD(data.totals.lentUSD)} sub={`${data.lent.length} ${t("finance.people")}`} />
       </div>
 
@@ -385,10 +395,17 @@ export function ReceivablesTab({ onOpenDebts }) {
           {data.invoices.length === 0 ? (
             <p className="mini-empty">{t("financeX.noUnpaidInvoices")}</p>
           ) : (
+            <>
+            <div className="inv-pick-bar">
+              <span className="mini-empty">{t("financeX.pickInvoicesHint")}</span>
+              <button type="button" className="btn btn-outline" onClick={() => saveExcluded([])}>{t("financeX.countAll")}</button>
+              <button type="button" className="btn btn-outline" onClick={() => saveExcluded(data.invoices.map((i) => String(i._id)))}>{t("financeX.countNone")}</button>
+            </div>
             <div className="table-scroll">
               <table className="athletes">
                 <thead>
                   <tr>
+                    <th style={{ width: 40 }}>✔</th>
                     <th>{t("invoices.invoiceNo")}</th>
                     <th>{t("invoices.date")}</th>
                     <th>{t("invoices.customer")}</th>
@@ -399,7 +416,10 @@ export function ReceivablesTab({ onOpenDebts }) {
                 </thead>
                 <tbody>
                   {data.invoices.map((i) => (
-                    <tr key={i._id}>
+                    <tr key={i._id} className={i.included ? "" : "inv-excluded"}>
+                      <td data-label={t("financeX.countIt")}>
+                        <input type="checkbox" checked={i.included} onChange={() => toggleInvoice(i._id)} aria-label={t("financeX.countIt")} />
+                      </td>
                       <td data-label={t("invoices.invoiceNo")}><Link to={`/admin/invoices/${i._id}`}>{i.invoiceNo}</Link></td>
                       <td data-label={t("invoices.date")}>{fmtDate(i.date)}</td>
                       <td data-label={t("invoices.customer")}>
@@ -408,12 +428,13 @@ export function ReceivablesTab({ onOpenDebts }) {
                       </td>
                       <td data-label={t("invoices.total")}>{formatUSD(i.total)}</td>
                       <td data-label={t("finance.paidSoFar")}>{formatUSD(i.paid)}</td>
-                      <td data-label={t("financeX.owes")}><b style={{ color: "var(--bad)" }}>{formatUSD(i.balanceUSD)}</b></td>
+                      <td data-label={t("financeX.owes")}><b style={{ color: i.included ? "var(--bad)" : "inherit" }}>{formatUSD(i.balanceUSD)}</b></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </>
       )}

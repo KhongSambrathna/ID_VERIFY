@@ -570,6 +570,9 @@ exports.updateSettings = wrap(async (req, res) => {
   const st = await getSettings(req);
   if (Array.isArray(req.body.receivableTeams)) st.receivableTeams = req.body.receivableTeams.map((x) => String(x).trim()).filter(Boolean);
   if (req.body.includeInvoices !== undefined) st.includeInvoices = Boolean(req.body.includeInvoices);
+  if (Array.isArray(req.body.excludedInvoices)) {
+    st.excludedInvoices = [...new Set(req.body.excludedInvoices.map(String))].filter((x) => mongoose.Types.ObjectId.isValid(x));
+  }
   await st.save();
   res.json(st);
 });
@@ -619,17 +622,19 @@ exports.receivables = wrap(async (req, res) => {
   });
 
   let invoices = [];
+  const excluded = new Set((st.excludedInvoices || []).map(String));
   if (st.includeInvoices) {
     const list = await Invoice.find({ voided: false }).select("invoiceNo date customer total paidAmount").sort({ date: -1 }).lean();
     invoices = list
       .filter((i) => i.total - (i.paidAmount || 0) > 0.004)
-      .map((i) => ({ _id: i._id, invoiceNo: i.invoiceNo, date: i.date, customer: i.customer, total: i.total, paid: i.paidAmount || 0, balanceUSD: roundUSD(i.total - (i.paidAmount || 0)) }));
+      .map((i) => ({ _id: i._id, invoiceNo: i.invoiceNo, date: i.date, customer: i.customer, total: i.total, paid: i.paidAmount || 0, balanceUSD: roundUSD(i.total - (i.paidAmount || 0)), included: !excluded.has(String(i._id)) }));
   }
+  const countedInvoices = invoices.filter((i) => i.included);
 
   const lent = (await FinanceDebt.find({ ...own(req), direction: "lend", closed: false })).map(debtView);
 
   const studentsUSD = roundUSD(students.reduce((s, r) => s + r.totalUSD, 0));
-  const invoicesUSD = roundUSD(invoices.reduce((s, r) => s + r.balanceUSD, 0));
+  const invoicesUSD = roundUSD(countedInvoices.reduce((s, r) => s + r.balanceUSD, 0));
   const lentUSD = roundUSD(lent.reduce((s, d) => s + d.remainingUSD, 0));
   res.json({
     settings: st,
@@ -641,6 +646,7 @@ exports.receivables = wrap(async (req, res) => {
       studentsKHR: students.reduce((s, r) => s + r.totalKHR, 0),
       studentsUSD,
       invoicesUSD,
+      invoicesCounted: countedInvoices.length,
       lentUSD,
       allUSD: roundUSD(studentsUSD + invoicesUSD + lentUSD),
     },

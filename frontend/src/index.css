@@ -3313,3 +3313,10 @@ label.fin-cat { user-select: none; }
 .badge.repay-interest_only { background: #fde4c8; color: #b4501c; }
 .badge.repay-flexible { background: #dff3e4; color: #2a7a45; }
 .badge.repay-fixed { background: #dfe9f7; color: #24508f; }
+
+/* Owed to me — choose which unpaid invoices count */
+.inv-pick-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0 10px; }
+.inv-pick-bar .mini-empty { flex: 1 1 260px; }
+tr.inv-excluded td { opacity: 0.45; }
+tr.inv-excluded td:first-child { opacity: 1; }
+.inv-pick-bar .btn { padding: 6px 12px; font-size: 13px; }

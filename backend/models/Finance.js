@@ -109,6 +109,8 @@ const settingsSchema = new mongoose.Schema(
     owner: { ...ref, unique: true },
     receivableTeams: { type: [String], default: [] },
     includeInvoices: { type: Boolean, default: true },
+    // Unpaid invoices I chose NOT to count (new invoices count by default)
+    excludedInvoices: [{ type: mongoose.Schema.Types.ObjectId, ref: "Invoice" }],
   },
   { timestamps: true }
 );
