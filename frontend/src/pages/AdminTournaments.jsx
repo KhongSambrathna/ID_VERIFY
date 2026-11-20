@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axios";
+import { formatKHR } from "../utils/currency";
 import { useAuth } from "../context/AuthContext";
 import TeamSelect from "../components/TeamSelect";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -65,6 +66,9 @@ export default function AdminTournaments() {
   const [error, setError] = useState("");
 
   const [showCreate, setShowCreate] = useState(false);
+  // null = the form creates a new tournament; an id = it edits that one
+  // (name, description, fee, match dates, player cap, age rule).
+  const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
@@ -110,11 +114,60 @@ export default function AdminTournaments() {
   const addDateField = () => setForm({ ...form, matchDates: [...form.matchDates, ""] });
   const removeDateField = (i) => setForm({ ...form, matchDates: form.matchDates.filter((_, idx) => idx !== i) });
 
-  const handleCreate = async (e) => {
+  const startEdit = (tour) => {
+    setEditingId(tour._id);
+    setForm({
+      name: tour.name || "",
+      description: tour.description || "",
+      entryFee: tour.entryFee ? String(tour.entryFee) : "",
+      team: tour.team || "",
+      matchDates: tour.matchDates?.length ? tour.matchDates.map(formatDate) : [""],
+      ageLimitYear: tour.ageLimitYear ? String(tour.ageLimitYear) : "",
+      overageSlots: tour.overageSlots ? String(tour.overageSlots) : "",
+      overageLimitYear: tour.overageLimitYear ? String(tour.overageLimitYear) : "",
+      maxParticipants: tour.maxParticipants ? String(tour.maxParticipants) : "",
+    });
+    setFormError("");
+    setShowCreate(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const closeForm = () => {
+    setShowCreate(false);
+    setEditingId(null);
+    setForm(emptyForm);
+    setFormError("");
+  };
+
+  const handleSave = async (e) => {
     e.preventDefault();
     setFormError("");
+    const editing = tournaments.find((x) => x._id === editingId);
+    if (editing && form.maxParticipants && Number(form.maxParticipants) < (editing.registrationCount || 0)) {
+      if (
+        !confirm(
+          t("tournamentEdit.capBelowCount").replace("{max}", form.maxParticipants).replace("{count}", editing.registrationCount)
+        )
+      )
+        return;
+    }
     setSaving(true);
     try {
+      if (editingId) {
+        await api.put(`/tournaments/${editingId}`, {
+          name: form.name,
+          description: form.description,
+          entryFee: form.entryFee === "" ? 0 : form.entryFee,
+          matchDates: form.matchDates.filter(Boolean),
+          ageLimitYear: form.ageLimitYear,
+          overageSlots: form.ageLimitYear ? form.overageSlots : "",
+          overageLimitYear: form.ageLimitYear ? form.overageLimitYear : "",
+          maxParticipants: form.maxParticipants,
+        });
+        closeForm();
+        await load();
+        if (expandedId === editingId) setExpandedId(null);
+        return;
+      }
       const { data } = await api.post("/tournaments", {
         name: form.name,
         description: form.description,
@@ -303,14 +356,15 @@ export default function AdminTournaments() {
         <h2>{t("adminTournaments.title")}</h2>
         <p>{t("adminTournaments.subtitle")}</p>
         <div className="dash-actions">
-          <button className="btn btn-primary" onClick={() => setShowCreate((v) => !v)}>
+          <button className="btn btn-primary" onClick={() => (showCreate ? closeForm() : (setEditingId(null), setForm(emptyForm), setShowCreate(true)))}>
             {showCreate ? t("common.cancel") : t("adminTournaments.newButton")}
           </button>
         </div>
       </div>
 
       {showCreate && (
-        <form className="card" style={{ maxWidth: 520, marginBottom: 24 }} onSubmit={handleCreate}>
+        <form className="card" style={{ maxWidth: 520, marginBottom: 24 }} onSubmit={handleSave}>
+          {editingId && <h3 style={{ marginTop: 0 }}>✏️ {t("tournamentEdit.title")}</h3>}
           <div className="field">
             <label>{t("common.name")}</label>
             <input value={form.name} onChange={update("name")} required />
@@ -321,7 +375,7 @@ export default function AdminTournaments() {
           </div>
           <div className="field">
             <label>{t("adminTournaments.entryFeeLabel")}</label>
-            <input type="number" min="0" step="0.01" value={form.entryFee} onChange={update("entryFee")} />
+            <input type="number" min="0" step="100" value={form.entryFee} onChange={update("entryFee")} />
           </div>
           <div className="field">
             <label>{t("adminTournaments.matchDatesLabel")}</label>
@@ -339,7 +393,11 @@ export default function AdminTournaments() {
               {t("adminTournaments.addDateButton")}
             </button>
           </div>
-          {isAdmin ? (
+          {editingId ? (
+            <p className="help-text" style={{ marginTop: -8 }}>
+              {t("common.team")}: <b>{form.team || t("adminTournaments.allTeams")}</b> — {t("tournamentEdit.teamLocked")}
+            </p>
+          ) : isAdmin ? (
             <>
               <TeamSelect value={form.team} onChange={(team) => setForm({ ...form, team })} label={t("adminTournaments.teamSelectLabel")} />
             </>
@@ -380,9 +438,22 @@ export default function AdminTournaments() {
             </>
           )}
           {formError && <div className="error-text">{formError}</div>}
-          <button className="btn btn-primary" disabled={saving}>
-            {saving ? t("adminTournaments.creating") : t("adminTournaments.createButton")}
-          </button>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button className="btn btn-primary" disabled={saving}>
+              {editingId
+                ? saving
+                  ? t("common.saving")
+                  : t("tournamentEdit.saveButton")
+                : saving
+                  ? t("adminTournaments.creating")
+                  : t("adminTournaments.createButton")}
+            </button>
+            {editingId && (
+              <button type="button" className="btn btn-outline" onClick={closeForm}>
+                {t("common.cancel")}
+              </button>
+            )}
+          </div>
         </form>
       )}
 
@@ -416,7 +487,7 @@ export default function AdminTournaments() {
                       )}
                     </td>
                     <td data-label={t("common.team")}>{tour.team || t("adminTournaments.allTeams")}</td>
-                    <td data-label={t("adminTournaments.entryFeeHeader")}>${tour.entryFee || 0}</td>
+                    <td data-label={t("adminTournaments.entryFeeHeader")}>{formatKHR(tour.entryFee || 0)}</td>
                     <td data-label={t("adminTournaments.datesHeader")}>
                       {tour.matchDates?.length ? tour.matchDates.map(formatDate).join(", ") : "—"}
                     </td>
@@ -440,6 +511,9 @@ export default function AdminTournaments() {
                       </button>
                       <button className="action-btn" onClick={() => navigate(`/tournaments/${tour._id}/squad`)}>
                         {t("adminTournaments.viewSquad")}
+                      </button>
+                      <button className="action-btn" onClick={() => startEdit(tour)}>
+                        ✏️ {t("common.edit")}
                       </button>
                       <button className="action-btn" onClick={() => exportCsv(tour)}>
                         {t("common.export")}
@@ -589,7 +663,7 @@ export default function AdminTournaments() {
                                           {staffRoleLabel(a.role, t)}
                                         </span>
                                       )}
-                                      {a.feeOwed > 0 ? ` (${t("adminTournaments.owes")} $${a.feeOwed})` : ""}
+                                      {a.feeOwed > 0 ? ` (${t("adminTournaments.owes")} ${formatKHR(a.feeOwed)})` : ""}
                                     </span>
                                     <button
                                       className="action-btn positive"
