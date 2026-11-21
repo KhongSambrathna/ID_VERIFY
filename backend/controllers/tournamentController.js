@@ -2,6 +2,8 @@ const Tournament = require("../models/Tournament");
 const Athlete = require("../models/Athlete");
 const Admin = require("../models/Admin");
 const Lineup = require("../models/Lineup");
+const Team = require("../models/Team");
+const gazetteer = require("../utils/gazetteer");
 const { notifyAdmins, notifyTeamCoaches } = require("../utils/notify");
 
 // Finds (or creates) the auto-managed Lineup — the same "Squad list" the My
@@ -57,6 +59,74 @@ function canManage(req, tournament) {
   return false;
 }
 
+// Teams allowed to register: [team] for a team-scoped tournament, else the
+// Admin-picked allowedTeams. Empty = open to every team.
+function tournamentTeams(tournament) {
+  if (tournament.team) return [tournament.team];
+  return (tournament.allowedTeams || []).filter(Boolean);
+}
+function isTeamAllowed(tournament, team) {
+  const teams = tournamentTeams(tournament);
+  return teams.length === 0 || teams.includes(team);
+}
+// Whether a non-Admin caller (Head Coach / Player / Referee) can see this
+// tournament at all: open ones, or ones that include their own team.
+function canSee(req, tournament) {
+  if (req.adminRole === "ADMIN" || req.adminRole === "REFEREE") return true;
+  const teams = tournamentTeams(tournament);
+  return teams.length === 0 || (!!req.adminTeam && teams.includes(req.adminTeam));
+}
+
+// PLAYER-role registrations of one team (what every per-team rule counts).
+function teamPlayerRegs(tournament, team) {
+  return tournament.registrations.filter((r) => r.team === team && !isStaffRole(r.role));
+}
+
+// Is this address code inside the tournament's home area? null = can't
+// tell (no code, or the code is less detailed than a home area code needs).
+function isInsideHomeArea(tournament, addressCode) {
+  const homes = tournament.homeAreaCodes || [];
+  if (!homes.length) return true;
+  const code = addressCode ? String(addressCode) : "";
+  if (!code) return null;
+  if (homes.some((h) => code.startsWith(h))) return true;
+  // e.g. home is district "1701" but the athlete only picked province "17".
+  if (homes.some((h) => h.length > code.length && h.startsWith(code))) return null;
+  return false;
+}
+
+// Everything the squad page needs to show how full each team is.
+function teamStats(tournament) {
+  const teams = new Set(tournamentTeams(tournament));
+  tournament.registrations.forEach((r) => teams.add(r.team));
+  const rules = getOverageRules(tournament);
+  return [...teams].sort().map((team) => {
+    const regs = teamPlayerRegs(tournament, team);
+    return {
+      team,
+      players: regs.length,
+      belowMin: !!tournament.minPlayersPerTeam && regs.length < tournament.minPlayersPerTeam,
+      overage: overageRuleUsage(tournament, team),
+      outsideUsed: regs.filter((r) => r.isOutside).length,
+      categories: (tournament.customCategories || []).map((c) => ({
+        key: c.key,
+        label: c.label,
+        maxPerTeam: c.maxPerTeam || 0,
+        used: regs.filter((r) => (r.categories || []).includes(c.key)).length,
+      })),
+      hasRules: rules.length > 0,
+    };
+  });
+}
+
+function homeAreas(tournament) {
+  return (tournament.homeAreaCodes || []).map((code) => ({
+    code,
+    km: gazetteer.name(code, "km"),
+    en: gazetteer.name(code, "en"),
+  }));
+}
+
 // `athleteId` — pass the CALLER's own athlete id (individual Player login
 // only) to also include myRegistrationId, so the list view can show
 // "Registered" without a separate detail fetch per tournament.
@@ -69,10 +139,21 @@ function summarize(t, athleteId) {
     entryFee: t.entryFee,
     matchDates: t.matchDates,
     team: t.team || "",
+    allowedTeams: t.allowedTeams || [],
+    maxPlayersPerTeam: t.maxPlayersPerTeam ?? null,
+    minPlayersPerTeam: t.minPlayersPerTeam ?? null,
+    homeAreas: homeAreas(t),
+    outsideSlotsPerTeam: t.outsideSlotsPerTeam || 0,
+    customCategories: t.customCategories || [],
+    rulesText: t.rulesText || "",
     ageLimitYear: t.ageLimitYear ?? null,
     // Each over-age rule with how many of its slots are taken. The two
     // totals are kept for anything still reading the old single-rule shape.
-    overageRules: overageRuleUsage(t),
+    // Slots are per team; `used` is only meaningful with a single team.
+    overageRules:
+      tournamentTeams(t).length === 1
+        ? overageRuleUsage(t, tournamentTeams(t)[0])
+        : getOverageRules(t), // several teams: slots only (see teamStats for each team)
     overageSlots: getOverageRules(t).reduce((n, r) => n + r.slots, 0),
     overageUsed: t.registrations.filter((r) => r.isOverage && !isStaffRole(r.role)).length,
     maxParticipants: t.maxParticipants ?? null,
@@ -207,6 +288,62 @@ function parseAgeRuleFields(body) {
   return { ageLimitYear, overageRules, overageSlots: 0, overageLimitYear: null, maxParticipants };
 }
 
+// The non-age rules (allowed teams, per-team squad size, outside-district,
+// custom categories, text rules). Only fields present in `body` are
+// returned, so an update can send just what changed. `isHeadCoach`
+// callers can't set allowedTeams (their tournament is locked to `team`).
+async function parseExtraRuleFields(body, { isHeadCoach = false } = {}) {
+  const out = {};
+  const num = (v) => (v === "" || v == null ? null : Number(v));
+
+  if (body.allowedTeams !== undefined && !isHeadCoach) {
+    const names = [...new Set((Array.isArray(body.allowedTeams) ? body.allowedTeams : []).map(String).filter(Boolean))];
+    if (names.length) {
+      const found = await Team.find({ name: { $in: names } }).select("name");
+      const known = new Set(found.map((t) => t.name));
+      const unknown = names.filter((n) => !known.has(n));
+      if (unknown.length) throw { status: 400, message: `Unknown team(s): ${unknown.join(", ")}` };
+    }
+    out.allowedTeams = names;
+  }
+  for (const key of ["maxPlayersPerTeam", "minPlayersPerTeam"]) {
+    if (body[key] === undefined) continue;
+    const v = num(body[key]);
+    if (v !== null && (!Number.isInteger(v) || v < 0)) throw { status: 400, message: `${key} must be a whole number` };
+    out[key] = v || null;
+  }
+  if (body.homeAreaCodes !== undefined) {
+    const codes = [...new Set((Array.isArray(body.homeAreaCodes) ? body.homeAreaCodes : []).map(String).filter(Boolean))];
+    const bad = codes.filter((c) => !(c.length === 2 || c.length === 4) || !gazetteer.isValid(c));
+    if (bad.length) throw { status: 400, message: `Home area must be a province or district: ${bad.join(", ")}` };
+    out.homeAreaCodes = codes;
+  }
+  if (body.outsideSlotsPerTeam !== undefined) {
+    const v = num(body.outsideSlotsPerTeam) || 0;
+    if (!Number.isInteger(v) || v < 0) throw { status: 400, message: "Outside-district players must be a whole number" };
+    out.outsideSlotsPerTeam = v;
+  }
+  if (body.customCategories !== undefined) {
+    const list = Array.isArray(body.customCategories) ? body.customCategories : [];
+    const used = new Set();
+    out.customCategories = list
+      .filter((c) => c && String(c.label || "").trim())
+      .map((c) => {
+        let key = String(c.key || "").trim() || Math.random().toString(36).slice(2, 8);
+        while (used.has(key)) key = Math.random().toString(36).slice(2, 8);
+        used.add(key);
+        const max = num(c.maxPerTeam) || 0;
+        if (!Number.isInteger(max) || max < 0) throw { status: 400, message: `"${c.label}": limit must be a whole number` };
+        return { key, label: String(c.label).trim(), maxPerTeam: max };
+      });
+  }
+  if (body.rulesText !== undefined) out.rulesText = String(body.rulesText || "").slice(0, 5000);
+  if (out.maxPlayersPerTeam && out.minPlayersPerTeam && out.minPlayersPerTeam > out.maxPlayersPerTeam) {
+    throw { status: 400, message: "Minimum players per team can't be more than the maximum" };
+  }
+  return out;
+}
+
 // The tournament's over-age rules, youngest year first. A tournament
 // created before overageRules existed (only overageSlots/overageLimitYear
 // set) is read as one equivalent rule; no lower year there meant "any age",
@@ -235,11 +372,13 @@ function registrationRuleYear(reg, rules) {
 }
 
 // [{birthYear, slots, used}] — how full each over-age rule is right now.
-function overageRuleUsage(tournament) {
+// Pass `team` to count one team's slots only (slots are per team).
+function overageRuleUsage(tournament, team) {
   const rules = getOverageRules(tournament);
   const used = new Map(rules.map((r) => [r.birthYear, 0]));
   tournament.registrations.forEach((reg) => {
     if (!reg.isOverage || isStaffRole(reg.role)) return;
+    if (team !== undefined && reg.team !== team) return;
     const y = registrationRuleYear(reg, rules);
     if (used.has(y)) used.set(y, used.get(y) + 1);
   });
@@ -255,6 +394,8 @@ exports.createTournament = async (req, res) => {
     const isHeadCoach = req.adminRole === "HEAD_COACH";
     const scopedTeam = isHeadCoach ? req.adminTeam : team || "";
     const ageRule = parseAgeRuleFields(req.body);
+    const extraRules = await parseExtraRuleFields(req.body, { isHeadCoach });
+    if (scopedTeam) delete extraRules.allowedTeams;
 
     const tournament = await Tournament.create({
       name: name.trim(),
@@ -263,6 +404,7 @@ exports.createTournament = async (req, res) => {
       matchDates: Array.isArray(matchDates) ? matchDates.filter(Boolean) : [],
       team: scopedTeam,
       ...ageRule,
+      ...extraRules,
       createdBy: req.adminId,
     });
 
@@ -289,12 +431,7 @@ exports.createTournament = async (req, res) => {
 // - Individual Player login: same as above, scoped to their account's team.
 exports.listTournaments = async (req, res) => {
   try {
-    let filter = {};
-    if (req.adminRole !== "ADMIN" && req.adminRole !== "REFEREE") {
-      const team = req.adminTeam;
-      filter = team ? { $or: [{ team: "" }, { team }] } : { team: "" };
-    }
-    const tournaments = await Tournament.find(filter).sort({ createdAt: -1 });
+    const tournaments = (await Tournament.find({}).sort({ createdAt: -1 })).filter((t) => canSee(req, t));
 
     // Best-effort auto-settle on the way past — only Admin/Head Coach
     // trigger it (a Player's or Referee's own list view shouldn't be the
@@ -324,7 +461,7 @@ exports.getTournament = async (req, res) => {
     const tournament = await Tournament.findById(req.params.id);
     if (!tournament) return res.status(404).json({ message: "Tournament not found" });
 
-    if (req.adminRole !== "ADMIN" && tournament.team && tournament.team !== req.adminTeam) {
+    if (!canSee(req, tournament)) {
       return res.status(403).json({ message: "Access denied" });
     }
 
@@ -373,7 +510,13 @@ exports.getTournament = async (req, res) => {
       if (mine) myRegistrationId = mine._id;
     }
 
-    res.json({ ...tournament.toObject(), overageRules: overageRuleUsage(tournament), myRegistrationId });
+    res.json({
+      ...tournament.toObject(),
+      overageRules: getOverageRules(tournament),
+      homeAreas: homeAreas(tournament),
+      teamStats: teamStats(tournament),
+      myRegistrationId,
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -406,6 +549,22 @@ exports.updateTournament = async (req, res) => {
         maxParticipants: req.body.maxParticipants !== undefined ? req.body.maxParticipants : tournament.maxParticipants,
       });
       Object.assign(tournament, ageRule);
+    }
+
+    const extraRules = await parseExtraRuleFields(req.body, { isHeadCoach: req.adminRole === "HEAD_COACH" });
+    if (tournament.team) delete extraRules.allowedTeams;
+    const minP = extraRules.minPlayersPerTeam !== undefined ? extraRules.minPlayersPerTeam : tournament.minPlayersPerTeam;
+    const maxP = extraRules.maxPlayersPerTeam !== undefined ? extraRules.maxPlayersPerTeam : tournament.maxPlayersPerTeam;
+    if (minP && maxP && minP > maxP) {
+      return res.status(400).json({ message: "Minimum players per team can't be more than the maximum" });
+    }
+    Object.assign(tournament, extraRules);
+    // A removed category can't stay tagged on anyone.
+    if (extraRules.customCategories) {
+      const keys = new Set(extraRules.customCategories.map((c) => c.key));
+      tournament.registrations.forEach((r) => {
+        r.categories = (r.categories || []).filter((k) => keys.has(k));
+      });
     }
 
     await tournament.save();
@@ -461,17 +620,15 @@ async function buildRegistration(tournament, athleteId, requestedTeam, { allowDe
     throw { status: 409, message: "Already registered for this tournament" };
   }
 
-  const eligible = tournament.team
-    ? athlete.assignments.filter((a) => a.team === tournament.team)
-    : requestedTeam
-    ? athlete.assignments.filter((a) => a.team === requestedTeam)
-    : athlete.assignments;
+  const allowed = athlete.assignments.filter((a) => isTeamAllowed(tournament, a.team));
+  const eligible = requestedTeam ? allowed.filter((a) => a.team === requestedTeam) : allowed;
 
   if (eligible.length === 0) {
+    const teams = tournamentTeams(tournament);
     throw {
       status: 403,
-      message: tournament.team
-        ? `Not registered on ${tournament.team} — can't join this tournament`
+      message: teams.length
+        ? `Only ${teams.join(", ")} can join this tournament — this person isn't on ${teams.length > 1 ? "any of those teams" : "that team"}`
         : "Choose which team you're registering under",
     };
   }
@@ -497,7 +654,17 @@ async function buildRegistration(tournament, athleteId, requestedTeam, { allowDe
     };
   }
 
-  const { isOverage, overageYear } = staff ? { isOverage: false, overageYear: null } : checkAgeRule(tournament, athlete);
+  if (!staff && tournament.maxPlayersPerTeam) {
+    const n = teamPlayerRegs(tournament, assignment.team).length;
+    if (n >= tournament.maxPlayersPerTeam) {
+      throw { status: 403, message: `${assignment.team} already has ${n}/${tournament.maxPlayersPerTeam} players registered` };
+    }
+  }
+
+  const { isOverage, overageYear } = staff
+    ? { isOverage: false, overageYear: null }
+    : checkAgeRule(tournament, athlete, assignment.team);
+  const isOutside = staff ? false : checkOutsideRule(tournament, athlete, assignment.team);
 
   return {
     athlete: athlete._id,
@@ -511,14 +678,41 @@ async function buildRegistration(tournament, athleteId, requestedTeam, { allowDe
     jerseyNumber: assignment.jerseyNumber ?? null,
     isOverage,
     overageYear,
+    isOutside,
+    addressCode: athlete.addressCode || null,
   };
+}
+
+// Returns whether this player is an outsider (uses one of their team's
+// outsideSlotsPerTeam). Throws when the address isn't picked, or the
+// team's outsider spots are full / not allowed.
+function checkOutsideRule(tournament, athlete, team) {
+  if (!(tournament.homeAreaCodes || []).length) return false;
+  const inside = isInsideHomeArea(tournament, athlete.addressCode);
+  const areaNames = homeAreas(tournament).map((a) => a.km || a.code).join(", ");
+  if (inside === null) {
+    throw {
+      status: 403,
+      message: `This tournament limits players from outside ${areaNames} — pick this person's address (province/district) first (Edit athlete)`,
+    };
+  }
+  if (inside) return false;
+  const slots = tournament.outsideSlotsPerTeam || 0;
+  if (!slots) {
+    throw { status: 403, message: `Lives outside ${areaNames} — this tournament doesn't allow outside players` };
+  }
+  const used = teamPlayerRegs(tournament, team).filter((r) => r.isOutside).length;
+  if (used >= slots) {
+    throw { status: 403, message: `Lives outside ${areaNames} — ${team}'s ${slots} outside-player spot(s) are already full` };
+  }
+  return true;
 }
 
 // Returns {isOverage, overageYear} — whether this registration uses an
 // over-age exception and which rule's slot (see the Tournament model
 // comment). Throws a {status, message} rejection when the athlete is too
 // old for every rule, or every rule they fit is already full.
-function checkAgeRule(tournament, athlete) {
+function checkAgeRule(tournament, athlete, team) {
   const none = { isOverage: false, overageYear: null };
   if (!tournament.ageLimitYear) return none;
 
@@ -532,7 +726,7 @@ function checkAgeRule(tournament, athlete) {
   if (birthYear >= tournament.ageLimitYear) return none; // within the normal age limit
 
   // Older than the normal cutoff — only allowed through an over-age rule.
-  const usage = overageRuleUsage(tournament); // youngest year first
+  const usage = overageRuleUsage(tournament, team); // this team's slots, youngest year first
   if (usage.length === 0) {
     throw {
       status: 403,
@@ -553,7 +747,7 @@ function checkAgeRule(tournament, athlete) {
     const detail = fits.map((r) => `${r.birthYear}+: ${r.used}/${r.slots}`).join(", ");
     throw {
       status: 403,
-      message: `Born ${birthYear} — the over-age spot(s) for this birth year are already full (${detail})`,
+      message: `Born ${birthYear} — ${team}'s over-age spot(s) for this birth year are already full (${detail})`,
     };
   }
   return { isOverage: true, overageYear: open.birthYear };
@@ -577,7 +771,7 @@ exports.registerSelf = async (req, res) => {
     }
     const tournament = await Tournament.findById(req.params.id);
     if (!tournament) return res.status(404).json({ message: "Tournament not found" });
-    if (tournament.team && tournament.team !== req.adminTeam) {
+    if (!canSee(req, tournament)) {
       return res.status(403).json({ message: "Access denied" });
     }
     if (tournament.registrationClosed) {
@@ -613,11 +807,13 @@ exports.registerOnBehalf = async (req, res) => {
     // into anything; a Head Coach may register any of their own team's
     // athletes even into an open (not team-scoped) tournament, just never
     // into a DIFFERENT team's tournament.
-    if (req.adminRole === "HEAD_COACH" && tournament.team && tournament.team !== req.adminTeam) {
+    if (req.adminRole === "HEAD_COACH" && !canSee(req, tournament)) {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    const { athleteId, team } = req.body;
+    const { athleteId } = req.body;
+    // A Head Coach always registers under their own team.
+    const team = req.adminRole === "HEAD_COACH" ? req.adminTeam : req.body.team;
     if (!athleteId) return res.status(400).json({ message: "athleteId is required" });
 
     if (req.adminRole === "HEAD_COACH") {
@@ -826,7 +1022,8 @@ exports.exportRegistrationsCsv = async (req, res) => {
       const s = v === null || v === undefined ? "" : String(v);
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const header = ["Verify ID", "Full name", "Khmer name", "Team", "Role", "Jersey #", "Over-age", "Registered by", "Fee paid"];
+    const catLabel = new Map((tournament.customCategories || []).map((c) => [c.key, c.label]));
+    const header = ["Verify ID", "Full name", "Khmer name", "Team", "Role", "Jersey #", "Over-age", "Outside district", "Categories", "Registered by", "Fee paid"];
     const lines = [header.map(escapeCsv).join(",")];
     tournament.registrations.forEach((r) => {
       lines.push(
@@ -838,6 +1035,8 @@ exports.exportRegistrationsCsv = async (req, res) => {
           r.role && r.role !== "PLAYER" ? r.role : "Player",
           r.jerseyNumber ?? "",
           r.isOverage ? (r.overageYear ? `Yes (${r.overageYear}+)` : "Yes") : "",
+          r.isOutside ? "Yes" : "",
+          (r.categories || []).map((k) => catLabel.get(k) || k).join("; "),
           r.registeredBy ? "Admin/Coach" : "Self",
           tournament.entryFee > 0
             ? r.convertedToDebt
@@ -854,6 +1053,42 @@ exports.exportRegistrationsCsv = async (req, res) => {
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${tournament.name.replace(/[^a-z0-9]+/gi, "-")}-registrations.csv"`);
     res.send("﻿" + csv);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PATCH /api/tournaments/:id/registrations/:registrationId/categories
+// (Admin, or the Head Coach of that registration's team) — body:
+// { categories: [key, ...] }. Tags a player with the tournament's custom
+// categories; each category's maxPerTeam is checked against that team.
+exports.setRegistrationCategories = async (req, res) => {
+  try {
+    const tournament = await Tournament.findById(req.params.id);
+    if (!tournament) return res.status(404).json({ message: "Tournament not found" });
+    const row = tournament.registrations.id(req.params.registrationId);
+    if (!row) return res.status(404).json({ message: "Registration not found" });
+    if (req.adminRole !== "ADMIN" && !(req.adminRole === "HEAD_COACH" && row.team === req.adminTeam)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const defs = new Map((tournament.customCategories || []).map((c) => [c.key, c]));
+    const wanted = [...new Set((Array.isArray(req.body.categories) ? req.body.categories : []).map(String))];
+    const unknown = wanted.filter((k) => !defs.has(k));
+    if (unknown.length) return res.status(400).json({ message: "Unknown category" });
+
+    for (const key of wanted) {
+      if ((row.categories || []).includes(key)) continue; // already counted
+      const def = defs.get(key);
+      if (!def.maxPerTeam) continue;
+      const used = teamPlayerRegs(tournament, row.team).filter((r) => (r.categories || []).includes(key)).length;
+      if (used >= def.maxPerTeam) {
+        return res.status(403).json({ message: `${row.team} already has ${used}/${def.maxPerTeam} "${def.label}"` });
+      }
+    }
+    row.categories = wanted;
+    await tournament.save();
+    res.json({ categories: row.categories, teamStats: teamStats(tournament) });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { formatKHR } from "../utils/currency";
 import { useAuth } from "../context/AuthContext";
-import TeamSelect from "../components/TeamSelect";
+import TournamentRulesFields, { emptyRules, rulesFromTournament, rulesPayload, rulesSummaryLines } from "../components/TournamentRulesFields";
 import { useLanguage } from "../i18n/LanguageContext";
 
 function formatDate(d) {
@@ -38,7 +38,7 @@ function ageRuleSummary(tour, t) {
       t("adminTournaments.overagePrefix") +
       rules
         .map((r) =>
-          t("adminTournaments.overageRuleSummary")
+          (r.used == null ? t("adminTournaments.overageRulePerTeam") : t("adminTournaments.overageRuleSummary"))
             .replace("{year}", r.birthYear || "—")
             .replace("{slots}", r.slots)
             .replace("{used}", r.used || 0)
@@ -58,6 +58,7 @@ const emptyForm = {
   // Over-age exceptions — one row per birth year: { birthYear, slots }.
   overageRules: [],
   maxParticipants: "",
+  ...emptyRules,
 };
 
 // Create/manage tournaments, register players on their behalf (for anyone
@@ -65,7 +66,7 @@ const emptyForm = {
 // Coach is always forced onto their own team (server-enforced too); only
 // Admin can leave a tournament open to every team.
 export default function AdminTournaments() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const [tournaments, setTournaments] = useState([]);
@@ -141,6 +142,7 @@ export default function AdminTournaments() {
         slots: String(r.slots || ""),
       })),
       maxParticipants: tour.maxParticipants ? String(tour.maxParticipants) : "",
+      ...rulesFromTournament(tour),
     });
     setFormError("");
     setShowCreate(true);
@@ -176,6 +178,7 @@ export default function AdminTournaments() {
           ageLimitYear: form.ageLimitYear,
           overageRules: form.ageLimitYear ? form.overageRules : [],
           maxParticipants: form.maxParticipants,
+          ...rulesPayload(form, { canPickTeams: isAdmin && !form.team }),
         });
         closeForm();
         await load();
@@ -187,10 +190,11 @@ export default function AdminTournaments() {
         description: form.description,
         entryFee: form.entryFee,
         matchDates: form.matchDates.filter(Boolean),
-        team: isAdmin ? form.team : undefined,
+        team: undefined,
         ageLimitYear: form.ageLimitYear,
         overageRules: form.ageLimitYear ? form.overageRules : [],
         maxParticipants: form.maxParticipants,
+        ...rulesPayload(form, { canPickTeams: isAdmin }),
       });
       setForm(emptyForm);
       setShowCreate(false);
@@ -406,15 +410,11 @@ export default function AdminTournaments() {
               {t("adminTournaments.addDateButton")}
             </button>
           </div>
-          {editingId ? (
+          {editingId && form.team ? (
             <p className="help-text" style={{ marginTop: -8 }}>
-              {t("common.team")}: <b>{form.team || t("adminTournaments.allTeams")}</b> — {t("tournamentEdit.teamLocked")}
+              {t("common.team")}: <b>{form.team}</b> — {t("tournamentEdit.teamLocked")}
             </p>
-          ) : isAdmin ? (
-            <>
-              <TeamSelect value={form.team} onChange={(team) => setForm({ ...form, team })} label={t("adminTournaments.teamSelectLabel")} />
-            </>
-          ) : (
+          ) : isAdmin ? null : (
             <p className="help-text" style={{ marginTop: -8 }}>
               {t("adminTournaments.teamScopedHelp")}
             </p>
@@ -424,6 +424,8 @@ export default function AdminTournaments() {
             <label>{t("adminTournaments.maxParticipantsLabel")}</label>
             <input type="number" min="1" value={form.maxParticipants} onChange={update("maxParticipants")} />
           </div>
+
+          <TournamentRulesFields form={form} setForm={setForm} canPickTeams={isAdmin && !form.team} />
 
           <div className="field">
             <label>{t("adminTournaments.ageLimitLabel")}</label>
@@ -517,13 +519,20 @@ export default function AdminTournaments() {
                         </span>
                       )}
                     </td>
-                    <td data-label={t("common.team")}>{tour.team || t("adminTournaments.allTeams")}</td>
+                    <td data-label={t("common.team")}>
+                      {tour.team || (tour.allowedTeams?.length ? tour.allowedTeams.join(", ") : t("adminTournaments.allTeams"))}
+                    </td>
                     <td data-label={t("adminTournaments.entryFeeHeader")}>{formatKHR(tour.entryFee || 0)}</td>
                     <td data-label={t("adminTournaments.datesHeader")}>
                       {tour.matchDates?.length ? tour.matchDates.map(formatDate).join(", ") : "—"}
                     </td>
                     <td data-label={t("adminTournaments.rulesHeader")}>
                       {ageRuleSummary(tour, t)}
+                      {rulesSummaryLines({ ...tour, allowedTeams: [] }, t, language).map((line) => (
+                        <div key={line} className="help-text" style={{ margin: 0 }}>
+                          {line}
+                        </div>
+                      ))}
                       {tour.maxParticipants
                         ? t("adminTournaments.capSuffix").replace("{count}", tour.registrationCount).replace("{max}", tour.maxParticipants)
                         : ""}

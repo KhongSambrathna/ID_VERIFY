@@ -198,10 +198,11 @@ export default function Navbar() {
               </NavDropdown>
               <NavDropdown
                 label={t("navbar.system")}
-                active={anyActive("/admin/users", "/admin/sponsors", "/admin/poster", ...publicLinks)}
+                active={anyActive("/admin/users", "/admin/teams", "/admin/sponsors", "/admin/poster", ...publicLinks)}
               >
                 <Label>{t("navbar.manage")}</Label>
                 <L to="/admin/users">🔑 {t("navbar.users")}</L>
+                <L to="/admin/teams">🏟️ {t("navbar.teams")}</L>
                 <L to="/admin/sponsors">🤝 {t("navbar.sponsors")}</L>
                 <L to="/admin/poster">🖼️ {t("navbar.posterGenerator")}</L>
                 <L to="/admin/telegram">🤖 {t("navbar.telegramBot")}</L>

@@ -36,7 +36,15 @@ const registrationSchema = new mongoose.Schema(
     // from (that rule's birthYear) — null when not overage. Older rows
     // registered before overageRules existed have this unset; the
     // controller works out their rule from dateOfBirth instead.
+    // Over-age slots are counted PER TEAM (each team gets the same rules).
     overageYear: { type: Number, default: null },
+    // true = this player lives outside the tournament's home area
+    // (homeAreaCodes) and used one of their team's outsideSlotsPerTeam.
+    isOutside: { type: Boolean, default: false },
+    addressCode: { type: String, default: null }, // snapshot of Athlete.addressCode
+    // Keys of the tournament's customCategories this player is tagged with
+    // (set by Admin/Head Coach on the squad page, never by the player).
+    categories: { type: [String], default: [] },
     // Set by Admin/Head Coach when this player pays the entry fee in person
     // (typically cash, on match day) — a simple note in the list, not a
     // payment record of its own. `feePaidAmount` is the actual cash amount
@@ -79,6 +87,38 @@ const tournamentSchema = new mongoose.Schema(
     // register. A Head Coach can only ever create/manage a tournament
     // scoped to their own team; only an Admin can leave this open.
     team: { type: String, default: "" },
+    // Only used when `team` is blank (Admin-made tournaments): which teams
+    // may register. Empty = every team. A Head Coach's own tournament
+    // always uses `team` instead.
+    allowedTeams: { type: [String], default: [] },
+    // Per-team squad size — PLAYER registrations only, each team counted
+    // on its own. null/0 = no limit. The minimum is shown as a warning on
+    // the squad page; it doesn't block anything.
+    maxPlayersPerTeam: { type: Number, default: null },
+    minPlayersPerTeam: { type: Number, default: null },
+    // "Outside district" rule. homeAreaCodes = the home area as gazetteer
+    // codes (province "17" or district "1701" — see utils/gazetteer.js);
+    // empty = no rule. A player whose Athlete.addressCode isn't inside any
+    // of them is an outsider; each team may register up to
+    // outsideSlotsPerTeam of them (0 = none allowed).
+    homeAreaCodes: { type: [String], default: [] },
+    outsideSlotsPerTeam: { type: Number, default: 0 },
+    // Admin-defined limited categories, e.g. { label: "Foreign player",
+    // maxPerTeam: 1 }. Staff tag registrations with them; the limit is
+    // enforced per team when tagging.
+    customCategories: {
+      type: [
+        {
+          _id: false,
+          key: { type: String, required: true },
+          label: { type: String, required: true },
+          maxPerTeam: { type: Number, default: 0 }, // 0 = no limit, just a tag
+        },
+      ],
+      default: [],
+    },
+    // Free-text rules shown to players (not enforced by the system).
+    rulesText: { type: String, default: "" },
     // Age rule — all optional; null/0 = no restriction of that kind.
     // Example: ageLimitYear 2010, overageSlots 4, overageLimitYear 2008
     // means "born 2010 or later to register normally; up to 4 players born

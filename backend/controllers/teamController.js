@@ -2,6 +2,7 @@ const Team = require("../models/Team");
 const Athlete = require("../models/Athlete");
 const uploadBufferToCloudinary = require("../utils/uploadToCloudinary");
 const cloudinary = require("../config/cloudinary");
+const { previewTeam, purgeTeam } = require("../utils/purge");
 
 // GET /api/teams  (admin only) — for the Team dropdowns (add athlete, assign coach)
 exports.listTeams = async (req, res) => {
@@ -222,11 +223,32 @@ exports.createTeam = async (req, res) => {
 };
 
 // DELETE /api/teams/:id  (admin only)
+// GET /api/teams/:id/delete-preview  (admin only) — counts of everything
+// deleting this team would remove, for the confirm dialog.
+exports.previewDeleteTeam = async (req, res) => {
+  try {
+    const team = await Team.findById(req.params.id);
+    if (!team) return res.status(404).json({ message: "Team not found" });
+    res.json(await previewTeam(team));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// DELETE /api/teams/:id  (admin only) — body: { confirmName } must equal the
+// team's name exactly. Permanently deletes the team and everything that
+// belongs to it (see utils/purge.js purgeTeam): players who are ONLY on
+// this team are deleted completely; players also on other teams just lose
+// this team.
 exports.deleteTeam = async (req, res) => {
   try {
-    const team = await Team.findByIdAndDelete(req.params.id);
+    const team = await Team.findById(req.params.id);
     if (!team) return res.status(404).json({ message: "Team not found" });
-    res.json({ message: "Team deleted" });
+    if (String(req.body?.confirmName || "").trim() !== team.name) {
+      return res.status(400).json({ message: "Type the team name exactly to confirm" });
+    }
+    const result = await purgeTeam(team);
+    res.json({ message: "Team deleted", ...result });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

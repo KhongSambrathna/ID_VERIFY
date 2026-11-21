@@ -15,6 +15,7 @@ import SearchPage from "./pages/SearchPage";
 import AboutUs from "./pages/AboutUs";
 import CoachDashboard from "./pages/CoachDashboard";
 import AdminUsers from "./pages/AdminUsers";
+import AdminTeams from "./pages/AdminTeams";
 import AdminSponsors from "./pages/AdminSponsors";
 import AdminMatchDay from "./pages/AdminMatchDay";
 import AdminShop from "./pages/AdminShop";
@@ -161,6 +162,14 @@ export default function App() {
           element={
             <ProtectedRoute role="ADMIN">
               <AdminUsers />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/teams"
+          element={
+            <ProtectedRoute role="ADMIN">
+              <AdminTeams />
             </ProtectedRoute>
           }
         />

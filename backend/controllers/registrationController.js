@@ -1,4 +1,5 @@
 const RegistrationInvite = require("../models/RegistrationInvite");
+const { isValid: isValidAreaCode } = require("../utils/gazetteer");
 const Athlete = require("../models/Athlete");
 const Team = require("../models/Team");
 const generateShortId = require("../utils/generateShortId");
@@ -227,7 +228,7 @@ exports.registerViaInvite = async (req, res) => {
     const { invite, error } = await loadUsableInvite(req.params.token);
     if (error) return res.status(error.status).json({ message: error.message });
 
-    const { fullName, khmerName, dateOfBirth, gender, address, isAvailable } = req.body;
+    const { fullName, khmerName, dateOfBirth, gender, address, addressCode, isAvailable } = req.body;
     if (!fullName || !fullName.trim()) {
       return res.status(400).json({ message: "Full name is required" });
     }
@@ -278,6 +279,7 @@ exports.registerViaInvite = async (req, res) => {
       dateOfBirth,
       gender,
       address,
+      addressCode: isValidAreaCode(addressCode) ? String(addressCode) : null,
       // A self-registration is ALWAYS pending — it needs an Admin to confirm
       // the person's identity/documents before it's public, same as an
       // assignment a Head Coach adds directly.

@@ -49,6 +49,7 @@ function TournamentExportSheet({ innerRef, tournament }) {
               <p className="squad-export-meta">
                 DOB {formatDob(r.dateOfBirth) || "—"} · {r.team}
                 {r.isOverage ? ` · over-age${r.overageYear ? ` (${r.overageYear}+)` : ""}` : ""}
+                {r.isOutside ? " · outside" : ""}
               </p>
             </div>
           </div>
@@ -104,6 +105,26 @@ export default function TournamentSquadPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Staff: tag/untag a player with one of the tournament's custom
+  // categories (per-team limits checked on the server).
+  const toggleCategory = async (r, key) => {
+    const cur = r.categories || [];
+    const next = cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key];
+    setActingId(r._id);
+    try {
+      const { data } = await api.patch(`/tournaments/${id}/registrations/${r._id}/categories`, { categories: next });
+      setTournament((tour) => ({
+        ...tour,
+        teamStats: data.teamStats,
+        registrations: tour.registrations.map((x) => (x._id === r._id ? { ...x, categories: data.categories } : x)),
+      }));
+    } catch (err) {
+      alert(err.response?.data?.message || t("tournamentRules.failedToTag"));
+    } finally {
+      setActingId(null);
+    }
+  };
 
   // Admin/Head Coach only — same register-on-behalf search as the
   // Tournaments list page, ported here so landing on this page right after
@@ -388,6 +409,51 @@ export default function TournamentSquadPage() {
         </div>
       )}
 
+      {tournament.rulesText && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <h4 style={{ marginTop: 0 }}>{t("tournamentRules.rulesHeading")}</h4>
+          <div style={{ whiteSpace: "pre-wrap" }}>{tournament.rulesText}</div>
+        </div>
+      )}
+
+      {tournament.teamStats?.length > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <h4 style={{ marginTop: 0 }}>{t("tournamentRules.teamStatsHeading")}</h4>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {tournament.teamStats.map((ts) => (
+              <div key={ts.team} style={{ display: "flex", flexWrap: "wrap", gap: "4px 12px", alignItems: "center" }}>
+                <b className="caps-display">{ts.team}</b>
+                <span>
+                  {t("tournamentRules.players")}: {ts.players}
+                  {tournament.maxPlayersPerTeam ? `/${tournament.maxPlayersPerTeam}` : ""}
+                </span>
+                {ts.belowMin && (
+                  <span className="badge rejected">
+                    {t("tournamentRules.belowMin").replace("{min}", tournament.minPlayersPerTeam)}
+                  </span>
+                )}
+                {ts.overage.map((o) => (
+                  <span key={o.birthYear}>
+                    {t("tournamentRules.overAge")} {o.birthYear || ""}+: {o.used}/{o.slots}
+                  </span>
+                ))}
+                {tournament.homeAreaCodes?.length > 0 && (
+                  <span>
+                    {t("tournamentRules.outside")}: {ts.outsideUsed}/{tournament.outsideSlotsPerTeam || 0}
+                  </span>
+                )}
+                {ts.categories.map((c) => (
+                  <span key={c.key}>
+                    {c.label}: {c.used}
+                    {c.maxPerTeam ? `/${c.maxPerTeam}` : ""}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {tournament.registrations.length === 0 ? (
         <p>{t("tournamentSquadPage.noOneRegistered")}</p>
       ) : (
@@ -407,7 +473,31 @@ export default function TournamentSquadPage() {
                     <p className="name">
                       {r.fullName}
                       {r.isOverage && <span className="badge pending" style={{ marginLeft: 6 }}>{t("tournamentSquadPage.overAge")}{r.overageYear ? ` ${r.overageYear}+` : ""}</span>}
+                      {r.isOutside && <span className="badge pending" style={{ marginLeft: 6 }}>{t("tournamentRules.outsideBadge")}</span>}
+                      {isPlayer &&
+                        (tournament.customCategories || [])
+                          .filter((c) => (r.categories || []).includes(c.key))
+                          .map((c) => (
+                            <span key={c.key} className="badge" style={{ marginLeft: 6 }}>
+                              {c.label}
+                            </span>
+                          ))}
                     </p>
+                    {!isPlayer && (tournament.customCategories || []).length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 10px" }}>
+                        {tournament.customCategories.map((c) => (
+                          <label key={c.key} style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: "normal", fontSize: "0.85em" }}>
+                            <input
+                              type="checkbox"
+                              disabled={actingId === r._id}
+                              checked={(r.categories || []).includes(c.key)}
+                              onChange={() => toggleCategory(r, c.key)}
+                            />
+                            {c.label}
+                          </label>
+                        ))}
+                      </div>
+                    )}
                     <p className="role">
                       {r.khmerName ? `${r.khmerName} · ` : ""}
                       {t("tournamentSquadPage.dobLabel")} {formatDob(r.dateOfBirth) || "—"} · <span className="caps-display">{r.team}</span>

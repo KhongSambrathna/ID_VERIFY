@@ -1,4 +1,6 @@
 const Athlete = require("../models/Athlete");
+const { previewAthlete, purgeAthlete } = require("../utils/purge");
+const { isValid: isValidAreaCode } = require("../utils/gazetteer");
 const Team = require("../models/Team");
 const ScanLog = require("../models/ScanLog");
 const generateAthleteQR = require("../utils/generateQR");
@@ -12,28 +14,6 @@ const { ensurePlayerAccountForAthlete } = require("../utils/playerAccount");
 function toBool(value) {
   if (typeof value === "boolean") return value;
   return value === "true" || value === true;
-}
-
-// Best-effort Cloudinary cleanup (photo, QR, supporting documents) for a
-// person being fully deleted. Fire-and-forget — a slow/failed cleanup
-// shouldn't hold up the delete response, just gets logged.
-function cleanupAthleteAssets(athlete) {
-  const cleanupJobs = [];
-  if (athlete.photoPublicId) cleanupJobs.push(cloudinary.uploader.destroy(athlete.photoPublicId));
-  if (athlete.pendingPhotoPublicId) cleanupJobs.push(cloudinary.uploader.destroy(athlete.pendingPhotoPublicId));
-  if (athlete.qrCodePublicId) cleanupJobs.push(cloudinary.uploader.destroy(athlete.qrCodePublicId));
-  (athlete.supportingDocuments || []).forEach((doc) => {
-    if (doc.publicId) {
-      cleanupJobs.push(
-        cloudinary.uploader.destroy(doc.publicId, { resource_type: doc.resourceType || "image" })
-      );
-    }
-  });
-  Promise.allSettled(cleanupJobs).then((results) => {
-    results.forEach((r) => {
-      if (r.status === "rejected") console.warn("Cloudinary cleanup failed:", r.reason?.message);
-    });
-  });
 }
 
 // Called whenever an assignment gets approved — if this person has a photo
@@ -87,7 +67,7 @@ function discardStalePendingPhotoIfUnreviewable(athlete) {
 function promotePendingProfileChangesIfAny(athlete) {
   if (!athlete.pendingChanges) return;
   const staged = athlete.pendingChanges;
-  ["fullName", "khmerName", "dateOfBirth", "gender", "address"].forEach((field) => {
+  ["fullName", "khmerName", "dateOfBirth", "gender", "address", "addressCode"].forEach((field) => {
     if (staged[field] !== undefined) athlete[field] = staged[field];
   });
   athlete.pendingChanges = null;
@@ -116,7 +96,7 @@ function discardStalePendingProfileChangesIfUnreviewable(athlete) {
 exports.createAthlete = async (req, res) => {
   try {
     const isHeadCoach = req.adminRole === "HEAD_COACH";
-    const { fullName, khmerName, dateOfBirth, gender, role, address, isAvailable } = req.body;
+    const { fullName, khmerName, dateOfBirth, gender, role, address, addressCode, isAvailable } = req.body;
 
     const team = isHeadCoach ? req.adminTeam : req.body.team;
     if (isHeadCoach && !team) {
@@ -132,6 +112,7 @@ exports.createAthlete = async (req, res) => {
       dateOfBirth,
       gender,
       address,
+      addressCode: isValidAreaCode(addressCode) ? String(addressCode) : null,
       assignments: team
         ? [
             {
@@ -314,9 +295,9 @@ exports.getAthleteById = async (req, res) => {
 // An individual Player account (not the shared/legacy team-wide login) may
 // also reach this, scoped to editing their OWN record only (see
 // isPlayerSelf below) — same editable fields as a Head Coach edit.
-const ADMIN_EDITABLE_FIELDS = ["fullName", "khmerName", "dateOfBirth", "gender", "address", "status"];
-const HEAD_COACH_EDITABLE_FIELDS = ["fullName", "khmerName", "dateOfBirth", "gender", "address"];
-const PLAYER_EDITABLE_FIELDS = ["fullName", "khmerName", "dateOfBirth", "gender", "address"];
+const ADMIN_EDITABLE_FIELDS = ["fullName", "khmerName", "dateOfBirth", "gender", "address", "addressCode", "status"];
+const HEAD_COACH_EDITABLE_FIELDS = ["fullName", "khmerName", "dateOfBirth", "gender", "address", "addressCode"];
+const PLAYER_EDITABLE_FIELDS = ["fullName", "khmerName", "dateOfBirth", "gender", "address", "addressCode"];
 
 // Date-of-birth needs its own comparison — the form sends "YYYY-MM-DD" but
 // the stored value is a Date — so a plain string compare would treat every
@@ -373,6 +354,10 @@ exports.updateAthlete = async (req, res) => {
       : isPlayerSelf
       ? PLAYER_EDITABLE_FIELDS
       : ADMIN_EDITABLE_FIELDS;
+    // Only a real gazetteer code is kept; anything else (blank, typo) clears it.
+    if (req.body.addressCode !== undefined) {
+      req.body.addressCode = isValidAreaCode(req.body.addressCode) ? String(req.body.addressCode) : null;
+    }
     editableFields.forEach((field) => {
       if (req.body[field] === undefined) return;
       if (valuesDiffer(field, athlete[field], req.body[field])) {
@@ -871,8 +856,8 @@ exports.removeAssignment = async (req, res) => {
     const wasLast = athlete.assignments.length === 1;
     athlete.assignments = athlete.assignments.filter((a) => String(a._id) !== String(assignment._id));
     if (wasLast) {
-      cleanupAthleteAssets(athlete);
-      await Athlete.findByIdAndDelete(athlete._id);
+      // Last team gone → remove the person and everything linked to them.
+      await purgeAthlete(athlete);
       notifyTeamCoaches(
         team,
         `🗑️ ${fullName} was removed from ${team} by Admin (their only team, so the whole record was deleted)${reason ? ` — ${reason}` : ""}.`
@@ -908,8 +893,8 @@ exports.approveAssignment = async (req, res) => {
       const wasLast = athlete.assignments.length === 1;
       athlete.assignments = athlete.assignments.filter((a) => String(a._id) !== String(assignment._id));
       if (wasLast) {
-        cleanupAthleteAssets(athlete);
-        await Athlete.findByIdAndDelete(athlete._id);
+        // Last team gone → remove the person and everything linked to them.
+        await purgeAthlete(athlete);
         notifyTeamCoaches(team, `✅ ${fullName}'s removal from ${team} was confirmed by Admin.`);
         return res.json({
           message: "Removal confirmed — it was their only team, so the whole record was deleted",
@@ -982,8 +967,8 @@ exports.rejectAssignment = async (req, res) => {
     const wasLast = athlete.assignments.length === 1;
     athlete.assignments = athlete.assignments.filter((a) => String(a._id) !== String(assignment._id));
     if (wasLast) {
-      cleanupAthleteAssets(athlete);
-      await Athlete.findByIdAndDelete(athlete._id);
+      // Last team gone → remove the person and everything linked to them.
+      await purgeAthlete(athlete);
       notifyTeamCoaches(team, `❌ ${fullName}'s ${team} assignment was rejected by Admin${reason ? ` — ${reason}` : ""}.`);
       return res.json({
         message: "Rejected — it was their only team, so the whole record was deleted",
@@ -1009,22 +994,40 @@ exports.rejectAssignment = async (req, res) => {
 // body { reason } + Head Coach Telegram notification as removeAssignment
 // above — every one of this person's teams gets told, since the whole
 // record (not just one team's assignment) is gone.
+// GET /api/athletes/:id/delete-preview  (Admin) — what deleting would remove.
+exports.previewDeleteAthlete = async (req, res) => {
+  try {
+    const athlete = await Athlete.findById(req.params.id);
+    if (!athlete) return res.status(404).json({ message: "Athlete not found" });
+    res.json(await previewAthlete(athlete));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 exports.deleteAthlete = async (req, res) => {
   try {
     const athlete = await Athlete.findById(req.params.id);
     if (!athlete) return res.status(404).json({ message: "Athlete not found" });
 
+    // Same safety step as deleting a team: the confirm box makes Admin type
+    // the person's full name exactly.
+    if (String(req.body?.confirmName || "").trim() !== String(athlete.fullName || "").trim()) {
+      return res.status(400).json({ message: "Type the athlete's full name exactly to confirm" });
+    }
     const reason = String(req.body?.reason || "").trim();
     const teams = [...new Set(athlete.assignments.map((a) => a.team))];
     const fullName = athlete.fullName;
 
-    cleanupAthleteAssets(athlete);
-    await Athlete.findByIdAndDelete(athlete._id);
+    // Removes the athlete AND everything linked to them: login account,
+    // attendance, payments, scan logs, squad-list/formation/Starting XI
+    // spots, tournament registrations, jersey orders, Cloudinary files.
+    const result = await purgeAthlete(athlete);
 
     const text = `🗑️ ${fullName}'s whole record was deleted by Admin${reason ? ` — ${reason}` : ""}.`;
     teams.forEach((team) => notifyTeamCoaches(team, text));
 
-    res.json({ message: "Athlete deleted" });
+    res.json({ message: "Athlete deleted", ...result });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -1313,8 +1316,8 @@ exports.bulkApproveAssignments = async (req, res) => {
           const wasLast = athlete.assignments.length === 1;
           athlete.assignments = athlete.assignments.filter((a) => String(a._id) !== String(assignment._id));
           if (wasLast) {
-            cleanupAthleteAssets(athlete);
-            await Athlete.findByIdAndDelete(athlete._id);
+            // Last team gone → remove the person and everything linked to them.
+            await purgeAthlete(athlete);
           } else {
             discardStalePendingPhotoIfUnreviewable(athlete);
             discardStalePendingProfileChangesIfUnreviewable(athlete);

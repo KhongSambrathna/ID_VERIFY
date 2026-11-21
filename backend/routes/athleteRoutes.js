@@ -23,6 +23,7 @@ const {
   exportRosterCsv,
   bulkApproveAssignments,
   deleteAthlete,
+  previewDeleteAthlete,
   verifyAthlete,
   searchAthletes,
   checkDuplicateName,
@@ -125,6 +126,7 @@ router.delete(
 
 // Admin-only — a Head Coach removes someone through the assignment routes
 // above instead (which always requires Admin confirmation, per team).
+router.get("/:id/delete-preview", requireRole("ADMIN"), previewDeleteAthlete);
 router.delete("/:id", requireRole("ADMIN"), deleteAthlete);
 
 module.exports = router;

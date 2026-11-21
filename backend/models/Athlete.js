@@ -130,6 +130,12 @@ const athleteSchema = new mongoose.Schema(
     dateOfBirth: { type: Date },
     gender: { type: String, enum: ["male", "female", "other"] },
     address: { type: String },
+    // Picked from the province/district/commune/village lists (see
+    // utils/gazetteer.js) — the deepest NCDD code chosen, e.g. "17010101"
+    // (village) or "1701" (district only). `address` above stays the
+    // human-readable text (filled in from the pick, still editable).
+    // Tournament "outside district" rules read the district from this code.
+    addressCode: { type: String, default: null },
     // Link to this person's own Facebook profile — stored purely so
     // Admin/Head Coach can quickly open a Messenger chat with them (e.g. to
     // remind about an upcoming match or an unpaid fee) and paste a

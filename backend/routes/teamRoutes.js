@@ -6,6 +6,7 @@ const {
   listTeams,
   createTeam,
   deleteTeam,
+  previewDeleteTeam,
   getMyKhqr,
   uploadMyKhqr,
   removeMyKhqr,
@@ -119,6 +120,7 @@ router.patch("/jersey-orders/status-all", setAllJerseyOrdersStatus);
 router.post("/jersey-orders/delete-selected", deleteSelectedJerseyOrders);
 
 router.post("/", createTeam);
+router.get("/:id/delete-preview", previewDeleteTeam);
 router.delete("/:id", deleteTeam);
 router.put("/:id/logo", upload.single("logo"), uploadTeamLogo);
 router.delete("/:id/logo", removeTeamLogo);

@@ -4,6 +4,7 @@ import api from "../api/axios";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
+import AddressPicker from "../components/AddressPicker";
 
 function toDateInputValue(dob) {
   if (!dob) return "";
@@ -52,6 +53,7 @@ export default function PlayerEditProfile() {
           dateOfBirth: toDateInputValue(data.dateOfBirth),
           gender: data.gender || "male",
           address: data.address || "",
+          addressCode: data.addressCode || "",
         });
         setCurrentPhotoUrl(data.photoUrl || null);
         setExistingDocs(data.supportingDocuments || []);
@@ -163,7 +165,14 @@ export default function PlayerEditProfile() {
           </select>
         </div>
         <div className="field">
-          <label>{t("playerEditProfile.address")}</label>
+          <label>{t("addressPicker.label")}</label>
+          <AddressPicker
+            value={form.addressCode}
+            onChange={({ code, text }) => setForm((f) => ({ ...f, addressCode: code, address: text || f.address }))}
+          />
+        </div>
+        <div className="field">
+          <label>{t("addressPicker.detailLabel")}</label>
           <input value={form.address} onChange={update("address")} />
         </div>
         <div className="field">

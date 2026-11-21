@@ -5,6 +5,7 @@ import TeamSelect from "../components/TeamSelect";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
+import AddressPicker from "../components/AddressPicker";
 
 export default function AddAthlete() {
   const { t } = useLanguage();
@@ -17,6 +18,7 @@ export default function AddAthlete() {
     team: isHeadCoach ? coachTeam || "" : "",
     role: "PLAYER",
     address: "",
+    addressCode: "",
     isAvailable: "true",
   });
   const [photo, setPhoto] = useState(null);
@@ -203,7 +205,14 @@ export default function AddAthlete() {
           </select>
         </div>
         <div className="field">
-          <label>{t("addAthlete.address")}</label>
+          <label>{t("addressPicker.label")}</label>
+          <AddressPicker
+            value={form.addressCode}
+            onChange={({ code, text }) => setForm((f) => ({ ...f, addressCode: code, address: text || f.address }))}
+          />
+        </div>
+        <div className="field">
+          <label>{t("addressPicker.detailLabel")}</label>
           <input value={form.address} onChange={update("address")} />
         </div>
         <div className="field">

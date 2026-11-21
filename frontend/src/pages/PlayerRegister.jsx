@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import api from "../api/axios";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { useLanguage } from "../i18n/LanguageContext";
+import AddressPicker from "../components/AddressPicker";
 
 // PUBLIC self-registration page — reached from the shareable link a Head
 // Coach sends (…/register/<token>). No login needed: the whole point is the
@@ -26,6 +27,7 @@ export default function PlayerRegister() {
     dateOfBirth: "",
     gender: "male",
     address: "",
+    addressCode: "",
     isAvailable: "true",
   });
   const [photo, setPhoto] = useState(null);
@@ -324,7 +326,14 @@ export default function PlayerRegister() {
           </select>
         </div>
         <div className="field">
-          <label>{t("addAthlete.address")}</label>
+          <label>{t("addressPicker.label")}</label>
+          <AddressPicker
+            value={form.addressCode}
+            onChange={({ code, text }) => setForm((f) => ({ ...f, addressCode: code, address: text || f.address }))}
+          />
+        </div>
+        <div className="field">
+          <label>{t("addressPicker.detailLabel")}</label>
           <input
             value={form.address}
             onChange={update("address")}

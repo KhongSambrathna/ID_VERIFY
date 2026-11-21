@@ -15,6 +15,7 @@ const {
   settleTournamentNow,
   setRegistrationClosed,
   exportRegistrationsCsv,
+  setRegistrationCategories,
 } = require("../controllers/tournamentController");
 
 router.use(requireAuth);
@@ -42,6 +43,8 @@ router.post("/:id/register-admin", requireRole("ADMIN", "HEAD_COACH"), registerO
 
 // Note "paid their entry fee on match day" / force-settle unpaid → debt.
 router.patch("/:id/registrations/:registrationId/paid", requireRole("ADMIN", "HEAD_COACH"), setRegistrationPaid);
+// Tag a player with the tournament's custom categories (per-team limits).
+router.patch("/:id/registrations/:registrationId/categories", requireRole("ADMIN", "HEAD_COACH"), setRegistrationCategories);
 router.post("/:id/settle-debts", requireRole("ADMIN", "HEAD_COACH"), settleTournamentNow);
 
 // Open/close self-service registration for this tournament.

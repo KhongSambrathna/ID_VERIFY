@@ -4,6 +4,7 @@ import api from "../api/axios";
 import { formatKHR } from "../utils/currency";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
+import { rulesSummaryLines } from "../components/TournamentRulesFields";
 
 function formatDate(d) {
   const date = new Date(d);
@@ -15,7 +16,7 @@ function ageRuleSummary(tour, t) {
   if (!tour.ageLimitYear) return "";
   let s = t("tournamentsPage.bornYearPlus").replace("{year}", tour.ageLimitYear);
   (tour.overageRules || []).forEach((r) => {
-    s += t("tournamentsPage.overageDetail")
+    s += t(r.used == null ? "tournamentsPage.overageDetailPerTeam" : "tournamentsPage.overageDetail")
       .replace("{overageYear}", r.birthYear || "—")
       .replace("{slots}", r.slots)
       .replace("{used}", r.used || 0);
@@ -26,7 +27,7 @@ function ageRuleSummary(tour, t) {
 // Individual Player account only — browse open tournaments and register
 // yourself (blocked if you owe a fee on the team you'd be playing under).
 export default function TournamentsPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { team, athleteId } = useAuth();
   const navigate = useNavigate();
   const [tournaments, setTournaments] = useState([]);
@@ -124,7 +125,20 @@ export default function TournamentsPage() {
                   <td data-label={t("tournamentsPage.datesHeader")}>
                     {tour.matchDates?.length ? tour.matchDates.map(formatDate).join(", ") : "—"}
                   </td>
-                  <td data-label={t("tournamentsPage.rulesHeader")}>{ageRuleSummary(tour, t) || t("tournamentsPage.noAgeLimit")}</td>
+                  <td data-label={t("tournamentsPage.rulesHeader")}>
+                    {ageRuleSummary(tour, t) || t("tournamentsPage.noAgeLimit")}
+                    {rulesSummaryLines(tour, t, language).map((line) => (
+                      <div key={line} className="help-text" style={{ margin: 0 }}>
+                        {line}
+                      </div>
+                    ))}
+                    {tour.rulesText && (
+                      <details style={{ marginTop: 4 }}>
+                        <summary>{t("tournamentRules.rulesHeading")}</summary>
+                        <div style={{ whiteSpace: "pre-wrap" }}>{tour.rulesText}</div>
+                      </details>
+                    )}
+                  </td>
                   <td data-label={t("tournamentsPage.spotsHeader")}>
                     {tour.maxParticipants ? `${tour.registrationCount}/${tour.maxParticipants}` : tour.registrationCount}
                   </td>
