@@ -14,12 +14,12 @@ function formatDate(d) {
 function ageRuleSummary(tour, t) {
   if (!tour.ageLimitYear) return "";
   let s = t("tournamentsPage.bornYearPlus").replace("{year}", tour.ageLimitYear);
-  if (tour.overageSlots > 0) {
+  (tour.overageRules || []).forEach((r) => {
     s += t("tournamentsPage.overageDetail")
-      .replace("{overageYear}", tour.overageLimitYear || "—")
-      .replace("{slots}", tour.overageSlots)
-      .replace("{used}", tour.overageUsed || 0);
-  }
+      .replace("{overageYear}", r.birthYear || "—")
+      .replace("{slots}", r.slots)
+      .replace("{used}", r.used || 0);
+  });
   return s;
 }
 

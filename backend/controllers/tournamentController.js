@@ -70,9 +70,11 @@ function summarize(t, athleteId) {
     matchDates: t.matchDates,
     team: t.team || "",
     ageLimitYear: t.ageLimitYear ?? null,
-    overageSlots: t.overageSlots || 0,
-    overageLimitYear: t.overageLimitYear ?? null,
-    overageUsed: t.registrations.filter((r) => r.isOverage).length,
+    // Each over-age rule with how many of its slots are taken. The two
+    // totals are kept for anything still reading the old single-rule shape.
+    overageRules: overageRuleUsage(t),
+    overageSlots: getOverageRules(t).reduce((n, r) => n + r.slots, 0),
+    overageUsed: t.registrations.filter((r) => r.isOverage && !isStaffRole(r.role)).length,
     maxParticipants: t.maxParticipants ?? null,
     registrationClosed: !!t.registrationClosed,
     // PLAYER-only count — matches what maxParticipants actually caps (see
@@ -161,21 +163,87 @@ async function settleUnpaidToDebt(tournament, { force = false } = {}) {
 // Pulls the age-rule fields out of a create/update request body, with
 // light validation — used by both createTournament and updateTournament.
 // Throws a plain {status, message} on anything contradictory.
+// `overageRules` is a list of {birthYear, slots}; blank rows are ignored.
 function parseAgeRuleFields(body) {
-  const ageLimitYear = body.ageLimitYear !== undefined && body.ageLimitYear !== "" ? Number(body.ageLimitYear) : null;
-  const overageSlots = body.overageSlots !== undefined && body.overageSlots !== "" ? Number(body.overageSlots) || 0 : 0;
-  const overageLimitYear =
-    body.overageLimitYear !== undefined && body.overageLimitYear !== "" ? Number(body.overageLimitYear) : null;
+  const ageLimitYear = body.ageLimitYear !== undefined && body.ageLimitYear !== "" && body.ageLimitYear !== null
+    ? Number(body.ageLimitYear)
+    : null;
   const maxParticipants =
     body.maxParticipants !== undefined && body.maxParticipants !== "" ? Number(body.maxParticipants) : null;
 
-  if ((overageSlots > 0 || overageLimitYear !== null) && !ageLimitYear) {
+  const rawRules = Array.isArray(body.overageRules) ? body.overageRules : [];
+  const blank = (v) => v === "" || v == null;
+  if (rawRules.some((r) => r && blank(r.birthYear) && !blank(r.slots))) {
+    throw { status: 400, message: "Each over-age rule needs a birth year" };
+  }
+  const overageRules = rawRules
+    .filter((r) => r && !blank(r.birthYear))
+    .map((r) => ({ birthYear: Number(r.birthYear), slots: Number(r.slots) || 0 }));
+
+  if (overageRules.length > 0 && !ageLimitYear) {
     throw { status: 400, message: "Set an age limit year before adding overage exceptions" };
   }
-  if (ageLimitYear && overageLimitYear !== null && overageLimitYear > ageLimitYear) {
-    throw { status: 400, message: "The overage birth year must be older (a smaller year) than the age limit year" };
+  const seen = new Set();
+  for (const r of overageRules) {
+    if (!Number.isInteger(r.birthYear) || r.birthYear < 1900) {
+      throw { status: 400, message: "Each over-age rule needs a valid birth year" };
+    }
+    if (!Number.isInteger(r.slots) || r.slots < 1) {
+      throw { status: 400, message: `Over-age rule for ${r.birthYear}: number of players must be at least 1` };
+    }
+    if (r.birthYear >= ageLimitYear) {
+      throw {
+        status: 400,
+        message: `Over-age birth year ${r.birthYear} must be older (a smaller year) than the age limit year ${ageLimitYear}`,
+      };
+    }
+    if (seen.has(r.birthYear)) throw { status: 400, message: `Birth year ${r.birthYear} is listed twice` };
+    seen.add(r.birthYear);
   }
-  return { ageLimitYear, overageSlots, overageLimitYear, maxParticipants };
+  overageRules.sort((a, b) => b.birthYear - a.birthYear);
+
+  // Saving always moves the tournament onto overageRules — the legacy
+  // single-exception fields are cleared so the two can never disagree.
+  return { ageLimitYear, overageRules, overageSlots: 0, overageLimitYear: null, maxParticipants };
+}
+
+// The tournament's over-age rules, youngest year first. A tournament
+// created before overageRules existed (only overageSlots/overageLimitYear
+// set) is read as one equivalent rule; no lower year there meant "any age",
+// hence 0.
+function getOverageRules(tournament) {
+  if (!tournament.ageLimitYear) return [];
+  if (tournament.overageRules && tournament.overageRules.length) {
+    return tournament.overageRules
+      .map((r) => ({ birthYear: r.birthYear, slots: r.slots }))
+      .sort((a, b) => b.birthYear - a.birthYear);
+  }
+  if (tournament.overageSlots > 0) {
+    return [{ birthYear: tournament.overageLimitYear || 0, slots: tournament.overageSlots }];
+  }
+  return [];
+}
+
+// Which rule (birthYear) an existing overage registration is using. Newer
+// rows store it; older rows (before overageRules) are matched by their
+// date-of-birth snapshot to the youngest rule they fit.
+function registrationRuleYear(reg, rules) {
+  if (reg.overageYear != null && rules.some((r) => r.birthYear === reg.overageYear)) return reg.overageYear;
+  const by = reg.dateOfBirth ? new Date(reg.dateOfBirth).getFullYear() : null;
+  const fit = by != null ? rules.find((r) => by >= r.birthYear) : null;
+  return fit ? fit.birthYear : rules.length ? rules[rules.length - 1].birthYear : null;
+}
+
+// [{birthYear, slots, used}] — how full each over-age rule is right now.
+function overageRuleUsage(tournament) {
+  const rules = getOverageRules(tournament);
+  const used = new Map(rules.map((r) => [r.birthYear, 0]));
+  tournament.registrations.forEach((reg) => {
+    if (!reg.isOverage || isStaffRole(reg.role)) return;
+    const y = registrationRuleYear(reg, rules);
+    if (used.has(y)) used.set(y, used.get(y) + 1);
+  });
+  return rules.map((r) => ({ ...r, used: used.get(r.birthYear) || 0 }));
 }
 
 // POST /api/tournaments  (Admin, Head Coach)
@@ -305,7 +373,7 @@ exports.getTournament = async (req, res) => {
       if (mine) myRegistrationId = mine._id;
     }
 
-    res.json({ ...tournament.toObject(), myRegistrationId });
+    res.json({ ...tournament.toObject(), overageRules: overageRuleUsage(tournament), myRegistrationId });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -329,15 +397,13 @@ exports.updateTournament = async (req, res) => {
 
     if (
       req.body.ageLimitYear !== undefined ||
-      req.body.overageSlots !== undefined ||
-      req.body.overageLimitYear !== undefined ||
+      req.body.overageRules !== undefined ||
       req.body.maxParticipants !== undefined
     ) {
       const ageRule = parseAgeRuleFields({
-        ageLimitYear: req.body.ageLimitYear ?? tournament.ageLimitYear,
-        overageSlots: req.body.overageSlots ?? tournament.overageSlots,
-        overageLimitYear: req.body.overageLimitYear ?? tournament.overageLimitYear,
-        maxParticipants: req.body.maxParticipants ?? tournament.maxParticipants,
+        ageLimitYear: req.body.ageLimitYear !== undefined ? req.body.ageLimitYear : tournament.ageLimitYear,
+        overageRules: req.body.overageRules !== undefined ? req.body.overageRules : getOverageRules(tournament),
+        maxParticipants: req.body.maxParticipants !== undefined ? req.body.maxParticipants : tournament.maxParticipants,
       });
       Object.assign(tournament, ageRule);
     }
@@ -431,7 +497,7 @@ async function buildRegistration(tournament, athleteId, requestedTeam, { allowDe
     };
   }
 
-  const isOverage = staff ? false : checkAgeRule(tournament, athlete);
+  const { isOverage, overageYear } = staff ? { isOverage: false, overageYear: null } : checkAgeRule(tournament, athlete);
 
   return {
     athlete: athlete._id,
@@ -444,14 +510,17 @@ async function buildRegistration(tournament, athleteId, requestedTeam, { allowDe
     dateOfBirth: athlete.dateOfBirth || null,
     jerseyNumber: assignment.jerseyNumber ?? null,
     isOverage,
+    overageYear,
   };
 }
 
-// Returns whether this registration counts as an "overage" exception (see
-// the Tournament model comment). Throws a {status, message} rejection when
-// the athlete is too old outright, or when the overage exception is full.
+// Returns {isOverage, overageYear} — whether this registration uses an
+// over-age exception and which rule's slot (see the Tournament model
+// comment). Throws a {status, message} rejection when the athlete is too
+// old for every rule, or every rule they fit is already full.
 function checkAgeRule(tournament, athlete) {
-  if (!tournament.ageLimitYear) return false;
+  const none = { isOverage: false, overageYear: null };
+  if (!tournament.ageLimitYear) return none;
 
   if (!athlete.dateOfBirth) {
     throw {
@@ -460,29 +529,34 @@ function checkAgeRule(tournament, athlete) {
     };
   }
   const birthYear = new Date(athlete.dateOfBirth).getFullYear();
-  if (birthYear >= tournament.ageLimitYear) return false; // within the normal age limit
+  if (birthYear >= tournament.ageLimitYear) return none; // within the normal age limit
 
-  // Older than the normal cutoff — only allowed as a limited exception.
-  if (tournament.overageLimitYear && birthYear < tournament.overageLimitYear) {
-    throw {
-      status: 403,
-      message: `Born ${birthYear} — older than this tournament allows even as an exception (${tournament.overageLimitYear} or later)`,
-    };
-  }
-  if (!tournament.overageSlots) {
+  // Older than the normal cutoff — only allowed through an over-age rule.
+  const usage = overageRuleUsage(tournament); // youngest year first
+  if (usage.length === 0) {
     throw {
       status: 403,
       message: `Born ${birthYear} — older than the age limit (${tournament.ageLimitYear} or later) and no exceptions are allowed`,
     };
   }
-  const overageUsed = tournament.registrations.filter((r) => r.isOverage).length;
-  if (overageUsed >= tournament.overageSlots) {
+  const fits = usage.filter((r) => birthYear >= r.birthYear);
+  if (fits.length === 0) {
+    const oldest = usage[usage.length - 1].birthYear;
     throw {
       status: 403,
-      message: `Born ${birthYear} — the ${tournament.overageSlots} over-age exception spot(s) are already full`,
+      message: `Born ${birthYear} — older than this tournament allows even as an exception (${oldest} or later)`,
     };
   }
-  return true;
+  // Youngest rule with space first, so older slots stay free for older players.
+  const open = fits.find((r) => r.used < r.slots);
+  if (!open) {
+    const detail = fits.map((r) => `${r.birthYear}+: ${r.used}/${r.slots}`).join(", ");
+    throw {
+      status: 403,
+      message: `Born ${birthYear} — the over-age spot(s) for this birth year are already full (${detail})`,
+    };
+  }
+  return { isOverage: true, overageYear: open.birthYear };
 }
 
 // POST /api/tournaments/:id/register  (individual Player login only —
@@ -763,7 +837,7 @@ exports.exportRegistrationsCsv = async (req, res) => {
           r.team,
           r.role && r.role !== "PLAYER" ? r.role : "Player",
           r.jerseyNumber ?? "",
-          r.isOverage ? "Yes" : "",
+          r.isOverage ? (r.overageYear ? `Yes (${r.overageYear}+)` : "Yes") : "",
           r.registeredBy ? "Admin/Coach" : "Self",
           tournament.entryFee > 0
             ? r.convertedToDebt

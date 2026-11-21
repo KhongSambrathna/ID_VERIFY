@@ -32,6 +32,11 @@ const registrationSchema = new mongoose.Schema(
     // and used up one of the limited overage exception slots to register.
     // Always false when the tournament has no age limit set.
     isOverage: { type: Boolean, default: false },
+    // Which of the tournament's overageRules this person's slot was taken
+    // from (that rule's birthYear) — null when not overage. Older rows
+    // registered before overageRules existed have this unset; the
+    // controller works out their rule from dateOfBirth instead.
+    overageYear: { type: Number, default: null },
     // Set by Admin/Head Coach when this player pays the entry fee in person
     // (typically cash, on match day) — a simple note in the list, not a
     // payment record of its own. `feePaidAmount` is the actual cash amount
@@ -80,6 +85,26 @@ const tournamentSchema = new mongoose.Schema(
     // 2008 or 2009 may register anyway (an 'overage' exception); nobody
     // born before 2008 can register at all."
     ageLimitYear: { type: Number, default: null },
+    // Several over-age exceptions, each "up to `slots` players born in
+    // `birthYear` or later" (still older than ageLimitYear). Example:
+    // ageLimitYear 2010 + [{2008, 3}, {2006, 1}] means born 2010+ register
+    // normally, up to 3 players born 2008–2009 and 1 more born 2006–2007.
+    // A player always takes the youngest rule they fit that still has
+    // space, falling back to an older rule when that one is full. Nobody
+    // older than the oldest rule's year can register.
+    overageRules: {
+      type: [
+        {
+          _id: false,
+          birthYear: { type: Number, required: true },
+          slots: { type: Number, required: true, min: 1 },
+        },
+      ],
+      default: [],
+    },
+    // LEGACY single-exception fields (before overageRules) — still read
+    // for older tournaments while overageRules is empty; cleared as soon as
+    // the tournament's age rule is saved again.
     overageSlots: { type: Number, default: 0 },
     overageLimitYear: { type: Number, default: null },
     // Total registration cap across the whole tournament. null/0 = no cap.

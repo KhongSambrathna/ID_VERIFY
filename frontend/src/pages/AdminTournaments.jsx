@@ -32,11 +32,18 @@ function staffRoleLabel(role, t) {
 function ageRuleSummary(tour, t) {
   if (!tour.ageLimitYear) return t("adminTournaments.noAgeLimit");
   let s = t("adminTournaments.bornYearPlus").replace("{year}", tour.ageLimitYear);
-  if (tour.overageSlots > 0) {
-    s += t("adminTournaments.overageSummary")
-      .replace("{slots}", tour.overageSlots)
-      .replace("{used}", tour.overageUsed || 0);
-    if (tour.overageLimitYear) s += t("adminTournaments.noEarlierThan").replace("{year}", tour.overageLimitYear);
+  const rules = tour.overageRules || [];
+  if (rules.length) {
+    s +=
+      t("adminTournaments.overagePrefix") +
+      rules
+        .map((r) =>
+          t("adminTournaments.overageRuleSummary")
+            .replace("{year}", r.birthYear || "—")
+            .replace("{slots}", r.slots)
+            .replace("{used}", r.used || 0)
+        )
+        .join(", ");
   }
   return s;
 }
@@ -48,8 +55,8 @@ const emptyForm = {
   team: "",
   matchDates: [""],
   ageLimitYear: "",
-  overageSlots: "",
-  overageLimitYear: "",
+  // Over-age exceptions — one row per birth year: { birthYear, slots }.
+  overageRules: [],
   maxParticipants: "",
 };
 
@@ -111,6 +118,12 @@ export default function AdminTournaments() {
     next[i] = value;
     setForm({ ...form, matchDates: next });
   };
+  const updateRule = (i, key) => (e) => {
+    const next = form.overageRules.map((r, idx) => (idx === i ? { ...r, [key]: e.target.value } : r));
+    setForm({ ...form, overageRules: next });
+  };
+  const addRule = () => setForm({ ...form, overageRules: [...form.overageRules, { birthYear: "", slots: "" }] });
+  const removeRule = (i) => setForm({ ...form, overageRules: form.overageRules.filter((_, idx) => idx !== i) });
   const addDateField = () => setForm({ ...form, matchDates: [...form.matchDates, ""] });
   const removeDateField = (i) => setForm({ ...form, matchDates: form.matchDates.filter((_, idx) => idx !== i) });
 
@@ -123,8 +136,10 @@ export default function AdminTournaments() {
       team: tour.team || "",
       matchDates: tour.matchDates?.length ? tour.matchDates.map(formatDate) : [""],
       ageLimitYear: tour.ageLimitYear ? String(tour.ageLimitYear) : "",
-      overageSlots: tour.overageSlots ? String(tour.overageSlots) : "",
-      overageLimitYear: tour.overageLimitYear ? String(tour.overageLimitYear) : "",
+      overageRules: (tour.overageRules || []).map((r) => ({
+        birthYear: r.birthYear ? String(r.birthYear) : "",
+        slots: String(r.slots || ""),
+      })),
       maxParticipants: tour.maxParticipants ? String(tour.maxParticipants) : "",
     });
     setFormError("");
@@ -159,8 +174,7 @@ export default function AdminTournaments() {
           entryFee: form.entryFee === "" ? 0 : form.entryFee,
           matchDates: form.matchDates.filter(Boolean),
           ageLimitYear: form.ageLimitYear,
-          overageSlots: form.ageLimitYear ? form.overageSlots : "",
-          overageLimitYear: form.ageLimitYear ? form.overageLimitYear : "",
+          overageRules: form.ageLimitYear ? form.overageRules : [],
           maxParticipants: form.maxParticipants,
         });
         closeForm();
@@ -175,8 +189,7 @@ export default function AdminTournaments() {
         matchDates: form.matchDates.filter(Boolean),
         team: isAdmin ? form.team : undefined,
         ageLimitYear: form.ageLimitYear,
-        overageSlots: form.overageSlots,
-        overageLimitYear: form.overageLimitYear,
+        overageRules: form.ageLimitYear ? form.overageRules : [],
         maxParticipants: form.maxParticipants,
       });
       setForm(emptyForm);
@@ -419,18 +432,36 @@ export default function AdminTournaments() {
           {form.ageLimitYear && (
             <>
               <div className="field">
-                <label>{t("adminTournaments.overageSlotsLabel")}</label>
-                <input type="number" min="0" value={form.overageSlots} onChange={update("overageSlots")} />
-              </div>
-              <div className="field">
-                <label>{t("adminTournaments.overageLimitYearLabel")}</label>
-                <input
-                  type="number"
-                  min="1900"
-                  placeholder={t("adminTournaments.overageLimitYearPlaceholder")}
-                  value={form.overageLimitYear}
-                  onChange={update("overageLimitYear")}
-                />
+                <label>{t("adminTournaments.overageRulesLabel")}</label>
+                {form.overageRules.map((r, i) => (
+                  <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
+                    <span>{t("adminTournaments.ruleBornPrefix")}</span>
+                    <input
+                      type="number"
+                      min="1900"
+                      style={{ width: 110 }}
+                      placeholder={t("adminTournaments.overageLimitYearPlaceholder")}
+                      value={r.birthYear}
+                      onChange={updateRule(i, "birthYear")}
+                    />
+                    <span>{t("adminTournaments.ruleCountPrefix")}</span>
+                    <input
+                      type="number"
+                      min="1"
+                      style={{ width: 80 }}
+                      placeholder="3"
+                      value={r.slots}
+                      onChange={updateRule(i, "slots")}
+                    />
+                    <span>{t("adminTournaments.rulePeopleSuffix")}</span>
+                    <button type="button" className="link-btn" onClick={() => removeRule(i)}>
+                      {t("common.remove")}
+                    </button>
+                  </div>
+                ))}
+                <button type="button" className="link-btn" onClick={addRule}>
+                  {t("adminTournaments.addRuleButton")}
+                </button>
               </div>
               <p className="help-text" style={{ marginTop: -8 }}>
                 {t("adminTournaments.overageHelp")}

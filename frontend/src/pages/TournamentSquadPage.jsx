@@ -48,7 +48,7 @@ function TournamentExportSheet({ innerRef, tournament }) {
               {r.khmerName && <p className="squad-export-name-kh">{r.khmerName}</p>}
               <p className="squad-export-meta">
                 DOB {formatDob(r.dateOfBirth) || "—"} · {r.team}
-                {r.isOverage ? " · over-age" : ""}
+                {r.isOverage ? ` · over-age${r.overageYear ? ` (${r.overageYear}+)` : ""}` : ""}
               </p>
             </div>
           </div>
@@ -406,7 +406,7 @@ export default function TournamentSquadPage() {
                   <div className="athlete-info">
                     <p className="name">
                       {r.fullName}
-                      {r.isOverage && <span className="badge pending" style={{ marginLeft: 6 }}>{t("tournamentSquadPage.overAge")}</span>}
+                      {r.isOverage && <span className="badge pending" style={{ marginLeft: 6 }}>{t("tournamentSquadPage.overAge")}{r.overageYear ? ` ${r.overageYear}+` : ""}</span>}
                     </p>
                     <p className="role">
                       {r.khmerName ? `${r.khmerName} · ` : ""}
