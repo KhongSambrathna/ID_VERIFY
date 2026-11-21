@@ -19,7 +19,15 @@ const cartSchema = new mongoose.Schema(
     name: { type: String, trim: true, default: "" },
     phone: { type: String, trim: true, default: "" },
     note: { type: String, trim: true, default: "" },
-    step: { type: String, enum: ["", "name", "phone", "note", "confirm"], default: "" },
+    step: { type: String, enum: ["", "name", "phone", "note", "confirm", "acct_user", "acct_code"], default: "" },
+    // Linking a website account from inside the bot (👤 គណនីរបស់ខ្ញុំ):
+    // the username typed so far, and a lock after too many wrong codes.
+    linkUsername: { type: String, default: "" },
+    linkFails: { type: Number, default: 0 },
+    linkLockedUntil: { type: Date, default: null },
+    // Last time this customer's chat message was passed on to the shop
+    // (so the "message sent" note isn't repeated on every message).
+    lastChatAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
@@ -68,6 +76,30 @@ const linkSchema = new mongoose.Schema({
 
 // Remembers which alerts were already sent, so each goes out once.
 // Entries with expiresAt are cleaned up by MongoDB after that time.
+// One-time code for linking ANY website account (Admin, Head Coach, Player,
+// Referee) to Telegram from inside the bot: the person types their
+// username + this 6-digit code, or taps the t.me/<bot>?start=acct_<token>
+// link. Made by the person (Settings), by Admin (any account) or by a Head
+// Coach (their own team's player accounts). Expires after 15 minutes.
+const accountLinkSchema = new mongoose.Schema({
+  account: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", required: true, index: true },
+  code: { type: String, required: true },
+  token: { type: String, required: true, unique: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
+  createdAt: { type: Date, default: Date.now, expires: 60 * 15 },
+});
+
+// Live chat: a customer's message copied into an Admin's Telegram. When the
+// Admin presses Reply on that copy, the bot looks it up here and sends the
+// answer to the right customer. Kept 30 days.
+const relaySchema = new mongoose.Schema({
+  adminChatId: { type: String, required: true },
+  adminMessageId: { type: Number, required: true },
+  customerChatId: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now, expires: 60 * 60 * 24 * 30 },
+});
+relaySchema.index({ adminChatId: 1, adminMessageId: 1 });
+
 const alertLogSchema = new mongoose.Schema({
   key: { type: String, required: true, unique: true },
   at: { type: Date, default: Date.now },
@@ -79,5 +111,7 @@ module.exports = {
   BotCart: mongoose.model("BotCart", cartSchema),
   BotOrder: mongoose.model("BotOrder", orderSchema),
   TelegramLink: mongoose.model("TelegramLink", linkSchema),
+  BotRelay: mongoose.model("BotRelay", relaySchema),
+  AccountLinkCode: mongoose.model("AccountLinkCode", accountLinkSchema),
   AlertLog: mongoose.model("AlertLog", alertLogSchema),
 };

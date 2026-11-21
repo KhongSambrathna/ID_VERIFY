@@ -5,6 +5,10 @@
 // Admin: gets each order in Telegram with ✅ / ❌ buttons. ✅ makes a real
 // invoice (stock is cut automatically); the customer is told either way.
 // Admin also links their Telegram here via t.me/<bot>?start=link_<code>.
+// Mini App: the 🛍 "open shop" buttons open /tg-shop on the website inside
+// Telegram (scrollable product grid + cart + checkout).
+// Live chat: any other message a customer sends is copied to the Admin's
+// Telegram; the Admin presses Reply on it and the bot sends the answer back.
 //
 // Telegram calls POST /api/telegram/webhook/<secret> with every update;
 // handleUpdate() below does the work.
@@ -12,12 +16,13 @@ const mongoose = require("mongoose");
 const Product = require("../models/Product");
 const Admin = require("../models/Admin");
 const Counter = require("../models/Counter");
-const { BotCart, BotOrder, TelegramLink } = require("../models/TelegramBot");
+const { BotCart, BotOrder, TelegramLink, BotRelay, AccountLinkCode } = require("../models/TelegramBot");
 const { FinanceSettings } = require("../models/Finance");
 const { effectivePrice } = require("../utils/pricing");
 const { roundUSD } = require("../utils/currency");
 const { tg, esc } = require("../utils/telegramApi");
 const { SHOP_INFO } = require("../utils/shopInfo");
+const { miniAppUrl } = require("../utils/telegramWebApp");
 
 const RATE = 4000; // ៛ per $1 — same as the website
 const PAGE = 8;
@@ -26,12 +31,15 @@ const usd = (n) => `$${(Math.round((Number(n) || 0) * 100) / 100).toFixed(2)}`;
 const riel = (n) => `៛${(Math.round(((Number(n) || 0) * RATE) / 100) * 100).toLocaleString("en-US")}`;
 const money = (n) => `${usd(n)} (≈ ${riel(n)})`;
 
-const BTN = { shop: "🛍 ទំនិញ", cart: "🧺 កន្ត្រក", orders: "📦 ការកម្មង់របស់ខ្ញុំ", contact: "📞 ទំនាក់ទំនង" };
+const BTN = { shop: "🛍 ទំនិញ", cart: "🧺 កន្ត្រក", orders: "📦 ការកម្មង់របស់ខ្ញុំ", contact: "📞 ទំនាក់ទំនង", account: "👤 គណនីរបស់ខ្ញុំ" };
 const mainKeyboard = {
-  keyboard: [[{ text: BTN.shop }, { text: BTN.cart }], [{ text: BTN.orders }, { text: BTN.contact }]],
+  keyboard: [[{ text: BTN.shop }, { text: BTN.cart }], [{ text: BTN.orders }, { text: BTN.contact }], [{ text: BTN.account }]],
   resize_keyboard: true,
   is_persistent: true,
 };
+
+// Inline button that opens the Mini App shop inside Telegram.
+const openShopButton = (text = "🛍 បើកហាង (អូសមើលទំនិញ)") => ({ text, web_app: { url: miniAppUrl() } });
 
 const send = (chatId, text, extra = {}) =>
   tg("sendMessage", { chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true, ...extra });
@@ -73,10 +81,11 @@ async function welcome(chatId, name) {
   await send(
     chatId,
     `សួស្តី${name ? ` <b>${esc(name)}</b>` : ""}! 👋\nស្វាគមន៍មកកាន់ <b>${SHOP_INFO.name}</b> ⚽\n\n` +
-      `ចុច <b>${BTN.shop}</b> ដើម្បីមើលទំនិញ ដាក់ក្នុងកន្ត្រក ហើយកម្មង់បានភ្លាមៗ។`,
+      `ចុច <b>🛍 បើកហាង</b> ខាងក្រោម ដើម្បីអូសមើលទំនិញ ដាក់ក្នុងកន្ត្រក ហើយកម្មង់បានភ្លាមៗ។\n` +
+      `💬 មានសំណួរ? សរសេរសារនៅទីនេះ — ហាងនឹងឆ្លើយតបអ្នក។`,
     { reply_markup: mainKeyboard }
   );
-  await showList(chatId, 0);
+  await send(chatId, "👇", { reply_markup: { inline_keyboard: [[openShopButton()]] } });
 }
 
 async function showList(chatId, page, editMessageId) {
@@ -97,6 +106,7 @@ async function showList(chatId, page, editMessageId) {
   if (pg < pages - 1) nav.push({ text: "▶️", callback_data: `l:${pg + 1}` });
   if (nav.length) rows.push(nav);
   rows.push([{ text: BTN.cart, callback_data: "c" }]);
+  rows.unshift([openShopButton("📱 មើលជារូបភាព (Mini App)")]);
   const text = `🛍 <b>ទំនិញ</b> (${list.length} មុខ) — ចុចលើទំនិញដើម្បីមើលរូប និងកម្មង់`;
   if (editMessageId) {
     const ok = await tg("editMessageText", { chat_id: chatId, message_id: editMessageId, text, parse_mode: "HTML", reply_markup: { inline_keyboard: rows } });
@@ -322,6 +332,77 @@ async function placeOrder(cb) {
   require("../utils/telegramAlerts").alertNewOrder(order).catch(() => {});
 }
 
+// Order from the Mini App (/tg-shop). `user` is the verified Telegram user,
+// `items` [{ id, qty }]. Prices are always recalculated here from the
+// database — whatever the page showed is never trusted. Returns
+// { order } or { error }.
+async function placeWebAppOrder(user, { items, name, phone, note }) {
+  const chatId = String(user.id);
+  name = String(name || "").trim().slice(0, 80);
+  phone = String(phone || "").trim().slice(0, 30);
+  note = String(note || "").trim().slice(0, 300);
+  if (!name) return { error: "សូមបញ្ចូលឈ្មោះ" };
+  if (String(phone).replace(/\D/g, "").length < 8) return { error: "លេខទូរស័ព្ទមិនត្រឹមត្រូវ" };
+
+  const wanted = new Map();
+  for (const it of Array.isArray(items) ? items : []) {
+    const qty = Math.floor(Number(it?.qty) || 0);
+    if (!mongoose.isValidObjectId(it?.id) || qty < 1) continue;
+    wanted.set(String(it.id), (wanted.get(String(it.id)) || 0) + qty);
+  }
+  if (!wanted.size) return { error: "កន្ត្រកនៅទទេ" };
+
+  const products = await Product.find({ _id: { $in: [...wanted.keys()] } }).lean();
+  const lines = [];
+  for (const [id, qty] of wanted) {
+    const p = products.find((x) => String(x._id) === id);
+    if (!p || p.stock <= 0) return { error: `${p ? p.name : "ទំនិញមួយ"} អស់ស្តុកហើយ` };
+    if (qty > p.stock) return { error: `${p.name}: នៅសល់តែ ${p.stock}` };
+    const { unitPrice, listPrice } = effectivePrice(p, qty, false);
+    lines.push({ product: p, qty, unitPrice, listPrice, total: roundUSD(unitPrice * qty) });
+  }
+  const total = roundUSD(lines.reduce((s, l) => s + l.total, 0));
+
+  // Remember name/phone for next time (same record the chat checkout uses).
+  const cart = await getCart(user, chatId);
+  cart.name = name;
+  cart.phone = phone;
+  cart.step = "";
+  await cart.save();
+
+  const order = await BotOrder.create({
+    orderNo: await nextOrderNo(),
+    chatId,
+    username: user.username || "",
+    customer: { name, phone },
+    items: lines.map((l) => ({
+      product: l.product._id,
+      name: l.product.name,
+      unit: l.product.unit || "pcs",
+      qty: l.qty,
+      unitPrice: l.unitPrice,
+      listPrice: l.listPrice,
+    })),
+    total,
+    note,
+  });
+  let text = `✅ <b>ទទួលបានការកម្មង់ ${order.orderNo}</b>\n\n`;
+  lines.forEach((l, i) => (text += `${i + 1}. ${esc(l.product.name)} — ${l.qty} × ${usd(l.unitPrice)} = ${usd(l.total)}\n`));
+  text += `\n💰 សរុប ${money(total)}\n\nយើងនឹងទាក់ទងទៅលេខ ${esc(phone)} ឆាប់ៗនេះ។ សូមអរគុណ! 🙏\n📞 ${SHOP_INFO.phone}`;
+  await send(chatId, text, { reply_markup: mainKeyboard });
+  require("../utils/telegramAlerts").alertNewOrder(order).catch(() => {});
+  return { order };
+}
+
+// Saved name/phone for pre-filling the Mini App checkout.
+async function webAppProfile(user) {
+  const cart = await BotCart.findOne({ chatId: String(user.id) }).lean();
+  return {
+    name: cart?.name || [user.first_name, user.last_name].filter(Boolean).join(" "),
+    phone: cart?.phone || "",
+  };
+}
+
 async function myOrders(chatId) {
   const list = await BotOrder.find({ chatId }).sort({ createdAt: -1 }).limit(5).lean();
   if (!list.length) return send(chatId, "📦 អ្នកមិនទាន់មានការកម្មង់ទេ។", { reply_markup: mainKeyboard });
@@ -337,7 +418,7 @@ async function myOrders(chatId) {
 function contact(chatId) {
   return send(
     chatId,
-    `🏪 <b>${SHOP_INFO.name}</b>\n📞 ${SHOP_INFO.phone}\n📍 ${SHOP_INFO.address}`,
+    `🏪 <b>${SHOP_INFO.name}</b>\n📞 ${SHOP_INFO.phone}\n📍 ${SHOP_INFO.address}\n\n💬 ឬសរសេរសារនៅទីនេះ — ហាងនឹងឆ្លើយតបតាម Telegram។`,
     { reply_markup: mainKeyboard }
   );
 }
@@ -448,6 +529,165 @@ async function markAdminMessages(order, label) {
   }
 }
 
+// ---------------- Website accounts (link · reset password) ----------------
+// Anyone with a login on the website (Admin, Head Coach, Player, Referee)
+// links this Telegram chat with their username + a one-time code (made in
+// Settings, or by Admin / their Head Coach). Linked accounts then get the
+// site's Telegram notifications here and can reset their password here.
+
+const ROLE_KM = { ADMIN: "Admin", HEAD_COACH: "គ្រូបង្វឹក", PLAYER: "កីឡាករ", REFEREE: "អាជ្ញាកណ្ដាល" };
+const MAX_LINK_FAILS = 5;
+
+async function accountMenu(chatId) {
+  const accounts = await Admin.find({ telegramChatId: chatId }).select("username role team").lean();
+  let text = "👤 <b>គណនីលើវេបសាយ</b>\n\n";
+  const rows = [];
+  if (!accounts.length) {
+    text +=
+      "Telegram នេះមិនទាន់ភ្ជាប់គណនីណាទេ។\n\n" +
+      "ភ្ជាប់ ដើម្បី៖\n• 🔔 ទទួលព័ត៌មាន/ការជូនដំណឹងពីវេបសាយ\n• 🔑 កំណត់លេខសម្ងាត់ថ្មីនៅទីនេះ ពេលភ្លេច\n\n" +
+      "ត្រូវការ <b>username</b> និង <b>លេខកូដ ៦ ខ្ទង់</b>៖ យកពីទំព័រ ការកំណត់ (Settings) លើវេបសាយ ឬសុំពី Admin / គ្រូបង្វឹករបស់អ្នក។";
+  } else {
+    text += "បានភ្ជាប់៖\n";
+    for (const a of accounts) {
+      text += `• <b>${esc(a.username)}</b> — ${ROLE_KM[a.role] || a.role}${a.team ? ` · ${esc(a.team)}` : ""}\n`;
+      rows.push([
+        { text: `🔑 លេខសម្ងាត់ថ្មី · ${a.username}`.slice(0, 60), callback_data: `rp:${a._id}` },
+        { text: "✂️ ផ្ដាច់", callback_data: `ul:${a._id}` },
+      ]);
+    }
+  }
+  rows.push([{ text: accounts.length ? "➕ ភ្ជាប់គណនីមួយទៀត" : "🔗 ភ្ជាប់គណនី", callback_data: "lk" }]);
+  return send(chatId, text, { reply_markup: { inline_keyboard: rows } });
+}
+
+async function startAccountLink(chatId, from) {
+  const cart = await getCart(from, chatId);
+  if (cart.linkLockedUntil && cart.linkLockedUntil > new Date()) {
+    return send(chatId, "⛔ បញ្ចូលលេខកូដខុសច្រើនដងពេក។ សូមព្យាយាមម្ដងទៀតក្រោយ ១ ម៉ោង។");
+  }
+  cart.step = "acct_user";
+  cart.linkUsername = "";
+  await cart.save();
+  return send(chatId, "👤 សូមវាយ <b>username</b> (ឈ្មោះអ្នកប្រើ) របស់អ្នកលើវេបសាយ:", {
+    reply_markup: { force_reply: true, input_field_placeholder: "username" },
+  });
+}
+
+async function finishLink(chatId, account, linkRow) {
+  account.telegramChatId = chatId;
+  await account.save();
+  if (linkRow) await AccountLinkCode.deleteMany({ account: account._id });
+  await send(
+    chatId,
+    `✅ បានភ្ជាប់គណនី <b>${esc(account.username)}</b> (${ROLE_KM[account.role] || account.role}) ហើយ!\n\n` +
+      "• 🔔 ព័ត៌មាន/ការជូនដំណឹងពីវេបសាយ នឹងមកទីនេះ\n• 🔑 ភ្លេចលេខសម្ងាត់? ចុច <b>" + BTN.account + "</b> → លេខសម្ងាត់ថ្មី",
+    { reply_markup: mainKeyboard }
+  );
+}
+
+// step "acct_code": check username + code.
+async function checkLinkCode(cart, msg, code) {
+  const chatId = cart.chatId;
+  // Don't leave the code sitting in the chat.
+  tg("deleteMessage", { chat_id: chatId, message_id: msg.message_id }).catch(() => {});
+  const account = await Admin.findOne({ username: cart.linkUsername });
+  const row = account ? await AccountLinkCode.findOne({ account: account._id, code: String(code).replace(/\s/g, "") }) : null;
+  if (!row) {
+    cart.linkFails = (cart.linkFails || 0) + 1;
+    const left = MAX_LINK_FAILS - cart.linkFails;
+    if (left <= 0) {
+      cart.linkFails = 0;
+      cart.linkLockedUntil = new Date(Date.now() + 60 * 60 * 1000);
+      cart.step = "";
+      await cart.save();
+      return send(chatId, "⛔ username ឬលេខកូដមិនត្រឹមត្រូវច្រើនដងពេក។ សូមព្យាយាមម្ដងទៀតក្រោយ ១ ម៉ោង។", { reply_markup: mainKeyboard });
+    }
+    await cart.save();
+    return send(chatId, `⚠️ username ឬលេខកូដមិនត្រឹមត្រូវ ឬផុតកំណត់ (លេខកូដប្រើបាន ១៥ នាទី)។ សូមវាយលេខកូដម្ដងទៀត (នៅសល់ ${left} ដង) ឬ /cancel។`);
+  }
+  cart.step = "";
+  cart.linkFails = 0;
+  cart.linkUsername = "";
+  await cart.save();
+  return finishLink(chatId, account, row);
+}
+
+// t.me/<bot>?start=acct_<token> — one tap from the website.
+async function linkByToken(chatId, token) {
+  const row = await AccountLinkCode.findOne({ token });
+  if (!row) return send(chatId, "⚠️ តំណនេះផុតកំណត់ ឬប្រើរួចហើយ។ សូមបង្កើតលេខកូដថ្មីលើវេបសាយ។", { reply_markup: mainKeyboard });
+  const account = await Admin.findById(row.account);
+  if (!account) return;
+  return finishLink(chatId, account, row);
+}
+
+// Only from the chat that is linked to that account.
+async function linkedAccount(chatId, id) {
+  if (!mongoose.isValidObjectId(id)) return null;
+  return Admin.findOne({ _id: id, telegramChatId: chatId });
+}
+
+async function resetPasswordHere(chatId, id) {
+  const account = await linkedAccount(chatId, id);
+  if (!account) return send(chatId, "⚠️ គណនីនេះមិនបានភ្ជាប់ជាមួយ Telegram នេះទេ។");
+  const temp = String(require("crypto").randomInt(100000, 1000000));
+  account.password = temp;
+  account.mustChangePassword = true;
+  await account.save();
+  return send(
+    chatId,
+    `🔑 លេខសម្ងាត់បណ្ដោះអាសន្នសម្រាប់ <b>${esc(account.username)}</b>:\n\n<code>${temp}</code>\n\n` +
+      "ចូលវេបសាយដោយប្រើលេខនេះ ហើយប្រព័ន្ធនឹងឱ្យអ្នកដាក់លេខសម្ងាត់ថ្មី។ កុំប្រាប់អ្នកផ្សេង 🔒",
+    { reply_markup: mainKeyboard }
+  );
+}
+
+// ---------------- Live chat (customer ⇄ Admin) ----------------
+
+async function chatAdmins() {
+  return Admin.find({ role: "ADMIN", telegramChatId: { $nin: [null, ""] } }).select("telegramChatId").lean();
+}
+
+// Copy a customer's message (text, photo, voice, sticker…) to every linked
+// Admin, with a header saying who it's from. Returns true if it reached anyone.
+async function relayToAdmins(msg, cart) {
+  const chatId = String(msg.chat.id);
+  const admins = (await chatAdmins()).filter((a) => String(a.telegramChatId) !== chatId);
+  if (!admins.length) return false;
+  const who = [cart.name || cart.firstName || "អតិថិជន", msg.from?.username ? `@${msg.from.username}` : ""].filter(Boolean).join(" ");
+  let reached = false;
+  for (const a of admins) {
+    const to = String(a.telegramChatId);
+    const head = await send(to, `💬 <b>សារពី ${esc(who)}</b>${cart.phone ? ` · 📱 ${esc(cart.phone)}` : ""}\n↩️ <i>ចុច Reply លើសារនេះ ដើម្បីឆ្លើយទៅអតិថិជន</i>`);
+    const copy = await tg("copyMessage", { chat_id: to, from_chat_id: chatId, message_id: msg.message_id });
+    const ids = [head?.message_id, copy?.message_id].filter(Boolean);
+    if (ids.length) reached = true;
+    await BotRelay.insertMany(ids.map((id) => ({ adminChatId: to, adminMessageId: id, customerChatId: chatId })));
+  }
+  return reached;
+}
+
+// An Admin replied (Telegram "Reply") to a relayed message or to an order
+// alert → send their answer to that customer. Returns true if handled.
+async function handleAdminReply(msg) {
+  const chatId = String(msg.chat.id);
+  const replied = msg.reply_to_message?.message_id;
+  if (!replied) return false;
+  let target = (await BotRelay.findOne({ adminChatId: chatId, adminMessageId: replied }).lean())?.customerChatId;
+  if (!target) {
+    const order = await BotOrder.findOne({ adminMessages: { $elemMatch: { chatId, messageId: replied } } }).lean();
+    target = order?.chatId;
+  }
+  if (!target) return false;
+  if (!(await Admin.exists({ role: "ADMIN", telegramChatId: chatId }))) return false;
+  const sent = await tg("copyMessage", { chat_id: target, from_chat_id: chatId, message_id: msg.message_id });
+  await send(chatId, sent ? "✅ បានផ្ញើទៅអតិថិជន" : "⚠️ ផ្ញើមិនបាន — អតិថិជនប្រហែលបានបិទ (block) bot", {
+    reply_to_message_id: msg.message_id,
+  });
+  return true;
+}
+
 // ---------------- Router ----------------
 
 async function onMessage(msg) {
@@ -455,9 +695,13 @@ async function onMessage(msg) {
   if (msg.chat.type !== "private") return; // shop works in private chats only
   const text = (msg.text || "").trim();
 
+  // Admin answering a customer (Reply on a relayed message / order alert).
+  if (msg.reply_to_message && (await handleAdminReply(msg))) return;
+
   if (text.startsWith("/start")) {
     const payload = text.split(/\s+/)[1] || "";
     if (payload.startsWith("link_")) return linkAdmin(chatId, payload.slice(5), msg.from);
+    if (payload.startsWith("acct_")) return linkByToken(chatId, payload.slice(5));
     const cart = await getCart(msg.from, chatId);
     cart.step = "";
     await cart.save();
@@ -472,6 +716,8 @@ async function onMessage(msg) {
   if (text === "/cart" || text === BTN.cart) return showCart(chatId, msg.from);
   if (text === "/orders" || text === BTN.orders) return myOrders(chatId);
   if (text === "/contact" || text === "/help" || text === BTN.contact) return contact(chatId);
+  if (text === "/account" || text === BTN.account) return accountMenu(chatId);
+  if (text === "/link") return startAccountLink(chatId, msg.from);
 
   const cart = await getCart(msg.from, chatId);
   if (text === "/cancel" || text === "❌ បោះបង់") {
@@ -479,6 +725,13 @@ async function onMessage(msg) {
     await cart.save();
     return send(chatId, "បានបោះបង់។ ទំនិញនៅក្នុងកន្ត្រកនៅដដែល។", { reply_markup: mainKeyboard });
   }
+  if (cart.step === "acct_user" && text) {
+    cart.linkUsername = text.slice(0, 60);
+    cart.step = "acct_code";
+    await cart.save();
+    return send(chatId, "🔢 សូមវាយ <b>លេខកូដ ៦ ខ្ទង់</b>:", { reply_markup: { force_reply: true, input_field_placeholder: "123456" } });
+  }
+  if (cart.step === "acct_code" && text) return checkLinkCode(cart, msg, text);
   if (cart.step === "name" && text) {
     cart.name = text.slice(0, 80);
     await cart.save();
@@ -497,8 +750,20 @@ async function onMessage(msg) {
     await cart.save();
     return askConfirm(cart);
   }
-  // Anything else: show the menu.
-  return send(chatId, `ចុច <b>${BTN.shop}</b> ដើម្បីមើលទំនិញ ឬ <b>${BTN.cart}</b> ដើម្បីមើលកន្ត្រក។`, { reply_markup: mainKeyboard });
+  // Anything else (a question, a photo, a voice note…): pass it to the shop.
+  if (!text.startsWith("/")) {
+    const reached = await relayToAdmins(msg, cart);
+    if (reached) {
+      const quiet = cart.lastChatAt && Date.now() - new Date(cart.lastChatAt).getTime() < 30 * 60 * 1000;
+      cart.lastChatAt = new Date();
+      await cart.save();
+      if (!quiet) return send(chatId, "✅ បានផ្ញើសាររបស់អ្នកទៅហាងហើយ — យើងនឹងឆ្លើយតបនៅទីនេះឆាប់ៗ 🙏", { reply_markup: mainKeyboard });
+      return;
+    }
+  }
+  return send(chatId, `ចុច <b>${BTN.shop}</b> ដើម្បីមើលទំនិញ ឬ <b>${BTN.cart}</b> ដើម្បីមើលកន្ត្រក។`, {
+    reply_markup: { inline_keyboard: [[openShopButton()]] },
+  });
 }
 
 async function onCallback(cb) {
@@ -552,6 +817,30 @@ async function onCallback(cb) {
     }
     case "ok":
       return placeOrder(cb);
+    case "lk":
+      await ack();
+      return startAccountLink(chatId, cb.from);
+    case "rp": {
+      // Ask first — a new password replaces the current one.
+      const account = await linkedAccount(chatId, a);
+      if (!account) return ack("មិនមានសិទ្ធិ", true);
+      await ack();
+      return send(chatId, `🔑 កំណត់លេខសម្ងាត់ថ្មីសម្រាប់ <b>${esc(account.username)}</b>? លេខសម្ងាត់ចាស់នឹងឈប់ប្រើបាន។`, {
+        reply_markup: { inline_keyboard: [[{ text: "✅ បាទ/ចាស កំណត់ថ្មី", callback_data: `rpy:${a}` }, { text: "❌ ទេ", callback_data: "noop" }]] },
+      });
+    }
+    case "rpy":
+      await ack();
+      if (msgId) tg("editMessageReplyMarkup", { chat_id: chatId, message_id: msgId, reply_markup: { inline_keyboard: [] } }).catch(() => {});
+      return resetPasswordHere(chatId, a);
+    case "ul": {
+      const account = await linkedAccount(chatId, a);
+      if (!account) return ack("មិនមានសិទ្ធិ", true);
+      account.telegramChatId = "";
+      await account.save();
+      await ack("✂️ បានផ្ដាច់");
+      return accountMenu(chatId);
+    }
     case "bo": {
       // Admin: bo:y:<orderId> / bo:n:<orderId>
       const admin = await isOrderAdmin(cb.from.id);
@@ -574,4 +863,4 @@ async function handleUpdate(update) {
   }
 }
 
-module.exports = { handleUpdate, confirmOrder, rejectOrder, BTN, usd, riel, money };
+module.exports = { handleUpdate, confirmOrder, rejectOrder, placeWebAppOrder, webAppProfile, BTN, usd, riel, money };

@@ -7,6 +7,9 @@ const c = require("../controllers/telegramController");
 router.post("/webhook/:secret", c.webhook);
 router.get("/tick", c.tick);
 router.get("/public", c.publicInfo);
+// Telegram Mini App (/tg-shop) — checked with Telegram's signed initData.
+router.post("/webapp/session", c.webAppSession);
+router.post("/webapp/order", c.webAppOrder);
 
 // Admin only.
 router.use(requireAuth, requireRole("ADMIN"));

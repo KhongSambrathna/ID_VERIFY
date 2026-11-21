@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import { LanguageProvider } from "./i18n/LanguageContext";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -45,12 +45,23 @@ import AdminPurchasePlans from "./pages/AdminPurchasePlans";
 import CoachModePicker from "./pages/CoachModePicker";
 import AdminFinance from "./pages/AdminFinance";
 import AdminTelegram from "./pages/AdminTelegram";
+import TgShop from "./pages/TgShop";
 import CoachModeBanner from "./components/CoachModeBanner";
 import usePageTracking from "./hooks/usePageTracking";
 
 export default function App() {
   // Counts every page opened, for the admin Analytics page.
   usePageTracking();
+  const { pathname } = useLocation();
+
+  // Telegram Mini App shop — full screen inside Telegram, no site navbar.
+  if (pathname.startsWith("/tg-shop")) {
+    return (
+      <LanguageProvider>
+        <TgShop />
+      </LanguageProvider>
+    );
+  }
 
   return (
     <LanguageProvider>

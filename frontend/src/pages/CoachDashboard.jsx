@@ -10,6 +10,7 @@ import JerseyOrderManager from "../components/JerseyOrderManager";
 import AttendanceManager from "../components/AttendanceManager";
 import RegistrationInviteManager from "../components/RegistrationInviteManager";
 import { useLanguage } from "../i18n/LanguageContext";
+import TelegramLinkCode from "../components/TelegramLinkCode";
 
 function formatDob(dob) {
   if (!dob) return null;
@@ -789,6 +790,7 @@ export default function CoachDashboard() {
                         >
                           {resettingId === a._id ? t("coachDashboard.resetting") : t("coachDashboard.resetPassword")}
                         </button>
+                        <TelegramLinkCode compact endpoint={`/auth/player-accounts/${a._id}/telegram-code`} />
                       </td>
                     </tr>
                   ))}

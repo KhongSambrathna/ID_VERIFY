@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import TelegramLinkCode from "../components/TelegramLinkCode";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -15,22 +16,36 @@ export default function SettingsPage() {
   const { t } = useLanguage();
   const { user, login } = useAuth();
 
-  // --- My Telegram chat id ---
-  const [telegramDraft, setTelegramDraft] = useState(user?.telegramChatId || "");
-  const [savingTelegram, setSavingTelegram] = useState(false);
-  const [telegramSaved, setTelegramSaved] = useState(false);
+  // --- My Telegram (linked inside the bot with username + one-time code) ---
+  const [linked, setLinked] = useState(Boolean(user?.telegramChatId));
+  const [unlinking, setUnlinking] = useState(false);
 
-  const saveTelegram = async () => {
-    setSavingTelegram(true);
-    setTelegramSaved(false);
+  // Linking happens in Telegram, so re-check when the page opens / regains focus.
+  useEffect(() => {
+    const refresh = () =>
+      api
+        .get("/auth/me")
+        .then(({ data }) => {
+          setLinked(Boolean(data.telegramChatId));
+          login(localStorage.getItem("token"), data);
+        })
+        .catch(() => {});
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const unlinkTelegram = async () => {
+    setUnlinking(true);
     try {
-      const { data } = await api.put("/auth/me/telegram", { telegramChatId: telegramDraft });
+      const { data } = await api.put("/auth/me/telegram", { telegramChatId: "" });
       login(localStorage.getItem("token"), data);
-      setTelegramSaved(true);
+      setLinked(false);
     } catch (err) {
       alert(err.response?.data?.message || t("common.failedToSave"));
     } finally {
-      setSavingTelegram(false);
+      setUnlinking(false);
     }
   };
 
@@ -76,33 +91,17 @@ export default function SettingsPage() {
       </div>
 
       <div className="card" style={{ maxWidth: 420, marginBottom: 24 }}>
-        <h4 style={{ marginTop: 0 }}>{t("settingsPage.myTelegramCardTitle")}</h4>
-        <p className="help-text" style={{ marginTop: -6 }}>
-          {t("settingsPage.myTelegramHelp")}
+        <h4 style={{ marginTop: 0 }}>{t("tgLink.cardTitle")}</h4>
+        <p className="help-text" style={{ marginTop: -6 }}>{t("tgLink.cardHelp")}</p>
+        <p>
+          {linked ? t("tgLink.linked") : t("tgLink.notLinked")}
+          {linked && (
+            <button type="button" className="link-btn" style={{ marginLeft: 10 }} disabled={unlinking} onClick={unlinkTelegram}>
+              {t("tgLink.unlink")}
+            </button>
+          )}
         </p>
-        <div className="field">
-          <label>{t("settingsPage.myTelegramLabel")}</label>
-          <input
-            placeholder={t("settingsPage.myTelegramPlaceholder")}
-            value={telegramDraft}
-            onChange={(e) => {
-              setTelegramDraft(e.target.value);
-              setTelegramSaved(false);
-            }}
-          />
-        </div>
-        <button
-          className="btn btn-outline"
-          style={{ color: "var(--navy)", borderColor: "var(--navy)" }}
-          onClick={saveTelegram}
-          disabled={savingTelegram}
-        >
-          {savingTelegram
-            ? t("settingsPage.savingTelegram")
-            : telegramSaved
-            ? t("settingsPage.telegramSaved")
-            : t("common.save")}
-        </button>
+        <TelegramLinkCode endpoint="/auth/me/telegram-code" />
       </div>
 
       <form className="card" style={{ maxWidth: 420 }} onSubmit={savePassword}>

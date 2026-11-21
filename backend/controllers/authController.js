@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const { createLinkCode } = require("../utils/accountLink");
 const Admin = require("../models/Admin");
 const Athlete = require("../models/Athlete");
 const { sendTelegramMessage } = require("../utils/notify");
@@ -352,6 +353,46 @@ exports.deleteUser = async (req, res) => {
     const user = await Admin.findByIdAndDelete(req.params.id);
     if (!user) return res.status(404).json({ message: "User not found" });
     res.json({ message: "User deleted" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ---- Link Telegram from inside the bot (username + one-time code) ----
+
+// POST /api/auth/me/telegram-code  (any signed-in account) — a code for myself.
+exports.myTelegramCode = async (req, res) => {
+  try {
+    const account = await Admin.findById(req.adminId);
+    if (!account) return res.status(404).json({ message: "Account not found" });
+    res.json(await createLinkCode(account, req.adminId));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// POST /api/auth/users/:id/telegram-code  (Admin) — for any account, e.g.
+// someone who forgot their password and can't sign in to make their own.
+exports.userTelegramCode = async (req, res) => {
+  try {
+    const account = await Admin.findById(req.params.id);
+    if (!account) return res.status(404).json({ message: "Account not found" });
+    res.json(await createLinkCode(account, req.adminId));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// POST /api/auth/player-accounts/:id/telegram-code  (Admin: any; Head
+// Coach: only their own team's player accounts).
+exports.playerTelegramCode = async (req, res) => {
+  try {
+    const account = await Admin.findOne({ _id: req.params.id, role: "PLAYER" });
+    if (!account) return res.status(404).json({ message: "Player account not found" });
+    if (req.adminRole === "HEAD_COACH" && account.team !== req.adminTeam) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    res.json(await createLinkCode(account, req.adminId));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

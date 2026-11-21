@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import html2canvas from "html2canvas";
+import { saveCanvasAsImage } from "../utils/saveCanvasAsImage";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api from "../api/axios";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -17,6 +19,39 @@ export default function InvoiceView() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const paperRef = useRef(null);
+  const [savingImage, setSavingImage] = useState(false);
+
+  // Save the invoice as a JPG (phone: share sheet → Save to Photos /
+  // Telegram; desktop: download). Always rendered at a fixed A5-ish width
+  // with desktop layout, so it looks the same whatever screen it's saved on.
+  const saveAsImage = async () => {
+    if (!paperRef.current) return;
+    setSavingImage(true);
+    try {
+      if (document.fonts?.ready) await document.fonts.ready; // Khmer fonts must be loaded
+      const canvas = await html2canvas(paperRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        windowWidth: 1100,
+        onclone: (doc) => {
+          const paper = doc.querySelector(".invoice-paper");
+          if (paper) {
+            paper.style.width = "760px";
+            paper.style.maxWidth = "none";
+            paper.style.margin = "0";
+            paper.style.boxShadow = "none";
+          }
+        },
+      });
+      await saveCanvasAsImage(canvas, `${inv.invoiceNo || "invoice"}.jpg`);
+    } catch (err) {
+      alert(err.message || t("invoices.imageFailed"));
+    } finally {
+      setSavingImage(false);
+    }
+  };
   const [inv, setInv] = useState(null);
   const [error, setError] = useState("");
   const [lang, setLang] = useState("km");
@@ -102,10 +137,13 @@ export default function InvoiceView() {
           <button type="button" className={lang === "en" ? "active" : ""} onClick={() => setLang("en")}>English</button>
         </div>
         <button type="button" className="btn btn-primary" onClick={() => window.print()}>🖨️ {t("invoices.print")}</button>
+        <button type="button" className="btn btn-outline" disabled={savingImage} onClick={saveAsImage}>
+          🖼️ {savingImage ? t("invoices.savingImage") : t("invoices.saveImage")}
+        </button>
       </div>
 
       {/* The invoice itself */}
-      <div className={`invoice-paper ${inv.voided ? "is-void" : ""}`} lang={lang}>
+      <div ref={paperRef} className={`invoice-paper ${inv.voided ? "is-void" : ""}`} lang={lang}>
         {inv.voided && <div className="invoice-void-stamp">{L.status.VOID}</div>}
         <header className="invoice-head">
           <div className="invoice-shop">

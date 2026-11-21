@@ -3,6 +3,7 @@ import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import TeamSelect from "../components/TeamSelect";
 import { useLanguage } from "../i18n/LanguageContext";
+import TelegramLinkCode from "../components/TelegramLinkCode";
 
 export default function AdminUsers() {
   const { t } = useLanguage();
@@ -257,6 +258,7 @@ export default function AdminUsers() {
                     )}
                   </td>
                   <td data-label={t("common.actions")} className="actions-cell">
+                    <TelegramLinkCode compact endpoint={`/auth/users/${u._id}/telegram-code`} />
                     {u._id !== currentUser?.id && (
                       <button className="link-btn" onClick={() => remove(u._id)}>
                         {t("common.delete")}
@@ -342,6 +344,7 @@ export default function AdminUsers() {
                     >
                       {resettingId === a._id ? t("adminUsers.resetting") : t("adminUsers.resetPassword")}
                     </button>
+                    <TelegramLinkCode compact endpoint={`/auth/player-accounts/${a._id}/telegram-code`} />
                   </td>
                 </tr>
               ))}

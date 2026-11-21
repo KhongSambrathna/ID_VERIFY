@@ -6,6 +6,7 @@ const { BotOrder, TelegramLink } = require("../models/TelegramBot");
 const { tg, getBotInfo, hasToken } = require("../utils/telegramApi");
 const bot = require("../bot/shopBot");
 const alerts = require("../utils/telegramAlerts");
+const { verifyInitData, miniAppUrl } = require("../utils/telegramWebApp");
 
 // The webhook URL carries a secret so nobody else can post fake updates.
 function webhookSecret() {
@@ -97,6 +98,10 @@ exports.setup = wrap(async (req, res) => {
     drop_pending_updates: true,
   });
   if (!ok) return res.status(502).json({ message: "Telegram refused the webhook — check the token and that the server URL is https" });
+  // The bot's ☰ menu button opens the Mini App shop.
+  await tg("setChatMenuButton", {
+    menu_button: { type: "web_app", text: "🛍 ហាង", web_app: { url: miniAppUrl() } },
+  });
   await tg("setMyCommands", {
     commands: [
       { command: "start", description: "ចាប់ផ្ដើម / Start" },
@@ -104,6 +109,7 @@ exports.setup = wrap(async (req, res) => {
       { command: "cart", description: "កន្ត្រក / Cart" },
       { command: "orders", description: "ការកម្មង់របស់ខ្ញុំ / My orders" },
       { command: "contact", description: "ទំនាក់ទំនង / Contact" },
+      { command: "account", description: "គណនីរបស់ខ្ញុំ / My account" },
     ],
   });
   res.json({ ok: true });
@@ -169,4 +175,22 @@ exports.rejectOrder = wrap(async (req, res) => {
   const r = await bot.rejectOrder(req.params.id, req.adminId);
   if (r.error) return res.status(400).json({ message: r.error });
   res.json({ order: r.order });
+});
+
+// ---- Mini App (public; every call proves who it is with Telegram initData) ----
+
+// POST /api/telegram/webapp/session { initData } → saved name/phone
+exports.webAppSession = wrap(async (req, res) => {
+  const user = verifyInitData(req.body?.initData);
+  if (!user) return res.status(401).json({ message: "សូមបើកទំព័រនេះពីក្នុង Telegram bot" });
+  res.json(await bot.webAppProfile(user));
+});
+
+// POST /api/telegram/webapp/order { initData, items: [{id, qty}], name, phone, note }
+exports.webAppOrder = wrap(async (req, res) => {
+  const user = verifyInitData(req.body?.initData);
+  if (!user) return res.status(401).json({ message: "សូមបើកទំព័រនេះពីក្នុង Telegram bot" });
+  const r = await bot.placeWebAppOrder(user, req.body || {});
+  if (r.error) return res.status(400).json({ message: r.error });
+  res.json({ orderNo: r.order.orderNo, total: r.order.total });
 });
