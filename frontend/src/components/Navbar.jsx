@@ -151,6 +151,12 @@ export default function Navbar() {
       {isRealAdmin && <L to="/admin/coach-mode">🧢 {t("coachMode.menu")}</L>}
       {isPlayer && athleteId && <L to="/player/edit">✏️ {t("navbar.editProfile")}</L>}
       <L to="/settings">⚙️ {t("navbar.settings")}</L>
+      <a href="#" onClick={(e) => { e.preventDefault(); closeMenu(); window.dispatchEvent(new CustomEvent("open-guide")); }}>
+        ❓ {t("guide.menu")}
+      </a>
+      <a href="#" onClick={(e) => { e.preventDefault(); closeMenu(); window.dispatchEvent(new CustomEvent("open-guide", { detail: "install" })); }}>
+        📲 {t("guide.menuInstall")}
+      </a>
       <a href="#" onClick={doLogout} className="nav-logout">
         ⎋ {t("navbar.logout")}
       </a>

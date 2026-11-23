@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
 import "./index.css";
+import "./utils/installPrompt"; // catch the "install app" offer early
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

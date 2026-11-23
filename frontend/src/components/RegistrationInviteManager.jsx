@@ -16,7 +16,10 @@ import { useLanguage } from "../i18n/LanguageContext";
 // "pending" until an Admin approves.
 export default function RegistrationInviteManager() {
   const { t } = useLanguage();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isRealAdmin, inCoachMode, coachTeam } = useAuth();
+  // An Admin in coach mode makes links for the team they're working on.
+  const coachModeAdmin = isRealAdmin && inCoachMode;
+  const canCreate = isAdmin || coachModeAdmin;
   const [invites, setInvites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -74,18 +77,18 @@ export default function RegistrationInviteManager() {
       }
       maxUses = n;
     }
-    if (!isAdmin) {
+    if (!canCreate) {
       setError(t("registrationInvites.adminOnly"));
       setCreating(false);
       return;
     }
-    if (!team) {
+    if (isAdmin && !team) {
       setError(t("registrationInvites.teamRequired"));
       setCreating(false);
       return;
     }
     try {
-      await api.post("/registration/invites", { team, maxUses });
+      await api.post("/registration/invites", { team: isAdmin ? team : coachTeam, maxUses });
       await load();
       setTeam("");
     } catch (err) {
@@ -157,11 +160,18 @@ export default function RegistrationInviteManager() {
       <div className="dash-header" style={{ marginBottom: 12 }}>
         <h3 style={{ margin: 0 }}>{t("registrationInvites.title")}</h3>
       </div>
-      {isAdmin ? (
+      {canCreate ? (
         <div className="card" style={{ maxWidth: 720, marginBottom: 24 }}>
           <p className="help-text" style={{ marginTop: 0 }}>
             {t("registrationInvites.intro")}
           </p>
+          {!isAdmin ? (
+            // Coach mode: the link is for the team being worked on.
+            <div className="field">
+              <label>{t("common.team")}</label>
+              <input value={coachTeam || ""} readOnly className="caps-display" />
+            </div>
+          ) : (
           <div className="field">
             <label>{t("common.team")}</label>
             <select
@@ -179,6 +189,7 @@ export default function RegistrationInviteManager() {
               ))}
             </select>
           </div>
+          )}
           <div className="field">
             <label>{t("registrationInvites.usageLabel")}</label>
             <select value={usage} onChange={(e) => setUsage(e.target.value)}>
@@ -202,7 +213,7 @@ export default function RegistrationInviteManager() {
           <button
             className="btn btn-primary"
             onClick={createInvite}
-            disabled={creating || !team}
+            disabled={creating || (isAdmin && !team)}
           >
             {creating ? t("registrationInvites.creating") : t("registrationInvites.createLink")}
           </button>

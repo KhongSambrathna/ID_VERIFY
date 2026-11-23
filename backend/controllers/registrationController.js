@@ -44,6 +44,7 @@ function publicMatch(a) {
 // body for them, so a coach can't create invites for another team. An Admin
 // may pick any team explicitly, same as adding an athlete directly.
 function resolveTeam(req) {
+  // Admin picks any team; in coach mode (or as a Head Coach) it's their team.
   return req.adminRole === "ADMIN" ? (req.body.team || "").trim() : req.adminTeam;
 }
 

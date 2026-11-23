@@ -44,7 +44,12 @@ router.post("/invites/:token/claim/:athleteId", claimExisting);
 router.use(requireAuth);
 
 router.get("/invites", requireRole("ADMIN", "HEAD_COACH"), listInvites);
-router.post("/invites", requireRole("ADMIN"), createInvite);
+// Admin only — also when an Admin is working in coach mode (link for that team).
+router.post(
+  "/invites",
+  (req, res, next) => (req.adminRole === "ADMIN" || req.isAdminCoachMode ? next() : res.status(403).json({ message: "Only an Admin can create registration links" })),
+  createInvite
+);
 router.delete("/invites/:id", requireRole("ADMIN", "HEAD_COACH"), revokeInvite);
 
 // Admin registration statistics — lots of data for the dashboard:

@@ -20,7 +20,11 @@ export default function AdminDashboard() {
   // Admin can tell an item that still needs identity/documents checked
   // apart from a routine re-approval of someone already verified. See
   // isPendingNew/isPendingEdit below for exactly what puts a row in each.
-  const [activeTab, setActiveTab] = useState("all");
+  // ?tab=registration (from the welcome guide) opens that tab directly.
+  const [activeTab, setActiveTab] = useState(() => {
+    const q = new URLSearchParams(window.location.search).get("tab");
+    return ["all", "pendingNew", "pendingEdit", "registration"].includes(q) ? q : "all";
+  });
   const [selectedPending, setSelectedPending] = useState([]);
   const [bulkApproving, setBulkApproving] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);

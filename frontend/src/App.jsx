@@ -48,6 +48,8 @@ import AdminFinance from "./pages/AdminFinance";
 import AdminTelegram from "./pages/AdminTelegram";
 import TgShop from "./pages/TgShop";
 import CoachModeBanner from "./components/CoachModeBanner";
+import WelcomeGuide from "./components/WelcomeGuide";
+import UpdateBanner from "./components/UpdateBanner";
 import usePageTracking from "./hooks/usePageTracking";
 
 export default function App() {
@@ -68,6 +70,8 @@ export default function App() {
     <LanguageProvider>
       <Navbar />
       <CoachModeBanner />
+      <WelcomeGuide />
+      <UpdateBanner />
       <Routes>
         <Route
           path="/admin/telegram"
