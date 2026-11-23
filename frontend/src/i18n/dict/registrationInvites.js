@@ -1,7 +1,17 @@
 export const km = {
+  "registrationInvites.usageLabel": "អ្នកណាអាចប្រើតំណនេះ",
+  "registrationInvites.usageAnyone": "កីឡាករទាំងក្រុម (មិនកំណត់ចំនួន) — ផ្ញើក្នុងក្រុម Telegram/Facebook",
+  "registrationInvites.usageOnePlayer": "កីឡាករតែម្នាក់",
+  "registrationInvites.usageCustom": "កំណត់ចំនួនកីឡាករ",
+  "registrationInvites.usageCustomCount": "ចំនួនកីឡាករ",
+  "registrationInvites.usageCustomPlaceholder": "ឧ. 20",
+  "registrationInvites.usageUnlimited": "មិនកំណត់",
+  "registrationInvites.colUsage": "បានប្រើ",
+  "registrationInvites.colPlayers": "កីឡាករដែលបានចុះឈ្មោះ",
+  "registrationInvites.invalidCustom": "សូមបញ្ចូលចំនួនកីឡាករ (យ៉ាងហោចណាស់ ១)",
   "registrationInvites.title": "តំណចុះឈ្មោះកីឡាករ",
   "registrationInvites.intro":
-    "បង្កើតតំណចុះឈ្មោះ ហើយផ្ញើវាទៅកីឡាករ (តាម Telegram/Facebook ជាដើម)។ កីឡាករបើកតំណ បំពេញព័ត៌មានខ្លួនឯង ហើយដាក់ស្នើ — កំណត់ត្រានឹងក្លាយជា \"កំពុងរង់ចាំ\" រហូតដល់អ្នកគ្រប់គ្រងអនុម័ត។ តំណនីមួយៗប្រើបានម្តងទៅតែកីឡាករម្នាក់ប៉ុណ្ណោះ — បង្កើតតំណថ្មីសម្រាប់កីឡាករបន្ទាប់។",
+    "បង្កើតតំណចុះឈ្មោះ ហើយផ្ញើវាទៅកីឡាករ (តាម Telegram/Facebook ជាដើម)។ កីឡាករបើកតំណ បំពេញព័ត៌មានខ្លួនឯង ហើយដាក់ស្នើ — កំណត់ត្រានឹងក្លាយជា \"កំពុងរង់ចាំ\" រហូតដល់អ្នកគ្រប់គ្រងអនុម័ត។ តំណមួយអាចឲ្យកីឡាករម្នាក់ ច្រើននាក់ ឬទាំងក្រុមប្រើបាន — ជ្រើសខាងក្រោម។",
   "registrationInvites.createLink": "+ បង្កើតតំណចុះឈ្មោះ",
   "registrationInvites.creating": "កំពុងបង្កើត…",
   "registrationInvites.createFailed": "បរាជ័យក្នុងការបង្កើតតំណចុះឈ្មោះ",
@@ -23,9 +33,19 @@ export const km = {
 };
 
 export const en = {
+  "registrationInvites.usageLabel": "Who can use this link",
+  "registrationInvites.usageAnyone": "The whole team (no limit) — post it in the team's Telegram/Facebook group",
+  "registrationInvites.usageOnePlayer": "One player only",
+  "registrationInvites.usageCustom": "A set number of players",
+  "registrationInvites.usageCustomCount": "Number of players",
+  "registrationInvites.usageCustomPlaceholder": "e.g. 20",
+  "registrationInvites.usageUnlimited": "Unlimited",
+  "registrationInvites.colUsage": "Used",
+  "registrationInvites.colPlayers": "Players who registered",
+  "registrationInvites.invalidCustom": "Enter how many players (at least 1)",
   "registrationInvites.title": "Player registration links",
   "registrationInvites.intro":
-    "Create a registration link and send it to a player (via Telegram/Facebook, etc.). The player opens the link, fills in their own details, and submits — the record stays \"pending\" until an Admin approves it. Each link works once, for one player only — create a new one for the next player.",
+    "Create a registration link and send it to a player (via Telegram/Facebook, etc.). The player opens the link, fills in their own details, and submits — the record stays \"pending\" until an Admin approves it. One link can be for one player, a set number, or the whole team — choose below.",
   "registrationInvites.createLink": "+ Create registration link",
   "registrationInvites.creating": "Creating…",
   "registrationInvites.createFailed": "Failed to create registration link",
