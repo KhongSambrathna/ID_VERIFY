@@ -52,6 +52,20 @@ const invoiceSchema = new mongoose.Schema(
     // Cancelled invoices stay on record (number isn't reused) but their
     // stock lines are returned to the shelf and they're left out of totals.
     voided: { type: Boolean, default: false },
+    // Packages sold on this invoice ({ package, name, count }). Packed ones
+    // are used first: they're unpacked back onto the shelf, then the lines
+    // cut stock as usual — so voiding the invoice simply puts the items back.
+    packages: {
+      type: [
+        {
+          package: { type: mongoose.Schema.Types.ObjectId, ref: "ShopPackage" },
+          name: { type: String, default: "" },
+          count: { type: Number, default: 1 },
+          _id: false,
+        },
+      ],
+      default: [],
+    },
     // A planned sale (quotation, "QT-2026-0001"): stock is NOT cut yet. It
     // shows as expected income in my monthly plan for expectedDate's month.
     // "Sell for real" turns it into a normal invoice (INV number, stock cut).

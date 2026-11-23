@@ -4,6 +4,49 @@ const Product = require("../models/Product");
 const StockMovement = require("../models/StockMovement");
 const Counter = require("../models/Counter");
 const { roundUSD } = require("../utils/currency");
+const ShopPackage = require("../models/ShopPackage");
+const { changePacked, totals } = require("../utils/packageStock");
+
+// [{ packageId, count }] from the form → [{ pkg, count, use }] where `use` is
+// how many already-packed packages this sale takes.
+async function loadPackages(raw) {
+  const out = [];
+  for (const r of Array.isArray(raw) ? raw : []) {
+    const id = r.packageId || r.package;
+    const n = Number(r.count);
+    if (!mongoose.isValidObjectId(id) || !Number.isInteger(n) || n <= 0) continue;
+    const pkg = await ShopPackage.findById(id);
+    if (!pkg) continue;
+    out.push({ pkg, count: n, use: Math.min(n, pkg.packed || 0) });
+  }
+  return out;
+}
+
+// Stock that packed packages give back when used: { productId: qty }.
+function packedExtra(pkgs) {
+  const m = new Map();
+  for (const { pkg, use } of pkgs) for (const [id, q] of totals(pkg.items, use)) m.set(id, (m.get(id) || 0) + q);
+  return m;
+}
+
+// Unpack the packed packages this sale uses (items back on the shelf, ready
+// for the invoice lines to cut).
+async function usePacked(pkgs, invoiceNo, adminId) {
+  for (const { pkg, use } of pkgs) {
+    if (!use) continue;
+    await changePacked({
+      name: pkg.name,
+      oldItems: pkg.items,
+      oldCount: pkg.packed,
+      newItems: pkg.items,
+      newCount: pkg.packed - use,
+      adminId,
+      note: `Package "${pkg.name}" ×${use} sold on ${invoiceNo}`,
+    });
+    pkg.packed -= use;
+    await pkg.save();
+  }
+}
 
 const TZ_OFFSET = "+07:00";
 
@@ -167,12 +210,15 @@ exports.createInvoice = async (req, res) => {
       }
     }
     const planned = Boolean(req.body.planned);
+    const pkgs = await loadPackages(req.body.packages);
+    const extra = packedExtra(pkgs);
     for (const it of items) {
       if (!it.product || planned) continue;
       const need = needByProduct.get(String(it.product._id));
-      if (need > it.product.stock) {
+      const have = it.product.stock + (extra.get(String(it.product._id)) || 0);
+      if (need > have) {
         return res.status(400).json({
-          message: `Not enough stock for "${it.product.name}" — only ${it.product.stock} ${it.product.unit || "pcs"} left`,
+          message: `Not enough stock for "${it.product.name}" — only ${have} ${it.product.unit || "pcs"} left`,
         });
       }
     }
@@ -216,10 +262,14 @@ exports.createInvoice = async (req, res) => {
       createdBy: req.adminId,
       planned,
       expectedDate: planned ? invoiceDate(req.body.expectedDate || req.body.date) : null,
+      packages: pkgs.map(({ pkg, count }) => ({ package: pkg._id, name: pkg.name, count })),
     });
 
     // 2) Cut stock (not for a planned sale — that happens when it's sold).
-    if (!planned) await cutStock(invoice, req.adminId);
+    if (!planned) {
+      await usePacked(pkgs, invoiceNo, req.adminId);
+      await cutStock(invoice, req.adminId);
+    }
 
     await invoice.save();
     if (!planned) require("../utils/telegramAlerts").stockChanged(items.filter((it) => it.product).map((it) => it.product._id));
@@ -296,10 +346,13 @@ exports.finalizeInvoice = async (req, res) => {
     if (inv.voided) return res.status(400).json({ message: "This invoice is void" });
     const need = new Map();
     for (const it of inv.items) if (it.product) need.set(String(it.product), (need.get(String(it.product)) || 0) + it.quantity);
+    const pkgs = await loadPackages((inv.packages || []).map((p) => ({ packageId: p.package, count: p.count })));
+    const extra = packedExtra(pkgs);
     for (const [id, qty] of need) {
       const p = await Product.findById(id);
       if (!p) return res.status(400).json({ message: "A product on this invoice no longer exists" });
-      if (qty > p.stock) return res.status(400).json({ message: `Not enough stock for "${p.name}" — only ${p.stock} ${p.unit || "pcs"} left` });
+      const have = p.stock + (extra.get(id) || 0);
+      if (qty > have) return res.status(400).json({ message: `Not enough stock for "${p.name}" — only ${have} ${p.unit || "pcs"} left` });
     }
     const quoteNo = inv.invoiceNo;
     inv.date = invoiceDate(req.body.date);
@@ -310,6 +363,7 @@ exports.finalizeInvoice = async (req, res) => {
       const p = num(req.body.paidAmount);
       if (!Number.isNaN(p) && p >= 0) inv.paidAmount = roundUSD(Math.min(p, inv.total));
     }
+    await usePacked(pkgs, inv.invoiceNo, req.adminId);
     await cutStock(inv, req.adminId);
     await inv.save();
     require("../utils/telegramAlerts").stockChanged([...need.keys()]);

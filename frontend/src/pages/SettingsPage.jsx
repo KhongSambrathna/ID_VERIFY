@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import TelegramLinkCode from "../components/TelegramLinkCode";
+import ProfileCard from "../components/ProfileCard";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -89,6 +90,8 @@ export default function SettingsPage() {
       <div className="dash-header">
         <h2>{t("settingsPage.title")}</h2>
       </div>
+
+      <ProfileCard />
 
       <div className="card" style={{ maxWidth: 420, marginBottom: 24 }}>
         <h4 style={{ marginTop: 0 }}>{t("tgLink.cardTitle")}</h4>

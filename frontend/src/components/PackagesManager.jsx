@@ -26,6 +26,8 @@ export default function PackagesManager({ products }) {
   const [price, setPrice] = useState("");
   const [isPublic, setIsPublic] = useState(true);
   const [active, setActive] = useState(true);
+  // How many packages are packed (their stock is already cut from the shelf).
+  const [packed, setPacked] = useState("1");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -53,6 +55,7 @@ export default function PackagesManager({ products }) {
       setPrice("");
       setIsPublic(true);
       setActive(true);
+      setPacked("1");
     } else {
       setEditing(pkg._id);
       setName(pkg.name);
@@ -67,6 +70,7 @@ export default function PackagesManager({ products }) {
       setPrice(pkg.price === null || pkg.price === undefined ? "" : String(pkg.price));
       setIsPublic(pkg.isPublic !== false);
       setActive(pkg.active !== false);
+      setPacked(String(pkg.packed || 0));
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -97,15 +101,41 @@ export default function PackagesManager({ products }) {
     }
     setSaving(true);
     try {
-      const body = { name: name.trim(), description, items, price: price === "" ? null : Number(price), isPublic, active };
+      const body = { name: name.trim(), description, items, price: price === "" ? null : Number(price), isPublic, active, packed: Number(packed) || 0 };
       if (editing === "new") await api.post("/packages", body);
       else await api.put(`/packages/${editing}`, body);
       setEditing(null);
       load();
     } catch (err) {
-      setFormError(err.response?.data?.message || t("invoices.failedToSave"));
+      const msg = err.response?.data?.message || t("invoices.failedToSave");
+      if (err.response?.data?.code === "NOT_ENOUGH_STOCK") alert(msg);
+      setFormError(msg);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // +1 / −1 packed package: packing cuts the items from stock, unpacking puts them back.
+  const changePacked = async (pkg, diff) => {
+    const next = (pkg.packed || 0) + diff;
+    if (next < 0) return;
+    try {
+      await api.put(`/packages/${pkg._id}`, { packed: next });
+      load();
+    } catch (err) {
+      alert(err.response?.data?.message || t("invoices.failedToSave"));
+    }
+  };
+
+  // Copy a package — the copy is packed once, so its items are cut from stock
+  // right away. If stock isn't enough the server refuses and we alert.
+  const duplicate = async (pkg) => {
+    try {
+      const { data } = await api.post(`/packages/${pkg._id}/duplicate`);
+      await load();
+      alert(t("packages.duplicated").replace("{name}", data.name));
+    } catch (err) {
+      alert(err.response?.data?.message || t("invoices.failedToSave"));
     }
   };
 
@@ -204,6 +234,13 @@ export default function PackagesManager({ products }) {
               <label className="check-row">
                 <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> {t("packages.active")}
               </label>
+              {lines.some((l) => l.kind === "stock") && (
+                <div className="field" style={{ maxWidth: 260, margin: 0 }}>
+                  <label>📦 {t("packages.packedCount")}</label>
+                  <input type="number" min="0" step="1" value={packed} onChange={(e) => setPacked(e.target.value)} />
+                  <small className="mini-empty">{t("packages.packedHelp")}</small>
+                </div>
+              )}
             </div>
             <div className="invoice-totals-box">
               <div><span>{t("packages.itemsTotal")}</span><b>{formatUSD(itemsTotal)}</b></div>
@@ -255,7 +292,7 @@ export default function PackagesManager({ products }) {
                     <span>
                       {it.product ? "📦" : "✍️"} {it.quantity}
                       {it.unit ? ` ${it.unit}` : "×"} {it.name}
-                      {it.product && it.stock < it.quantity && <span className="badge rejected" style={{ marginLeft: 6 }}>{t("invoices.notEnoughStock")}</span>}
+                      {it.product && !pkg.packed && it.stock < it.quantity && <span className="badge rejected" style={{ marginLeft: 6 }}>{t("invoices.notEnoughStock")}</span>}
                     </span>
                     <span>{formatUSD(it.total)}</span>
                   </li>
@@ -263,6 +300,9 @@ export default function PackagesManager({ products }) {
               </ul>
               <div className="package-meta">
                 {pkg.saving > 0 && <span className="badge verified">{t("packages.saving")} {formatUSD(pkg.saving)}</span>}
+                {pkg.canMake !== null && (
+                  <span className="badge verified">📦 {t("packages.packedBadge").replace("{n}", pkg.packed || 0)}</span>
+                )}
                 {pkg.canMake !== null && (
                   <span className={`badge ${pkg.canMake > 0 ? "" : "rejected"}`}>
                     {t("packages.canMake").replace("{n}", pkg.canMake)}
@@ -272,8 +312,21 @@ export default function PackagesManager({ products }) {
                 {!pkg.active && <span className="badge">{t("packages.inactive")}</span>}
               </div>
               <div className="package-actions">
-                <Link className="btn btn-primary" to={`/admin/invoices?package=${pkg._id}`}>🧾 {t("packages.sell")}</Link>
+                {pkg.active && pkg.canMake !== 0 ? (
+                  <Link className="btn btn-primary" to={`/admin/invoices?package=${pkg._id}`}>🧾 {t("packages.sell")}</Link>
+                ) : (
+                  <button className="btn btn-primary" disabled title={pkg.active ? t("invoices.notEnoughStock") : t("packages.inactive")}>
+                    🧾 {t("packages.sell")}
+                  </button>
+                )}
                 <button className="link-btn" onClick={() => openForm(pkg)}>✏️ {t("common.edit")}</button>
+                <button className="link-btn" onClick={() => duplicate(pkg)}>📄 {t("packages.duplicate")}</button>
+                {pkg.canMake !== null && (
+                  <>
+                    <button className="link-btn" onClick={() => changePacked(pkg, 1)}>➕ {t("packages.packOne")}</button>
+                    <button className="link-btn" disabled={!pkg.packed} onClick={() => changePacked(pkg, -1)}>➖ {t("packages.unpackOne")}</button>
+                  </>
+                )}
                 <button className="link-btn" onClick={() => remove(pkg)}>{t("common.delete")}</button>
               </div>
             </div>

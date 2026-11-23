@@ -25,6 +25,31 @@ async function tg(method, payload = {}) {
   }
 }
 
+// Same as tg(), but uploads a file (e.g. a QR code PNG) with multipart form
+// data. `file` = { field: "photo", buffer, filename, type }.
+async function tgUpload(method, payload = {}, file) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return null;
+  try {
+    const form = new FormData();
+    for (const [k, v] of Object.entries(payload)) {
+      if (v === undefined || v === null) continue;
+      form.append(k, typeof v === "object" ? JSON.stringify(v) : String(v));
+    }
+    form.append(file.field, new Blob([file.buffer], { type: file.type || "image/png" }), file.filename || "file.png");
+    const res = await fetch(`${apiBase()}/bot${token}/${method}`, { method: "POST", body: form });
+    const data = await res.json().catch(() => null);
+    if (!data || !data.ok) {
+      console.warn(`Telegram ${method} failed:`, data ? data.description : res.status);
+      return null;
+    }
+    return data.result;
+  } catch (err) {
+    console.warn(`Telegram ${method} failed:`, err.message);
+    return null;
+  }
+}
+
 // The bot's @username, looked up once.
 let botInfo = null;
 async function getBotInfo() {
@@ -37,4 +62,4 @@ async function getBotInfo() {
 // Escape text for parse_mode: "HTML".
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-module.exports = { tg, esc, getBotInfo, hasToken };
+module.exports = { tg, tgUpload, esc, getBotInfo, hasToken };

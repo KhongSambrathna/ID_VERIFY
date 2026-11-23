@@ -214,6 +214,20 @@ export default function TournamentSquadPage() {
     }
   };
 
+  // Entry fee by KHQR: make the QR, then open the payment page.
+  const [khqrBusy, setKhqrBusy] = useState(null);
+  const payKhqr = async (r) => {
+    setKhqrBusy(r._id);
+    try {
+      const { data } = await api.post("/bakong/tournament/create", { tournamentId: tournament._id, registrationId: r._id });
+      navigate(`/payment/return?md5=${encodeURIComponent(data.md5)}`);
+    } catch (e) {
+      alert(e.response?.data?.message || t("paymentReturn.checkFailed"));
+    } finally {
+      setKhqrBusy(null);
+    }
+  };
+
   const openPayForm = (row) => {
     setPayOpenId(row._id);
     setPayAmount(String(row.feePaidAmount > 0 ? row.feePaidAmount : tournament.entryFee));
@@ -504,7 +518,7 @@ export default function TournamentSquadPage() {
                       {r.registeredBy ? t("tournamentSquadPage.registeredByStaff") : ""}
                     </p>
                   </div>
-                  {!isPlayer && tournament.entryFee > 0 && (
+                  {(!isPlayer || isMine) && tournament.entryFee > 0 && (
                     r.convertedToDebt ? (
                       <span className="badge rejected">{t("tournamentSquadPage.convertedToDebtBadge")}</span>
                     ) : r.feePaid ? (
@@ -522,6 +536,12 @@ export default function TournamentSquadPage() {
                   {!isPlayer && tournament.entryFee > 0 && !r.convertedToDebt && (
                     <button className="link-btn" onClick={() => openPayForm(r)}>
                       {t("tournamentSquadPage.setAmountButton")}
+                    </button>
+                  )}
+                  {(!isPlayer || isMine) && tournament.entryFee > 0 && !r.convertedToDebt && !r.feePaid && (
+                    // KHQR for what's left of the entry fee → payment page
+                    <button className="action-btn positive" disabled={khqrBusy === r._id} onClick={() => payKhqr(r)}>
+                      💳 {khqrBusy === r._id ? "…" : t("paymentReturn.payKhqr")}
                     </button>
                   )}
                   {!isPlayer && r.pendingRemoval && (

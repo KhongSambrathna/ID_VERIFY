@@ -60,6 +60,25 @@ const orderSchema = new mongoose.Schema(
     invoice: { type: mongoose.Schema.Types.ObjectId, ref: "Invoice", default: null },
     handledBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
     handledAt: { type: Date, default: null },
+    // KHQR payment (utils/orderPayments.js). status:
+    //   none    → KHQR off when ordered (pay on delivery / by arrangement)
+    //   unpaid  → QR sent, waiting for the money
+    //   paid    → verified with the Bakong API (or marked by hand by Admin)
+    //   expired → QR timed out unpaid (customer can ask for a new one)
+    payment: {
+      status: { type: String, enum: ["none", "unpaid", "paid", "expired"], default: "none", index: true },
+      method: { type: String, default: "" }, // "khqr" | "manual"
+      qr: { type: String, default: "" },
+      md5: { type: String, default: "", index: true },
+      amount: { type: Number, default: 0 },
+      currency: { type: String, default: "USD" },
+      expiresAt: { type: Date, default: null },
+      paidAt: { type: Date, default: null },
+      hash: { type: String, default: "" }, // bank transaction hash
+      fromAccount: { type: String, default: "" },
+      markedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
+      qrMessageId: { type: Number, default: null }, // the QR photo sent to the customer
+    },
     // Admin alert messages about this order, so they can be updated after
     // it's confirmed/rejected somewhere else.
     adminMessages: [{ _id: false, chatId: String, messageId: Number }],

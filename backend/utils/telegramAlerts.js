@@ -85,10 +85,19 @@ async function alertNewOrder(order) {
   order.items.forEach((i, n) => (text += `${n + 1}. ${esc(i.name)} — ${i.qty} × ${usd(i.unitPrice)} = ${usd(i.qty * i.unitPrice)}\n`));
   text += `\n💰 សរុប <b>${usd(order.total)}</b> (${approx(order.total)})\n👤 ${esc(order.customer.name)}${order.username ? ` (@${esc(order.username)})` : ""}\n📱 ${esc(order.customer.phone)}`;
   if (order.note) text += `\n📝 ${esc(order.note)}`;
+  const ps = order.payment?.status;
+  if (ps === "unpaid") text += `\n\n💳 បានផ្ញើ KHQR ឲ្យអតិថិជន — រង់ចាំការបង់ (ផ្ទៀងផ្ទាត់ស្វ័យប្រវត្តិ)`;
+  if (ps === "paid") text += `\n\n✅ បានបង់រួច`;
   const rows = [[
     { text: "✅ យល់ព្រម → វិក្កយបត្រ", callback_data: `bo:y:${order._id}` },
     { text: "❌ បដិសេធ", callback_data: `bo:n:${order._id}` },
   ]];
+  if (ps === "unpaid" || ps === "none" || !ps) {
+    rows.push([
+      ...(ps === "unpaid" ? [{ text: "💳 ពិនិត្យការបង់", callback_data: `pv:${order._id}` }] : []),
+      { text: "💰 បានទទួលលុយ (ដៃ)", callback_data: `pm:${order._id}` },
+    ]);
+  }
   if (order.username) rows.push([{ text: `💬 ឆាតជាមួយ @${order.username}`, url: `https://t.me/${order.username}` }]);
   const link = webLink("/admin/telegram?tab=orders");
   if (link) rows.push([{ text: "🌐 មើលលើវេបសាយ", url: link }]);

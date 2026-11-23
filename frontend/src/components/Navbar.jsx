@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
+import api from "../api/axios";
+import Avatar from "./Avatar";
 
 // Is this link the page we're on? A link with "?tab=…" only matches that
 // exact tab; a plain link matches its path when no tab is selected — so
@@ -54,7 +56,7 @@ function NavDropdown({ label, active, align, children }) {
 }
 
 export default function Navbar() {
-  const { isAuthed, isAdmin, isHeadCoach, isPlayer, isReferee, athleteId, user, logout, isRealAdmin, inCoachMode, coachTeam } =
+  const { isAuthed, isAdmin, isHeadCoach, isPlayer, isReferee, athleteId, user, login, logout, isRealAdmin, inCoachMode, coachTeam } =
     useAuth();
   const { language, toggleLanguage, t } = useLanguage();
   const navigate = useNavigate();
@@ -80,6 +82,18 @@ export default function Navbar() {
 
   const closeMenu = () => setOpen(false);
 
+  // Name + photo for the account button: fetched once if this login was
+  // stored before profiles existed (Settings → My profile updates it).
+  useEffect(() => {
+    if (!isAuthed || user?.profile) return;
+    api
+      .get("/auth/me")
+      .then(({ data }) => login(localStorage.getItem("token"), data))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthed]);
+  const profile = user?.profile || { name: user?.username, photoUrl: "" };
+
   // One nav link — highlighted when it's the current page.
   const L = ({ to, children }) => (
     <Link to={to} onClick={closeMenu} className={matches(location, to) ? "active" : ""}>
@@ -102,7 +116,7 @@ export default function Navbar() {
   // live in their dashboard.
   const publicLinks = ["/search", "/shop", "/pricing", "/about"];
   const morePublic = () => (
-    <NavDropdown label={t("navbar.more")} active={anyActive(...publicLinks)}>
+    <NavDropdown label={`☰ ${t("navbar.more")}`} active={anyActive(...publicLinks)}>
       <L to="/search">🔍 {t("navbar.findPlayer")}</L>
       <L to="/shop">🛒 {t("navbar.shop")}</L>
       <L to="/pricing">💳 {t("navbar.pricing")}</L>
@@ -110,14 +124,30 @@ export default function Navbar() {
     </NavDropdown>
   );
 
-  // Account menu — who's signed in, settings, logout. Always last.
+  // Account menu — photo + name of who's signed in, settings, logout. Always last.
   const accountMenu = () => (
     <NavDropdown
-      label={<span className="nav-account">👤 {user?.username || t("navbar.account")}</span>}
+      label={
+        <span className="nav-account">
+          <Avatar name={profile.name} photoUrl={profile.photoUrl} size={28} />
+          <span className="nav-account-name">{profile.name || t("navbar.account")}</span>
+        </span>
+      }
       active={anyActive("/settings", "/player/edit", "/change-password")}
       align="right"
     >
-      {user?.role && <Label>{t(`navbar.role_${user.role}`, user.role)}{inCoachMode ? ` → 🧢 ${coachTeam}` : ""}</Label>}
+      <div className="nav-profile">
+        <Avatar name={profile.name} photoUrl={profile.photoUrl} size={44} />
+        <div>
+          <b>{profile.name}</b>
+          {profile.khmerName && <small>{profile.khmerName}</small>}
+          <small>
+            @{user?.username} · {t(`navbar.role_${user?.role}`, user?.role)}
+            {user?.team ? ` · ${user.team}` : ""}
+            {inCoachMode ? ` → 🧢 ${coachTeam}` : ""}
+          </small>
+        </div>
+      </div>
       {isRealAdmin && <L to="/admin/coach-mode">🧢 {t("coachMode.menu")}</L>}
       {isPlayer && athleteId && <L to="/player/edit">✏️ {t("navbar.editProfile")}</L>}
       <L to="/settings">⚙️ {t("navbar.settings")}</L>
@@ -131,7 +161,10 @@ export default function Navbar() {
     <header className="navbar" ref={navRef}>
       <div className="container">
         <Link to={isAuthed ? dashboardPath : "/"} className="brand" onClick={closeMenu}>
-          Countryside <span>Football ID Verify</span>
+          <img src="/logo.png?v=2" alt="" className="brand-logo" />
+          <div className="brand-text">
+            Countryside <span>Football ID Verify</span>
+          </div>
         </Link>
 
         <button
@@ -160,45 +193,54 @@ export default function Navbar() {
           {/* ---------- Admin ---------- */}
           {isAuthed && isAdmin && (
             <>
-              <L to="/admin">{t("navbar.dashboard")}</L>
-              <NavDropdown label={t("navbar.athletes")} active={anyActive("/admin/new", "/admin/cards", "/admin/cards/back")}>
+              <L to="/admin">🏠 {t("navbar.dashboard")}</L>
+              <NavDropdown
+                label={`👥 ${t("navbar.athletes")}`}
+                active={anyActive("/admin/new", "/admin/cards", "/admin/cards/back", "/debt-report", "/admin/stats")}
+              >
                 <L to="/admin/new">➕ {t("navbar.addAthlete")}</L>
+                <L to="/debt-report">📉 {t("navbar.studentDebts")}</L>
+                <L to="/admin/stats">📊 {t("navbar.stats")}</L>
+                <Label>{t("navbar.cards")}</Label>
                 <L to="/admin/cards">🪪 {t("navbar.exportCards")}</L>
                 <L to="/admin/cards/back">🖨️ {t("navbar.printCardBacks")}</L>
               </NavDropdown>
               <NavDropdown
-                label={t("navbar.competitions")}
-                active={anyActive("/admin/tournaments", "/admin/matchday", "/admin/jersey-orders")}
+                label={`🏆 ${t("navbar.competitions")}`}
+                active={anyActive("/admin/tournaments", "/admin/tournament-plans", "/admin/matchday", "/admin/jersey-orders")}
               >
+                <L to="/admin/tournament-plans">📅 {t("navbar.tournamentPlans")}</L>
                 <L to="/admin/tournaments">🏆 {t("navbar.tournaments")}</L>
                 <L to="/admin/matchday">⚽ {t("navbar.matchDay")}</L>
                 <L to="/admin/jersey-orders">👕 {t("navbar.jerseyOrders")}</L>
               </NavDropdown>
               <NavDropdown
-                label={t("navbar.shop")}
+                label={`🛒 ${t("navbar.shop")}`}
                 active={
-                  anyActive("/admin/shop", "/admin/shop?tab=stock", "/admin/shop?tab=report", "/admin/shop?tab=packages", "/admin/invoices", "/admin/purchase-plans", "/admin/telegram", "/admin/telegram?tab=orders") ||
+                  anyActive("/admin/shop", "/admin/shop?tab=stock", "/admin/shop?tab=report", "/admin/shop?tab=packages", "/admin/invoices", "/admin/purchase-plans", "/admin/telegram?tab=orders") ||
                   location.pathname.startsWith("/admin/invoices/")
                 }
               >
+                <Label>{t("navbar.sales")}</Label>
                 <L to="/admin/invoices">🧾 {t("navbar.invoices")}</L>
+                <L to="/admin/telegram?tab=orders">🤖 {t("navbar.botOrders")}</L>
+                <Label>{t("navbar.goods")}</Label>
                 <L to="/admin/shop">📦 {t("navbar.shopProducts")}</L>
                 <L to="/admin/shop?tab=stock">🔄 {t("navbar.shopStock")}</L>
                 <L to="/admin/shop?tab=packages">🎁 {t("navbar.packages")}</L>
                 <L to="/admin/purchase-plans">🛒 {t("navbar.purchasePlans")}</L>
-                <L to="/admin/telegram?tab=orders">🤖 {t("navbar.botOrders")}</L>
+                <Label>{t("navbar.reports")}</Label>
                 <L to="/admin/shop?tab=report">📈 {t("navbar.shopReport")}</L>
-                <L to="/shop">🛒 {t("navbar.viewPublicShop")}</L>
+                <L to="/shop">👀 {t("navbar.viewPublicShop")}</L>
               </NavDropdown>
-              <NavDropdown label={t("navbar.reports")} active={anyActive("/admin/stats", "/debt-report", "/admin/analytics", "/admin/finance")}>
-                <L to="/admin/stats">📊 {t("navbar.stats")}</L>
-                <L to="/debt-report">💰 {t("navbar.debtReport")}</L>
-                <L to="/admin/analytics">👥 {t("navbar.analytics")}</L>
-                <L to="/admin/finance">💰 {t("navbar.myFinance")}</L>
+              <NavDropdown label={`💰 ${t("navbar.money")}`} active={anyActive("/admin/finance", "/admin/telegram?tab=khqr")}>
+                <L to="/admin/finance">💼 {t("navbar.myFinance")}</L>
+                <L to="/debt-report">📉 {t("navbar.studentDebts")}</L>
+                <L to="/admin/telegram?tab=khqr">💳 {t("navbar.khqrPayments")}</L>
               </NavDropdown>
               <NavDropdown
-                label={t("navbar.system")}
-                active={anyActive("/admin/users", "/admin/teams", "/admin/sponsors", "/admin/poster", ...publicLinks)}
+                label={`⚙️ ${t("navbar.system")}`}
+                active={anyActive("/admin/users", "/admin/teams", "/admin/sponsors", "/admin/poster", "/admin/telegram", "/admin/analytics", ...publicLinks)}
               >
                 <Label>{t("navbar.manage")}</Label>
                 <L to="/admin/users">🔑 {t("navbar.users")}</L>
@@ -206,6 +248,7 @@ export default function Navbar() {
                 <L to="/admin/sponsors">🤝 {t("navbar.sponsors")}</L>
                 <L to="/admin/poster">🖼️ {t("navbar.posterGenerator")}</L>
                 <L to="/admin/telegram">🤖 {t("navbar.telegramBot")}</L>
+                <L to="/admin/analytics">👀 {t("navbar.analytics")}</L>
                 <Label>{t("navbar.publicPages")}</Label>
                 <L to="/search">🔍 {t("navbar.findPlayer")}</L>
                 <L to="/pricing">💳 {t("navbar.pricing")}</L>
@@ -217,13 +260,11 @@ export default function Navbar() {
           {/* ---------- Head coach ---------- */}
           {isAuthed && isHeadCoach && (
             <>
-              <L to="/coach">{t("navbar.dashboard")}</L>
-              <L to="/coach?tab=attendance">{t("navbar.attendance")}</L>
-              <L to="/admin/tournaments">{t("navbar.tournaments")}</L>
-              <NavDropdown label={t("navbar.reports")} active={anyActive("/admin/stats", "/debt-report")}>
-                <L to="/admin/stats">📊 {t("navbar.stats")}</L>
-                <L to="/debt-report">💰 {t("navbar.debtReport")}</L>
-              </NavDropdown>
+              <L to="/coach">🏠 {t("navbar.dashboard")}</L>
+              <L to="/coach?tab=attendance">📋 {t("navbar.attendance")}</L>
+              <L to="/admin/tournaments">🏆 {t("navbar.tournaments")}</L>
+              <L to="/debt-report">📉 {t("navbar.studentDebts")}</L>
+              <L to="/admin/stats">📊 {t("navbar.stats")}</L>
               {morePublic()}
             </>
           )}
@@ -231,10 +272,10 @@ export default function Navbar() {
           {/* ---------- Player ---------- */}
           {isAuthed && isPlayer && (
             <>
-              <L to="/player">{t("navbar.dashboard")}</L>
-              {athleteId && <L to="/tournaments">{t("navbar.tournaments")}</L>}
-              <L to="/squad-list">{t("navbar.squadList")}</L>
-              <L to="/jersey-orders">{t("navbar.jerseyOrders")}</L>
+              <L to="/player">🏠 {t("navbar.dashboard")}</L>
+              {athleteId && <L to="/tournaments">🏆 {t("navbar.tournaments")}</L>}
+              <L to="/squad-list">👥 {t("navbar.squadList")}</L>
+              <L to="/jersey-orders">👕 {t("navbar.jerseyOrders")}</L>
               {morePublic()}
             </>
           )}
@@ -242,7 +283,7 @@ export default function Navbar() {
           {/* ---------- Referee ---------- */}
           {isAuthed && isReferee && (
             <>
-              <L to="/referee">{t("navbar.schedule")}</L>
+              <L to="/referee">📅 {t("navbar.schedule")}</L>
               {morePublic()}
             </>
           )}

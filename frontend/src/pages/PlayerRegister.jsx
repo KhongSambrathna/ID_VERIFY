@@ -30,6 +30,9 @@ export default function PlayerRegister() {
     addressCode: "",
     isAvailable: "true",
   });
+  // The detail box is filled from the address picker only while the player
+  // hasn't typed their own text in it.
+  const [addressTyped, setAddressTyped] = useState(false);
   const [photo, setPhoto] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -39,14 +42,6 @@ export default function PlayerRegister() {
   // ID + password, write it down" success screen.
   const [result, setResult] = useState(null);
 
-  // Duplicate-name search (English name only) — as the player types their
-  // name, list anyone already in the system with the same/similar name, so
-  // someone who's already on another team can join THIS team too instead of
-  // creating a second profile. "dismissed" hides the list once they confirm
-  // they're a brand-new person (or after they pick a match).
-  const [duplicates, setDuplicates] = useState([]);
-  const [checkingDuplicate, setCheckingDuplicate] = useState(false);
-  const [dismissedDuplicates, setDismissedDuplicates] = useState(false);
   const [claimingId, setClaimingId] = useState(null);
 
   // Set when submit is blocked because the name already exists on another
@@ -77,33 +72,6 @@ export default function PlayerRegister() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
-
-  // Debounced duplicate check on the English name only — never the Khmer
-  // name. Skipped while the link is still loading/invalid, and only runs
-  // until the player dismisses the list (they've decided they're new).
-  useEffect(() => {
-    if (loading || linkError || dismissedDuplicates) return;
-    const fullName = form.fullName.trim();
-    if (fullName.length < 2) {
-      setDuplicates([]);
-      return;
-    }
-    setCheckingDuplicate(true);
-    const timer = setTimeout(async () => {
-      try {
-        const { data } = await api.get(`/registration/invites/${token}/check-duplicate`, {
-          params: { fullName },
-        });
-        setDuplicates(data.duplicates || []);
-      } catch {
-        // best-effort — a failed check shouldn't block registration
-      } finally {
-        setCheckingDuplicate(false);
-      }
-    }, 400);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.fullName, loading, linkError, dismissedDuplicates, token]);
 
   // "This is me — add me to {team}" — attaches a pending assignment to the
   // matched existing athlete (registering them at this team) rather than
@@ -142,12 +110,17 @@ export default function PlayerRegister() {
       setConfirmDuplicate(false);
     } catch (err) {
       const msg = err.response?.data;
-      if (msg?.code === "DUPLICATE_IN_OTHER_TEAM") {
+      if (msg?.code === "ALREADY_ON_TEAM") {
+        // Same name + birthday already on this team — the player registered
+        // before. Nothing to create; show who it is.
+        setDuplicateConflict({ kind: "already", people: msg.existing || [] });
+        setError("");
+      } else if (msg?.code === "DUPLICATE_IN_OTHER_TEAM") {
         // Name already exists on another team — skip auto-creation and ask
         // the player to confirm (claim the existing person, or register as
         // new anyway).
-        setDuplicateConflict(msg.existing || []);
-        setError(msg.message || t("playerRegister.duplicateInOtherTeam"));
+        setDuplicateConflict({ kind: "ask", people: msg.existing || [] });
+        setError("");
       } else {
         setError(msg?.message || t("playerRegister.submitFailed"));
         setDuplicateConflict(null);
@@ -244,48 +217,67 @@ export default function PlayerRegister() {
 
   return (
     <div className="auth-wrap">
-      {duplicateConflict && duplicateConflict.length > 0 ? (
-        <div className="card duplicate-card">
-          <h2>⚠ {t("playerRegister.duplicateTitle")}</h2>
-          <p>{t("playerRegister.duplicateIntro")}</p>
-          <ul className="duplicate-list">
-            {duplicateConflict.map((a) => (
-              <li key={a._id}>
-                {a.photoUrl && (
+      {duplicateConflict && duplicateConflict.people.length > 0 ? (
+        <div className="card duplicate-card" style={{ maxWidth: 560 }}>
+          <h2>⚠ {duplicateConflict.kind === "already" ? t("playerRegister.alreadyTitle") : t("playerRegister.duplicateTitle")}</h2>
+          <p>
+            {(duplicateConflict.kind === "already" ? t("playerRegister.alreadyIntro") : t("playerRegister.duplicateIntro"))
+              .replace("{name}", form.fullName.trim())
+              .replace("{team}", invite.team)}
+          </p>
+          {/* One box per person — the button inside a box is for THAT person only. */}
+          <div className="duplicate-people">
+            {duplicateConflict.people.map((a) => (
+              <div key={a._id} className="duplicate-person">
+                {a.photoUrl ? (
                   <img src={resolveFileUrl(a.photoUrl)} alt={a.fullName} className="duplicate-avatar" />
+                ) : (
+                  <div className="duplicate-avatar duplicate-avatar-empty">📷</div>
                 )}
-                <strong>{a.fullName}</strong>{a.khmerName ? ` (${a.khmerName})` : ""}
-              </li>
+                <div className="duplicate-person-info">
+                  <strong>{a.fullName}</strong>
+                  {a.khmerName && <div>{a.khmerName}</div>}
+                  <small>
+                    {t("playerRegister.yourId")}: <b>{a.verifyId}</b>
+                    {a.birthYear ? ` · ${t("playerRegister.born")} ${a.birthYear}` : ""}
+                  </small>
+                  <small>
+                    {t("playerRegister.teams")}: {a.teams && a.teams.length ? a.teams.join(", ") : "—"}
+                  </small>
+                  {duplicateConflict.kind === "ask" &&
+                    (a.onThisTeam ? (
+                      <small className="mini-empty">{t("playerRegister.alreadyOnThisTeam").replace("{team}", invite.team)}</small>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        style={{ marginTop: 6 }}
+                        disabled={claimingId === a._id}
+                        onClick={() => claimExisting(a._id)}
+                      >
+                        {claimingId === a._id
+                          ? t("common.saving")
+                          : t("playerRegister.thisIsMeAddToTeam").replace("{team}", invite.team)}
+                      </button>
+                    ))}
+                </div>
+              </div>
             ))}
-          </ul>
-          <p className="help-text">{t("playerRegister.duplicateNote")}</p>
-          <div className="field">
-            {duplicateConflict.map((a) => (
-              <button
-                key={a._id}
-                type="button"
-                className="btn btn-primary"
-                style={{ width: "100%", marginBottom: 8 }}
-                disabled={claimingId === a._id}
-                onClick={() => claimExisting(a._id)}
-              >
-                {claimingId === a._id
-                  ? t("common.saving")
-                  : t("playerRegister.thisIsMeAddToTeam").replace("{team}", invite.team)}
-              </button>
-            ))}
-            <button
-              type="button"
-              className="btn link-btn"
-              style={{ width: "100%", marginTop: 8 }}
-              onClick={registerAnyway}
-            >
-              {t("playerRegister.registerAnyway")}
-            </button>
           </div>
+          {error && <div className="error-text">{error}</div>}
+          {duplicateConflict.kind === "already" ? (
+            <p className="help-text">{t("playerRegister.alreadyNote")}</p>
+          ) : (
+            <>
+              <p className="help-text">{t("playerRegister.duplicateNote")}</p>
+              <button type="button" className="btn btn-outline" style={{ width: "100%" }} disabled={submitting} onClick={registerAnyway}>
+                {submitting ? t("playerRegister.submitting") : t("playerRegister.registerAnyway")}
+              </button>
+            </>
+          )}
           <p className="help-text" style={{ marginTop: 8 }}>
-            <button type="button" className="link-btn" onClick={() => setDuplicateConflict(null)}>
-              {t("common.cancel")}
+            <button type="button" className="link-btn" onClick={() => { setDuplicateConflict(null); setError(""); }}>
+              ← {t("playerRegister.backToForm")}
             </button>
           </p>
         </div>
@@ -297,7 +289,7 @@ export default function PlayerRegister() {
         </p>
 
         <div className="field">
-          <label>{t("addAthlete.fullName")}</label>
+          <label>{t("playerRegister.latinName")} *</label>
           <input
             value={form.fullName}
             onChange={update("fullName")}
@@ -306,7 +298,7 @@ export default function PlayerRegister() {
           />
         </div>
         <div className="field">
-          <label>{t("addAthlete.khmerName")}</label>
+          <label>{t("playerRegister.khmerNameLabel")}</label>
           <input
             value={form.khmerName}
             onChange={update("khmerName")}
@@ -314,8 +306,8 @@ export default function PlayerRegister() {
           />
         </div>
         <div className="field">
-          <label>{t("addAthlete.dateOfBirth")}</label>
-          <input type="date" value={form.dateOfBirth} onChange={update("dateOfBirth")} />
+          <label>{t("addAthlete.dateOfBirth")} *</label>
+          <input type="date" value={form.dateOfBirth} onChange={update("dateOfBirth")} required />
         </div>
         <div className="field">
           <label>{t("addAthlete.gender")}</label>
@@ -329,14 +321,19 @@ export default function PlayerRegister() {
           <label>{t("addressPicker.label")}</label>
           <AddressPicker
             value={form.addressCode}
-            onChange={({ code, text }) => setForm((f) => ({ ...f, addressCode: code, address: text || f.address }))}
+            onChange={({ code, text }) =>
+              setForm((f) => ({ ...f, addressCode: code, address: addressTyped && f.address.trim() ? f.address : text || "" }))
+            }
           />
         </div>
         <div className="field">
           <label>{t("addressPicker.detailLabel")}</label>
           <input
             value={form.address}
-            onChange={update("address")}
+            onChange={(e) => {
+              setAddressTyped(true);
+              update("address")(e);
+            }}
             placeholder={t("playerRegister.addressPlaceholder")}
           />
         </div>

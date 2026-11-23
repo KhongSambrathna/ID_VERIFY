@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
+import { formatKHR } from "../utils/currency";
 import { useAuth } from "../context/AuthContext";
 import { resolveFileUrl } from "../utils/fileUrl";
 import SquadListManager from "../components/SquadListManager";
@@ -312,7 +313,7 @@ export default function CoachDashboard() {
 
   const feeBreakdownText = (a) =>
     (a.fees || []).length
-      ? a.fees.map((f) => `$${f.amount}${f.note ? ` — ${f.note}` : ""}`).join(", ")
+      ? a.fees.map((f) => `${formatKHR(f.amount)}${f.note ? ` — ${f.note}` : ""}`).join(", ")
       : t("debtReport.noFeeBreakdown");
 
   // Pre-composes a ready-to-send debt reminder (name, team, total owed, and
@@ -463,7 +464,7 @@ export default function CoachDashboard() {
                       <span
                         className="badge rejected"
                         title={(athlete.fees || [])
-                          .map((f) => `$${f.amount}${f.note ? ` — ${f.note}` : ""}`)
+                          .map((f) => `${formatKHR(f.amount)}${f.note ? ` — ${f.note}` : ""}`)
                           .join(", ")}
                       >
                         {t("coachDashboard.owes")} ${athlete.feeOwed}
@@ -515,7 +516,7 @@ export default function CoachDashboard() {
                   owingRows.length === 1
                     ? t("debtReport.owingCountLabelSingular")
                     : t("debtReport.owingCountLabelPlural")
-                } — $${owingTotal} ${t("debtReport.totalLabel")}`}
+                } — ${formatKHR(owingTotal)} ${t("debtReport.totalLabel")}`}
           </p>
 
           {owingRows.length > 0 && (
@@ -546,7 +547,7 @@ export default function CoachDashboard() {
                       <td data-label={t("common.name")} className="caps-display">{a.fullName}</td>
                       <td data-label={t("common.role")}>{a.role || "—"}</td>
                       <td data-label={t("debtReport.owes")}>
-                        <span className="badge rejected">${a.feeOwed}</span>
+                        <span className="badge rejected">{formatKHR(a.feeOwed)}</span>
                       </td>
                       <td data-label={t("debtReport.note")}>{feeBreakdownText(a)}</td>
                       <td data-label={t("common.actions")} className="actions-cell">

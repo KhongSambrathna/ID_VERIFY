@@ -11,7 +11,13 @@ const mongoose = require("mongoose");
 const paymentSchema = new mongoose.Schema(
   {
     athlete: { type: mongoose.Schema.Types.ObjectId, ref: "Athlete", required: true },
-    assignmentId: { type: mongoose.Schema.Types.ObjectId, required: true },
+    // What is being paid:
+    //   FEE        → the athlete's owed fees on one team assignment (debts)
+    //   TOURNAMENT → one tournament registration's entry fee
+    kind: { type: String, enum: ["FEE", "TOURNAMENT"], default: "FEE" },
+    assignmentId: { type: mongoose.Schema.Types.ObjectId, default: null },
+    tournament: { type: mongoose.Schema.Types.ObjectId, ref: "Tournament", default: null },
+    registrationId: { type: mongoose.Schema.Types.ObjectId, default: null },
     team: { type: String, required: true }, // denormalized for easy filtering/reporting
     amount: { type: Number, required: true, min: 0.01 },
     // BAKONG: Bakong Open API (National Bank of Cambodia) KHQR / interbank
@@ -24,12 +30,22 @@ const paymentSchema = new mongoose.Schema(
     method: { type: String, enum: ["BAKONG", "CASH", "ABA_QR"], required: true },
     status: {
       type: String,
-      enum: ["PENDING", "COMPLETED", "FAILED", "CANCELLED"],
+      enum: ["PENDING", "COMPLETED", "FAILED", "CANCELLED", "EXPIRED"],
       default: "PENDING",
     },
     // Bakong payment reference (md5) — used to look up a Bakong payment by its
     // md5 when checking transaction status or displaying the QR image.
     reference: { type: String, index: true },
+    // KHQR made locally (utils/khqrPay.js): the QR text to show, its
+    // currency (fees are in Riel), when it stops working, and — once paid —
+    // the bank transaction hash and the payer's account.
+    currency: { type: String, enum: ["USD", "KHR"], default: "KHR" },
+    qr: { type: String, default: "" },
+    expiresAt: { type: Date, default: null },
+    label: { type: String, default: "" }, // "Sok Dara · NOKOR PHEAS UNITED · entry fee"
+    paidHash: { type: String, default: "" },
+    fromAccount: { type: String, default: "" },
+    paidAt: { type: Date, default: null },
     // ABA PayWay fields — only ever set for legacy method: "ABA" records.
     tranId: { type: String, index: true },
     abaStatusCode: { type: Number },

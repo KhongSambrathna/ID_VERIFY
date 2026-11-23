@@ -43,6 +43,8 @@ export default function AdminInvoices() {
   const [cPhone, setCPhone] = useState("");
   const [cAddress, setCAddress] = useState("");
   const [lines, setLines] = useState([blankLine()]);
+  // Packages added to this invoice: { packageId: count }.
+  const [pkgCounts, setPkgCounts] = useState({});
   const [discount, setDiscount] = useState("");
   const [paid, setPaid] = useState("");
   const [note, setNote] = useState("");
@@ -77,21 +79,85 @@ export default function AdminInvoices() {
     api.get("/packages").then(({ data }) => setPackages(data.filter((p) => p.active))).catch(() => {});
   }, []);
 
+  // Stock needed per product across all lines (same product on two lines).
+  const needByProduct = useMemo(() => {
+    const m = {};
+    lines.forEach((l) => {
+      if (l.kind === "stock" && l.productId) m[l.productId] = (m[l.productId] || 0) + (Number(l.quantity) || 0);
+    });
+    return m;
+  }, [lines]);
+
+  // Stock that already-packed packages bring: { productId: qty } for the
+  // given package counts (packed ones are used first when selling).
+  const packedExtra = (counts) => {
+    const m = {};
+    Object.entries(counts).forEach(([id, n]) => {
+      const pkg = packages.find((p) => p._id === id);
+      if (!pkg) return;
+      const use = Math.min(n, pkg.packed || 0);
+      pkg.items.forEach((it) => {
+        if (it.product) m[String(it.product)] = (m[String(it.product)] || 0) + it.quantity * use;
+      });
+    });
+    return m;
+  };
+
   // Add a whole package: its stock items + service/fee lines, grouped under
   // the package name; a cheaper package price is added to the discount.
+  // Adding the same package again adds its quantities to the existing group
+  // (2 packages = 2× everything). If stock can't cover it (counting what's
+  // already on the invoice), show an alert and don't add it.
   const addPackage = (pkg) => {
     if (!pkg) return;
-    const newLines = pkg.items.map((it) => ({
-      kind: it.product ? "stock" : "manual",
-      productId: it.product ? String(it.product) : "",
-      name: it.product ? "" : it.name,
-      quantity: String(it.quantity),
-      unitPrice: String(it.unitPrice),
-      priceManual: true, // keep the package's own prices
-      group: pkg.name,
-    }));
+    const nextCounts = { ...pkgCounts, [pkg._id]: (pkgCounts[pkg._id] || 0) + 1 };
+    if (!planned) {
+      const need = { ...needByProduct };
+      const extra = packedExtra(nextCounts);
+      const short = [];
+      pkg.items.forEach((it) => {
+        if (!it.product) return;
+        const id = String(it.product);
+        need[id] = (need[id] || 0) + it.quantity;
+      });
+      pkg.items.forEach((it) => {
+        if (!it.product) return;
+        const id = String(it.product);
+        const p = products.find((x) => x._id === id);
+        const stock = (p ? p.stock : 0) + (extra[id] || 0);
+        if (need[id] > stock && !short.some((s) => s.id === id)) short.push({ id, name: p ? p.name : it.name, need: need[id], stock });
+      });
+      if (short.length) {
+        alert(
+          `${t("packages.notEnoughTitle").replace("{name}", pkg.name)}\n` +
+            short.map((s) => `• ${s.name}: ${t("packages.needHave").replace("{need}", s.need).replace("{have}", s.stock)}`).join("\n")
+        );
+        return;
+      }
+    }
+    setPkgCounts(nextCounts);
     setLines((ls) => {
       const kept = ls.filter((l) => l.productId || l.name.trim() || l.group);
+      if (kept.some((l) => l.group === pkg.name)) {
+        // Same package again → bump the quantities of its lines.
+        const left = [...pkg.items];
+        return kept.map((l) => {
+          if (l.group !== pkg.name) return l;
+          const k = left.findIndex((it) => (it.product ? String(it.product) === l.productId : !l.productId && it.name === l.name));
+          if (k < 0) return l;
+          const [it] = left.splice(k, 1);
+          return { ...l, quantity: String((Number(l.quantity) || 0) + it.quantity) };
+        });
+      }
+      const newLines = pkg.items.map((it) => ({
+        kind: it.product ? "stock" : "manual",
+        productId: it.product ? String(it.product) : "",
+        name: it.product ? "" : it.name,
+        quantity: String(it.quantity),
+        unitPrice: String(it.unitPrice),
+        priceManual: true, // keep the package's own prices
+        group: pkg.name,
+      }));
       return [...kept, ...newLines];
     });
     if (pkg.saving > 0) setDiscount((d) => String(Math.round(((Number(d) || 0) + pkg.saving) * 100) / 100));
@@ -101,10 +167,11 @@ export default function AdminInvoices() {
   // "Sell" button on a package → /admin/invoices?package=<id>
   useEffect(() => {
     const id = params.get("package");
-    if (!id || packages.length === 0) return;
+    // Wait for products too — the stock check needs them.
+    if (!id || packages.length === 0 || products.length === 0) return;
     addPackage(packages.find((p) => p._id === id));
     setParams({}, { replace: true });
-  }, [packages]);
+  }, [packages, products]);
 
   const setLine = (i, patch) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   // Price for a stock line from the product's rules: sale discount,
@@ -130,18 +197,10 @@ export default function AdminInvoices() {
     );
   };
 
+  const packedExtraNow = packedExtra(pkgCounts);
   const subtotal = lines.reduce((s, l) => s + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0), 0);
   const disc = Math.min(Number(discount) || 0, subtotal);
   const total = subtotal - disc;
-
-  // Stock needed per product across all lines (same product on two lines).
-  const needByProduct = useMemo(() => {
-    const m = {};
-    lines.forEach((l) => {
-      if (l.kind === "stock" && l.productId) m[l.productId] = (m[l.productId] || 0) + (Number(l.quantity) || 0);
-    });
-    return m;
-  }, [lines]);
 
   const finalize = async (inv) => {
     if (!confirm(t("invoicesPlan.confirmFinalize").replace("{no}", inv.invoiceNo))) return;
@@ -158,6 +217,7 @@ export default function AdminInvoices() {
     setCPhone("");
     setCAddress("");
     setLines([blankLine()]);
+    setPkgCounts({});
     setCustomerType("retail");
     setDiscount("");
     setPaid("");
@@ -183,9 +243,21 @@ export default function AdminInvoices() {
       );
       items[items.length - 1].group = l.group || "";
     }
+    // Only packages whose lines are still on the invoice.
+    const usedCounts = Object.fromEntries(
+      Object.entries(pkgCounts).filter(([id]) => {
+        const pkg = packages.find((p) => p._id === id);
+        return pkg && lines.some((l) => l.group === pkg.name);
+      })
+    );
+    const extra = packedExtra(usedCounts);
     for (const [pid, need] of Object.entries(needByProduct)) {
       const p = products.find((x) => x._id === pid);
-      if (!planned && p && need > p.stock) return setFormError(`${p.name}: ${t("invoices.notEnoughStock")} (${p.stock})`);
+      const have = p ? p.stock + (extra[pid] || 0) : 0;
+      if (!planned && p && need > have) {
+        alert(`${p.name}: ${t("invoices.notEnoughStock")} (${have})`);
+        return setFormError(`${p.name}: ${t("invoices.notEnoughStock")} (${have})`);
+      }
     }
     setSaving(true);
     try {
@@ -200,6 +272,7 @@ export default function AdminInvoices() {
         note,
         planned,
         expectedDate: planned ? expectedDate : undefined,
+        packages: Object.entries(usedCounts).map(([packageId, count]) => ({ packageId, count })),
       });
       resetForm();
       navigate(`/admin/invoices/${data._id}`);
@@ -291,7 +364,7 @@ export default function AdminInvoices() {
           <div className="invoice-lines">
             {lines.map((l, i) => {
               const p = products.find((x) => x._id === l.productId);
-              const over = p && needByProduct[p._id] > p.stock;
+              const over = p && needByProduct[p._id] > p.stock + (packedExtraNow[p._id] || 0);
               return (
                 <div className={`invoice-line ${l.group ? "in-package" : ""}`} key={i}>
                   {l.group && (i === 0 || lines[i - 1].group !== l.group) && (
@@ -310,7 +383,7 @@ export default function AdminInvoices() {
                     ) : (
                       <input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} placeholder={t("invoices.descriptionPh")} />
                     )}
-                    {over && <small className="error-text">{t("invoices.notEnoughStock")} ({p.stock})</small>}
+                    {over && <small className="error-text">{t("invoices.notEnoughStock")} ({p.stock + (packedExtraNow[p._id] || 0)})</small>}
                     {p && !l.priceManual && (() => {
                       const ep = effectivePrice(p, Number(l.quantity) || 0, customerType === "wholesale");
                       if (!ep.reason) return null;
@@ -379,6 +452,7 @@ export default function AdminInvoices() {
                 {packages.map((p) => (
                   <option key={p._id} value={p._id} disabled={p.canMake === 0}>
                     {p.name} — {formatUSD(p.finalPrice)}
+                    {p.packed > 0 ? ` · 📦 ${p.packed}` : ""}
                     {p.canMake === 0 ? ` (${t("invoices.notEnoughStock")})` : ""}
                   </option>
                 ))}

@@ -7,6 +7,7 @@ const {
   createPackage,
   updatePackage,
   deletePackage,
+  duplicatePackage,
 } = require("../controllers/packageController");
 
 // Public — shown on the /shop page.
@@ -17,6 +18,7 @@ router.use(requireAuth, requireRole("ADMIN"));
 router.get("/", listPackages);
 router.post("/", createPackage);
 router.put("/:id", updatePackage);
+router.post("/:id/duplicate", duplicatePackage);
 router.delete("/:id", deletePackage);
 
 module.exports = router;

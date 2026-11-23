@@ -2,6 +2,13 @@ const mongoose = require("mongoose");
 const ShopPackage = require("../models/ShopPackage");
 const Product = require("../models/Product");
 const { roundUSD } = require("../utils/currency");
+const { changePacked, shortMessage } = require("../utils/packageStock");
+
+// Whole number ≥ 0, or NaN.
+function count(v, fallback) {
+  const n = num(v, fallback);
+  return Number.isInteger(n) && n >= 0 ? n : NaN;
+}
 
 function num(v, fallback = NaN) {
   if (v === undefined || v === null || v === "") return fallback;
@@ -10,8 +17,8 @@ function num(v, fallback = NaN) {
 }
 
 // Adds live info to a package: current product name/unit/stock for stock
-// items, the sum of the items, the final price, and how many packages the
-// current stock can still make.
+// items, the sum of the items, the final price, and how many packages can be
+// sold: the ones already packed + what the shelf stock can still make.
 async function enrich(pkgs, { publicView = false } = {}) {
   const ids = [...new Set(pkgs.flatMap((p) => p.items.filter((i) => i.product).map((i) => String(i.product))))];
   const products = await Product.find({ _id: { $in: ids } }).select("name unit stock imageUrl").lean();
@@ -47,7 +54,8 @@ async function enrich(pkgs, { publicView = false } = {}) {
       itemsTotal,
       finalPrice,
       saving: roundUSD(Math.max(itemsTotal - finalPrice, 0)),
-      canMake: canMake === Infinity ? null : canMake, // null = only services
+      packed: p.packed || 0,
+      canMake: canMake === Infinity ? null : canMake + (p.packed || 0), // null = only services
     };
   });
 }
@@ -118,6 +126,12 @@ exports.createPackage = async (req, res) => {
     const pkg = new ShopPackage({ name, items });
     const err = applyBody(pkg, req.body);
     if (err) return res.status(400).json({ message: err });
+    // How many to pack now (default 1) — their stock is cut straight away.
+    const packNow = count(req.body.packed, 1);
+    if (Number.isNaN(packNow)) return res.status(400).json({ message: "Enter how many packages to pack" });
+    const { short } = await changePacked({ name, newItems: items, newCount: packNow, adminId: req.adminId });
+    if (short.length) return res.status(400).json({ code: "NOT_ENOUGH_STOCK", short, message: shortMessage(name, short) });
+    pkg.packed = packNow;
     await pkg.save();
     res.status(201).json((await enrich([pkg]))[0]);
   } catch (err) {
@@ -130,14 +144,25 @@ exports.updatePackage = async (req, res) => {
   try {
     const pkg = await ShopPackage.findById(req.params.id);
     if (!pkg) return res.status(404).json({ message: "Package not found" });
+    const oldItems = pkg.items.map((i) => ({ product: i.product, quantity: i.quantity }));
+    const oldCount = pkg.packed || 0;
+    let newItems = oldItems;
     if (req.body.items !== undefined) {
       const { items, error } = parseItems(req.body.items);
       if (error) return res.status(400).json({ message: error });
       pkg.items = items;
+      newItems = items;
     }
+    const newCount = count(req.body.packed, oldCount);
+    if (Number.isNaN(newCount)) return res.status(400).json({ message: "Enter how many packages are packed" });
     const err = applyBody(pkg, req.body);
     if (err) return res.status(400).json({ message: err });
     if (!pkg.name) return res.status(400).json({ message: "Enter a package name" });
+    // Packing more cuts stock; unpacking (or changing the contents) puts the
+    // difference back. Refused, with nothing changed, if stock is short.
+    const { short } = await changePacked({ name: pkg.name, oldItems, oldCount, newItems, newCount, adminId: req.adminId });
+    if (short.length) return res.status(400).json({ code: "NOT_ENOUGH_STOCK", short, message: shortMessage(pkg.name, short) });
+    pkg.packed = newCount;
     await pkg.save();
     res.json((await enrich([pkg]))[0]);
   } catch (err) {
@@ -145,11 +170,45 @@ exports.updatePackage = async (req, res) => {
   }
 };
 
-// DELETE /api/packages/:id — invoices already made from it are unaffected.
+// POST /api/packages/:id/duplicate — a copy of the package with 1 packed:
+// its stock items are cut from the shelf right away. Refused (nothing
+// created) if the stock isn't enough. The copy is on sale but hidden from
+// the public shop so the shop doesn't list the same package twice.
+exports.duplicatePackage = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: "Package not found" });
+    const src = await ShopPackage.findById(req.params.id).lean();
+    if (!src) return res.status(404).json({ message: "Package not found" });
+    let name = `${src.name} (copy)`;
+    for (let n = 2; await ShopPackage.exists({ name }); n++) name = `${src.name} (copy ${n})`;
+    const items = src.items.map(({ product, name: itemName, quantity, unitPrice }) => ({ product, name: itemName, quantity, unitPrice }));
+    const { short } = await changePacked({ name, newItems: items, newCount: 1, adminId: req.adminId });
+    if (short.length) return res.status(400).json({ code: "NOT_ENOUGH_STOCK", short, message: shortMessage(src.name, short) });
+    const pkg = await ShopPackage.create({
+      name,
+      description: src.description,
+      items,
+      price: src.price,
+      isPublic: false,
+      active: true,
+      packed: 1,
+    });
+    res.status(201).json((await enrich([pkg]))[0]);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// DELETE /api/packages/:id — packed packages are unpacked first (their
+// items go back on the shelf). Invoices already made from it are unaffected.
 exports.deletePackage = async (req, res) => {
   try {
-    const pkg = await ShopPackage.findByIdAndDelete(req.params.id);
+    const pkg = await ShopPackage.findById(req.params.id);
     if (!pkg) return res.status(404).json({ message: "Package not found" });
+    if (pkg.packed > 0) {
+      await changePacked({ name: pkg.name, oldItems: pkg.items, oldCount: pkg.packed, newCount: 0, adminId: req.adminId });
+    }
+    await pkg.deleteOne();
     res.json({ message: "Package deleted" });
   } catch (err) {
     res.status(500).json({ message: err.message });

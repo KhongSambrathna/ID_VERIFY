@@ -3,6 +3,7 @@ import api from "../api/axios";
 import { formatUSD, approxKHR } from "../utils/currency";
 import { effectivePrice } from "../utils/pricing";
 import { SHOP_INFO } from "../utils/shopInfo";
+import KhqrPayCard, { KHQR_CSS } from "../components/KhqrPayCard";
 
 // Telegram Mini App shop — opened from the bot's "🛍 បើកហាង" button or ☰ menu
 // button (see backend bot/shopBot.js). Customers scroll the products,
@@ -175,7 +176,7 @@ export default function TgShop() {
 
   return (
     <div className="tgshop">
-      <style>{CSS}</style>
+      <style>{CSS + KHQR_CSS}</style>
 
       {view === "list" && (
         <>
@@ -282,7 +283,12 @@ export default function TgShop() {
           <p>
             សរុប <b>{formatUSD(done.total)}</b> {approxKHR(done.total)}
           </p>
-          <p>ហាងនឹងទាក់ទងអ្នកឆាប់ៗនេះ។ សូមអរគុណ! 🙏</p>
+          {done.payment ? (
+            // KHQR on → scan and pay right here
+            <KhqrPayCard initData={initData} orderId={done.id} orderNo={done.orderNo} initial={done.payment} />
+          ) : (
+            <p>ហាងនឹងទាក់ទងអ្នកឆាប់ៗនេះ។ សូមអរគុណ! 🙏</p>
+          )}
           <button type="button" className="tgs-link" onClick={() => setView("list")}>
             🛍 បន្តទិញ
           </button>

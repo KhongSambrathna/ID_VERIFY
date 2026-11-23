@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axios";
+import { resolveFileUrl } from "../utils/fileUrl";
 import { formatKHR } from "../utils/currency";
 import { useAuth } from "../context/AuthContext";
 import TournamentRulesFields, { emptyRules, rulesFromTournament, rulesPayload, rulesSummaryLines } from "../components/TournamentRulesFields";
@@ -284,8 +285,8 @@ export default function AdminTournaments() {
     }
   };
 
-  const removeRegistration = async (registrationId) => {
-    if (!confirm(t("adminTournaments.confirmRemovePlayer"))) return;
+  const removeRegistration = async (registrationId, name) => {
+    if (!confirm(`${name ? `${name}\n` : ""}${t("adminTournaments.confirmRemovePlayer")}`)) return;
     try {
       await api.delete(`/tournaments/${expandedId}/registrations/${registrationId}`);
       await loadDetail(expandedId);
@@ -609,45 +610,55 @@ export default function AdminTournaments() {
                             {detail.registrations.length === 0 ? (
                               <p className="help-text">{t("adminTournaments.nobodyRegistered")}</p>
                             ) : (
-                              <ul className="fee-items" style={{ marginBottom: 12 }}>
-                                {detail.registrations.map((r) => (
-                                  <li key={r._id} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
-                                      <span>
-                                        <span className="caps-display">{r.fullName} {r.khmerName ? `(${r.khmerName})` : ""} — {r.team}</span>
-                                        {r.role && r.role !== "PLAYER" && (
-                                          <span className="badge pending" style={{ marginLeft: 6 }}>
-                                            {staffRoleLabel(r.role, t)}
+                              <ol className="reg-cards">
+                                {detail.registrations.map((r, idx) => (
+                                  <li key={r._id} className={`reg-card ${payOpenId === r._id ? "open" : ""}`}>
+                                    {/* Who — one box per player; everything inside belongs to this player only */}
+                                    <div className="reg-card-who">
+                                      <span className="reg-card-no">{idx + 1}</span>
+                                      <img
+                                        className="reg-card-photo"
+                                        src={r.photoUrl ? resolveFileUrl(r.photoUrl) : "https://placehold.co/48x60?text=%F0%9F%93%B7"}
+                                        alt={r.fullName}
+                                      />
+                                      <div className="reg-card-name">
+                                        <strong className="caps-display">{r.fullName}</strong>
+                                        {r.khmerName && <span>{r.khmerName}</span>}
+                                        <small className="caps-display">
+                                          {r.team}
+                                          {r.jerseyNumber != null ? ` · #${r.jerseyNumber}` : ""}
+                                        </small>
+                                        <span className="reg-card-tags">
+                                          {r.role && r.role !== "PLAYER" && <span className="badge pending">{staffRoleLabel(r.role, t)}</span>}
+                                          {r.isOverage && <span className="badge pending">{t("adminTournaments.overageSuffix")}</span>}
+                                          {r.registeredBy && <span className="badge">{t("adminTournaments.registeredByStaffSuffix")}</span>}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    {/* Fee + actions for this player */}
+                                    <div className="reg-card-actions">
+                                      {detail.entryFee > 0 &&
+                                        (r.convertedToDebt ? (
+                                          <span className="badge rejected">{t("adminTournaments.convertedToDebtBadge")}</span>
+                                        ) : r.feePaid ? (
+                                          <span className="badge verified">{t("adminTournaments.paidBadge")}</span>
+                                        ) : r.feePaidAmount > 0 ? (
+                                          <span className="badge pending">
+                                            {t("adminTournaments.partialBadge")
+                                              .replace("{amount}", r.feePaidAmount)
+                                              .replace("{fee}", detail.entryFee)}
                                           </span>
-                                        )}
-                                        {r.jerseyNumber != null ? ` · #${r.jerseyNumber}` : ""}
-                                        {r.isOverage ? ` · ${t("adminTournaments.overageSuffix")}` : ""}
-                                        {r.registeredBy ? ` · ${t("adminTournaments.registeredByStaffSuffix")}` : ""}
-                                      </span>
-                                      <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                                        {detail.entryFee > 0 &&
-                                          (r.convertedToDebt ? (
-                                            <span className="badge rejected">{t("adminTournaments.convertedToDebtBadge")}</span>
-                                          ) : r.feePaid ? (
-                                            <span className="badge verified">{t("adminTournaments.paidBadge")}</span>
-                                          ) : r.feePaidAmount > 0 ? (
-                                            <span className="badge pending">
-                                              {t("adminTournaments.partialBadge")
-                                                .replace("{amount}", r.feePaidAmount)
-                                                .replace("{fee}", detail.entryFee)}
-                                            </span>
-                                          ) : (
-                                            <span className="badge pending">{t("adminTournaments.unpaidBadge")}</span>
-                                          ))}
-                                        {detail.entryFee > 0 && !r.convertedToDebt && (
-                                          <button type="button" className="link-btn" onClick={() => openPayForm(r, detail.entryFee)}>
-                                            {t("adminTournaments.setAmountButton")}
-                                          </button>
-                                        )}
-                                        <button className="link-btn" onClick={() => removeRegistration(r._id)}>
-                                          {t("common.remove")}
+                                        ) : (
+                                          <span className="badge pending">{t("adminTournaments.unpaidBadge")}</span>
+                                        ))}
+                                      {detail.entryFee > 0 && !r.convertedToDebt && (
+                                        <button type="button" className="action-btn" onClick={() => openPayForm(r, detail.entryFee)}>
+                                          💵 {t("adminTournaments.setAmountButton")}
                                         </button>
-                                      </span>
+                                      )}
+                                      <button className="action-btn danger" onClick={() => removeRegistration(r._id, r.fullName)}>
+                                        {t("common.remove")}
+                                      </button>
                                     </div>
                                     {payOpenId === r._id && (
                                       <div className="field" style={{ maxWidth: 260 }}>
@@ -682,7 +693,7 @@ export default function AdminTournaments() {
                                     )}
                                   </li>
                                 ))}
-                              </ul>
+                              </ol>
                             )}
                             <div className="field search-field" style={{ maxWidth: 340 }}>
                               <label>{t("adminTournaments.registerOnBehalfLabel")}</label>

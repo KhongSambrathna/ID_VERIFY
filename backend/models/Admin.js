@@ -47,6 +47,11 @@ const adminSchema = new mongoose.Schema(
     // breaks. Get this by messaging the club's bot once, then looking the
     // numeric chat id up (e.g. via @userinfobot).
     telegramChatId: { type: String, default: "" },
+    // Name + photo shown in the top bar (account menu). A Player account
+    // without its own uses its athlete profile's name and photo.
+    displayName: { type: String, trim: true, default: "" },
+    photoUrl: { type: String, default: "" },
+    photoPublicId: { type: String, default: "" },
   },
   { timestamps: true }
 );

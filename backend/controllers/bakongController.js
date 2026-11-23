@@ -1,7 +1,13 @@
 const Athlete = require("../models/Athlete");
 const Payment = require("../models/Payment");
-const { createPayment, getQrImage, checkTransaction } = require("../utils/bakong");
+const Tournament = require("../models/Tournament");
+const pay = require("../utils/khqrPay");
+const fees = require("../utils/feePayments");
 const { notifyAdmins, notifyTeamCoaches } = require("../utils/notify");
+
+// Bakong KHQR for student debts and tournament entry fees. The QR is made
+// locally (utils/khqrPay.js, official "bakong-khqr" package) and checked with
+// the Bakong Open API — see utils/feePayments.js for the whole flow.
 
 // Same access rule as fees: Admin any team, Head Coach/Player only their own team's assignment.
 async function findAssignmentForBakong(req, athleteId, assignmentId) {
@@ -19,148 +25,121 @@ function feeOwedOf(assignment) {
   return (assignment.fees || []).reduce((sum, f) => sum + (f.amount || 0), 0);
 }
 
-// POST /api/bakong/payment/create  { athleteId, assignmentId, amount, currency?, orderInfo? }
-// Creates a Bakong payment and returns the QR data (+ md5) the frontend needs
-// to display a scannable KHQR. Saves a Payment row (status PENDING) keyed by md5.
+// Who may see / check a payment: Admin any; others only their own team's
+// (and a Player only their own).
+function canSee(req, p) {
+  if (req.adminRole === "ADMIN") return true;
+  if (req.adminRole === "PLAYER") return req.athleteId && String(p.athlete) === String(req.athleteId);
+  return p.team === req.adminTeam;
+}
+
+const view = (p) => ({
+  status: p.status,
+  kind: p.kind || "FEE",
+  amount: p.amount,
+  currency: p.currency || "KHR",
+  qr: p.status === "PENDING" ? p.qr : "",
+  md5: p.reference,
+  expiresAt: p.expiresAt,
+  label: p.label,
+  paidAt: p.paidAt,
+  fromAccount: p.fromAccount,
+  tournament: p.tournament,
+});
+
+// POST /api/bakong/payment/create  { athleteId, assignmentId, amount? }
+// KHQR (in Riel) for what this athlete owes on that team (or part of it).
 exports.createBakongPayment = async (req, res) => {
   try {
-    const { athleteId, assignmentId, amount: rawAmount, currency, orderInfo } = req.body;
+    const { athleteId, assignmentId, amount } = req.body;
     const { athlete, assignment, error } = await findAssignmentForBakong(req, athleteId, assignmentId);
     if (error) return res.status(error[0]).json({ message: error[1] });
+    const p = await fees.createFeeQr({ athlete, assignment, amount, by: req.adminId });
+    res.json({ ...view(p), feeOwed: feeOwedOf(assignment) });
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
 
-    const amount = Math.round(Number(rawAmount) * 100) / 100;
-    const owed = feeOwedOf(assignment);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return res.status(400).json({ message: "Amount must be a positive number" });
-    }
-    if (amount > owed) {
-      return res.status(400).json({ message: "Amount is more than what's currently owed" });
-    }
+// POST /api/bakong/tournament/create  { tournamentId, registrationId }
+// KHQR for the unpaid part of one registration's entry fee. Admin, the
+// team's Head Coach, or the player themself.
+exports.createTournamentPayment = async (req, res) => {
+  try {
+    const t = await Tournament.findById(req.body.tournamentId);
+    if (!t) return res.status(404).json({ message: "Tournament not found" });
+    const row = t.registrations.id(req.body.registrationId);
+    if (!row) return res.status(404).json({ message: "Registration not found" });
+    const allowed =
+      req.adminRole === "ADMIN" ||
+      (req.adminRole === "PLAYER" ? String(row.athlete) === String(req.athleteId) : row.team === req.adminTeam);
+    if (!allowed) return res.status(403).json({ message: "Access denied" });
+    const p = await fees.createTournamentQr({ tournament: t, row, by: req.adminId });
+    res.json(view(p));
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
 
-    let bakongResult;
-    try {
-      bakongResult = await createPayment({ amount, currency, orderInfo });
-    } catch (err) {
-      return res.status(502).json({ message: err.message || "Bakong payment creation failed" });
-    }
-
-    const md5 = bakongResult.md5;
-    if (!md5) {
-      return res.status(502).json({ message: "Bakong did not return a payment reference (md5)" });
-    }
-
-    await Payment.create({
-      athlete: athlete._id,
-      assignmentId: assignment._id,
-      team: assignment.team,
-      amount,
-      method: "BAKONG",
-      status: "PENDING",
-      reference: md5,
-      recordedBy: req.adminId,
-      note: String(orderInfo || "").slice(0, 200),
-    });
-
-    return res.json({
-      status: "PENDING",
-      amount,
-      currency: bakongResult.currency || currency || "USD",
-      qr: bakongResult.qr,
-      md5,
-      feeOwed: owed,
-    });
+// GET /api/bakong/payment/:md5 — the QR to show + status (payment page).
+exports.getBakongPayment = async (req, res) => {
+  try {
+    const p = await Payment.findOne({ reference: req.params.md5, method: "BAKONG" }).sort({ createdAt: -1 });
+    if (!p) return res.status(404).json({ message: "Bakong payment not found" });
+    if (!canSee(req, p)) return res.status(403).json({ message: "Access denied" });
+    res.json(view(p));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// GET /api/bakong/qr-image?md5=...  (or POST { md5 })
-// Proxies Bakong's QR-image endpoint so the frontend never handles the Bearer token.
-// Returns the PNG image with the correct content type.
+// GET /api/bakong/qr-image?md5=... — PNG of the QR (made locally).
 exports.getBakongQrImage = async (req, res) => {
   try {
     const md5 = req.query.md5 || (req.body && req.body.md5);
     if (!md5) return res.status(400).json({ message: "md5 is required" });
-
-    const payment = await Payment.findOne({ reference: md5, method: "BAKONG" });
-    if (!payment) return res.status(404).json({ message: "Bakong payment not found" });
-
-    let qr;
-    try {
-      const fresh = await createPayment({
-        amount: payment.amount,
-        currency: payment.currency || "USD",
-        orderInfo: payment.note || "Athlete fee payment",
-      });
-      qr = fresh.qr;
-    } catch (err) {
-      return res.status(502).json({ message: err.message || "Failed to regenerate Bakong QR" });
-    }
-
-    let buffer;
-    try {
-      buffer = await getQrImage({ qr, md5 });
-    } catch (err) {
-      return res.status(502).json({ message: err.message || "Failed to fetch Bakong QR image" });
-    }
-
+    const p = await Payment.findOne({ reference: md5, method: "BAKONG" }).sort({ createdAt: -1 });
+    if (!p || !p.qr) return res.status(404).json({ message: "Bakong payment not found" });
+    if (!canSee(req, p)) return res.status(403).json({ message: "Access denied" });
     res.set("Content-Type", "image/png");
     res.set("Cache-Control", "no-store");
-    return res.send(buffer);
+    res.send(await pay.qrPng(p.qr));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
+
 // POST /api/bakong/check-transaction  { md5 }
-// Server-to-server verification with Bakong. If paid (responseCode 0), applies the
-// payment to the athlete's outstanding fees and marks the Payment row COMPLETED.
+// Ask Bakong now (at most every 4 s per payment); returns the status.
+const lastCheck = new Map();
 exports.checkBakongTransaction = async (req, res) => {
   try {
     const { md5 } = req.body;
     if (!md5) return res.status(400).json({ message: "md5 is required" });
-
-    const payment = await Payment.findOne({ reference: md5, method: "BAKONG" });
-    if (!payment) return res.status(404).json({ message: "Bakong payment not found" });
-
-    let data;
-    try {
-      data = await checkTransaction(md5);
-    } catch (err) {
-      return res.status(502).json({ message: err.message || "Bakong transaction check failed" });
+    let p = await Payment.findOne({ reference: md5, method: "BAKONG" }).sort({ createdAt: -1 });
+    if (!p) return res.status(404).json({ message: "Bakong payment not found" });
+    if (!canSee(req, p)) return res.status(403).json({ message: "Access denied" });
+    if (p.status === "PENDING" && Date.now() - (lastCheck.get(md5) || 0) > 4000) {
+      lastCheck.set(md5, Date.now());
+      const r = await fees.runFeeChecks({ ids: [p._id] });
+      p = await Payment.findById(p._id);
+      if (r.error && p.status === "PENDING") return res.json({ ...view(p), checkError: r.error });
     }
+    res.json(view(p));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
 
-    if (data.responseCode !== 0) {
-      // 1 = not yet paid / invalid md5 — leave the row PENDING for a retry.
-      return res.json({ status: "PENDING", responseCode: data.responseCode, message: data.responseMessage });
-    }
-
-    // Paid — credit it once (idempotent: skip if already COMPLETED).
-    if (payment.status === "COMPLETED") {
-      const athlete = await Athlete.findById(payment.athlete);
-      const assignment = athlete.assignments.id(payment.assignmentId);
-      return res.json({ status: "COMPLETED", feeOwed: feeOwedOf(assignment) });
-    }
-
-    const athlete = await Athlete.findById(payment.athlete);
-    const assignment = athlete.assignments.id(payment.assignmentId);
-    if (!assignment) return res.status(404).json({ message: "Assignment not found" });
-    if (req.adminRole !== "ADMIN" && assignment.team !== req.adminTeam) {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
-    const paidAmount = data.data?.amount ?? payment.amount;
-    const newFeeOwed = await applyPaymentToFees(athlete, assignment, paidAmount);
-
-    payment.status = "COMPLETED";
-    payment.amount = paidAmount;
-    payment.bakongResponse = data;
-    await payment.save();
-
-    const text = `💳 ${athlete.fullName} (${assignment.team}) paid $${paidAmount} via Bakong`;
-    notifyAdmins(text);
-    notifyTeamCoaches(assignment.team, text);
-
-    return res.json({ status: "COMPLETED", feeOwed: newFeeOwed });
+// POST /api/bakong/mark-paid { md5 } — Admin / Head Coach saw the money
+// arrive (bank app) but Bakong can't be checked: apply it by hand.
+exports.markBakongPaid = async (req, res) => {
+  try {
+    const p = await Payment.findOne({ reference: req.body.md5, method: "BAKONG" }).sort({ createdAt: -1 });
+    if (!p) return res.status(404).json({ message: "Bakong payment not found" });
+    if (req.adminRole === "PLAYER" || !canSee(req, p)) return res.status(403).json({ message: "Access denied" });
+    const r = await fees.applyPaid(p._id, { by: req.adminId });
+    res.json({ already: Boolean(r.already), ...view(await Payment.findById(p._id)) });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

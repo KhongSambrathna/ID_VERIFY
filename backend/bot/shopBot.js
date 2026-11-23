@@ -23,6 +23,7 @@ const { roundUSD } = require("../utils/currency");
 const { tg, esc } = require("../utils/telegramApi");
 const { SHOP_INFO } = require("../utils/shopInfo");
 const { miniAppUrl } = require("../utils/telegramWebApp");
+const payments = require("../utils/orderPayments");
 
 const RATE = 4000; // ៛ per $1 — same as the website
 const PAGE = 8;
@@ -329,6 +330,7 @@ async function placeOrder(cb) {
     `✅ <b>ទទួលបានការកម្មង់ ${order.orderNo}</b>\n💰 សរុប ${money(total)}\n\nយើងនឹងទាក់ទងទៅលេខ ${esc(cart.phone)} ឆាប់ៗនេះ។ សូមអរគុណ! 🙏\n📞 ${SHOP_INFO.phone}`,
     { reply_markup: mainKeyboard }
   );
+  await payments.offerPayment(order); // KHQR picture to scan (when switched on)
   require("../utils/telegramAlerts").alertNewOrder(order).catch(() => {});
 }
 
@@ -390,6 +392,7 @@ async function placeWebAppOrder(user, { items, name, phone, note }) {
   lines.forEach((l, i) => (text += `${i + 1}. ${esc(l.product.name)} — ${l.qty} × ${usd(l.unitPrice)} = ${usd(l.total)}\n`));
   text += `\n💰 សរុប ${money(total)}\n\nយើងនឹងទាក់ទងទៅលេខ ${esc(phone)} ឆាប់ៗនេះ។ សូមអរគុណ! 🙏\n📞 ${SHOP_INFO.phone}`;
   await send(chatId, text, { reply_markup: mainKeyboard });
+  await payments.offerPayment(order); // KHQR picture in the chat too
   require("../utils/telegramAlerts").alertNewOrder(order).catch(() => {});
   return { order };
 }
@@ -410,7 +413,8 @@ async function myOrders(chatId) {
   let text = "📦 <b>ការកម្មង់ចុងក្រោយរបស់អ្នក</b>\n";
   for (const o of list) {
     const d = new Date(o.createdAt).toLocaleDateString("en-GB", { timeZone: "Asia/Phnom_Penh" });
-    text += `\n<b>${o.orderNo}</b> · ${d} · ${usd(o.total)}\n${label[o.status]}\n${o.items.map((i) => `  • ${esc(i.name)} ×${i.qty}`).join("\n")}\n`;
+    const paid = o.payment?.status === "paid" ? " · 💳 បានបង់" : o.payment?.status === "unpaid" ? " · 💳 មិនទាន់បង់" : "";
+    text += `\n<b>${o.orderNo}</b> · ${d} · ${usd(o.total)}\n${label[o.status]}${paid}\n${o.items.map((i) => `  • ${esc(i.name)} ×${i.qty}`).join("\n")}\n`;
   }
   return send(chatId, text, { reply_markup: mainKeyboard });
 }
@@ -478,9 +482,12 @@ async function confirmOrder(orderId, adminId) {
         body: {
           customer: { name: order.customer.name || order.username || "Telegram", phone: order.customer.phone },
           items: order.items.map((i) => (i.product ? { productId: String(i.product), quantity: i.qty, unitPrice: i.unitPrice } : { name: i.name, quantity: i.qty, unitPrice: i.unitPrice })),
-          paidAmount: 0,
+          // Paid by KHQR (or marked paid) → a PAID invoice.
+          paidAmount: order.payment?.status === "paid" ? order.total : 0,
           language: "km",
-          note: `Telegram ${order.orderNo}${order.username ? ` (@${order.username})` : ""}${order.note ? ` · ${order.note}` : ""}`,
+          note:
+            `Telegram ${order.orderNo}${order.username ? ` (@${order.username})` : ""}${order.note ? ` · ${order.note}` : ""}` +
+            (order.payment?.status === "paid" ? ` · ${order.payment.method === "khqr" ? "KHQR" : "Paid"}${order.payment.hash ? ` ${order.payment.hash.slice(0, 10)}` : ""}` : ""),
         },
       },
       res
@@ -494,7 +501,7 @@ async function confirmOrder(orderId, adminId) {
   await order.save();
   await send(
     order.chatId,
-    `✅ <b>ការកម្មង់ ${order.orderNo} ត្រូវបានយល់ព្រម!</b>\n🧾 វិក្កយបត្រ ${result.data.invoiceNo}\n💰 សរុប ${money(result.data.total)}\n\nសូមអរគុណដែលបានគាំទ្រ ${SHOP_INFO.name} 🙏`,
+    `✅ <b>ការកម្មង់ ${order.orderNo} ត្រូវបានយល់ព្រម!</b>\n🧾 វិក្កយបត្រ ${result.data.invoiceNo}\n💰 សរុប ${money(result.data.total)}${order.payment?.status === "paid" ? " · ✅ បានបង់រួច" : ""}\n\nសូមអរគុណដែលបានគាំទ្រ ${SHOP_INFO.name} 🙏`,
     { reply_markup: mainKeyboard }
   );
   await markAdminMessages(order, `✅ បានយល់ព្រម · វិក្កយបត្រ ${result.data.invoiceNo}`);
@@ -690,10 +697,35 @@ async function handleAdminReply(msg) {
 
 // ---------------- Router ----------------
 
+// In a group: an Admin types /paygroup to make it the group where "💰 paid"
+// notices are posted, or /verify … to check a payment there.
+async function groupCommand(msg, text) {
+  const m = /^\/(paygroup|verify)(@\w+)?(?:\s+(.*))?$/i.exec(text);
+  if (!m) return;
+  const admin = await Admin.findOne({ role: "ADMIN", telegramChatId: String(msg.from?.id) });
+  if (!admin) return send(msg.chat.id, "⚠️ មានតែ Admin ដែលបានភ្ជាប់ Telegram ទេ ទើបប្រើបាន។");
+  if (m[1].toLowerCase() === "paygroup") {
+    const PaySettings = require("../models/PaySettings");
+    await PaySettings.updateOne({ key: "shop" }, { $set: { groupChatId: String(msg.chat.id), groupTitle: msg.chat.title || "" } }, { upsert: true });
+    return send(msg.chat.id, "✅ ក្រុមនេះនឹងទទួលដំណឹង «💰 បានទទួលលុយ» ពីការកម្មង់ដែលបង់តាម KHQR។");
+  }
+  const r = await payments.verify(m[3] || "").catch((e) => ({ text: `⚠️ ${esc(e.message)}` }));
+  return send(msg.chat.id, r.text);
+}
+
 async function onMessage(msg) {
   const chatId = String(msg.chat.id);
-  if (msg.chat.type !== "private") return; // shop works in private chats only
   const text = (msg.text || "").trim();
+  // Groups: only Admin commands (/paygroup, /verify). The shop itself works
+  // in private chats only.
+  if (msg.chat.type !== "private") return groupCommand(msg, text);
+
+  // Admin: /verify BO-0012 | md5 | bank hash
+  if (/^\/verify(@\w+)?(\s|$)/i.test(text)) {
+    if (!(await isOrderAdmin(msg.from.id))) return send(chatId, "មិនមានសិទ្ធិ");
+    const r = await payments.verify(text.split(/\s+/).slice(1).join(" ")).catch((e) => ({ text: `⚠️ ${esc(e.message)}` }));
+    return send(chatId, r.text);
+  }
 
   // Admin answering a customer (Reply on a relayed message / order alert).
   if (msg.reply_to_message && (await handleAdminReply(msg))) return;
@@ -840,6 +872,54 @@ async function onCallback(cb) {
       await account.save();
       await ack("✂️ បានផ្ដាច់");
       return accountMenu(chatId);
+    }
+    case "pc": {
+      // Customer: "I've paid — check"
+      const order = await BotOrder.findById(mongoose.isValidObjectId(a) ? a : null);
+      if (!order || order.chatId !== chatId) return ack();
+      if (order.payment?.status === "paid") return ack("✅ បានបង់រួចហើយ");
+      const r = await payments.runPaymentChecks({ orderIds: [order._id] });
+      if (r.paid.length) return ack("✅ បានទទួលការបង់ប្រាក់ — សូមអរគុណ!");
+      if (r.error) return ack("⏳ មិនទាន់អាចពិនិត្យបានទេ — ហាងនឹងពិនិត្យ ហើយបញ្ជាក់ជូនឆាប់ៗ", true);
+      return ack("⏳ មិនទាន់ឃើញការបង់ប្រាក់ទេ។ បើទើបបង់ សូមរង់ចាំបន្តិច រួចចុចម្ដងទៀត។", true);
+    }
+    case "pn": {
+      // Customer: new QR after the old one expired
+      const order = await BotOrder.findById(mongoose.isValidObjectId(a) ? a : null);
+      if (!order || order.chatId !== chatId) return ack();
+      if (order.status !== "pending" || order.payment?.status === "paid") return ack("ការកម្មង់នេះលែងត្រូវការបង់ទៀតហើយ", true);
+      await ack();
+      if (msgId) tg("editMessageReplyMarkup", { chat_id: chatId, message_id: msgId, reply_markup: { inline_keyboard: [] } }).catch(() => {});
+      const p = await payments.offerPayment(order);
+      if (!p) return send(chatId, `សូមទាក់ទងហាង 📞 ${SHOP_INFO.phone} ដើម្បីបង់ប្រាក់។`);
+      return;
+    }
+    case "pv": {
+      // Admin: check this order's payment now
+      const admin = await isOrderAdmin(cb.from.id);
+      if (!admin) return ack("មិនមានសិទ្ធិ", true);
+      const order = await BotOrder.findById(mongoose.isValidObjectId(a) ? a : null);
+      if (!order) return ack();
+      const r = await payments.verify(order.orderNo).catch((e) => ({ text: e.message }));
+      return ack(r.text.replace(/<[^>]+>/g, "").slice(0, 190), true);
+    }
+    case "pm": {
+      // Admin: mark paid by hand (saw the money in the bank app) — ask first
+      const admin = await isOrderAdmin(cb.from.id);
+      if (!admin) return ack("មិនមានសិទ្ធិ", true);
+      const order = await BotOrder.findById(mongoose.isValidObjectId(a) ? a : null);
+      if (!order) return ack();
+      await ack();
+      return send(chatId, `💰 បញ្ជាក់ថាបានទទួលលុយ <b>${usd(order.total)}</b> សម្រាប់ ${order.orderNo} ពិតមែន? (បានឃើញក្នុងកម្មវិធីធនាគារ)`, {
+        reply_markup: { inline_keyboard: [[{ text: "✅ បាទ/ចាស បានទទួល", callback_data: `pmy:${a}` }, { text: "❌ ទេ", callback_data: "noop" }]] },
+      });
+    }
+    case "pmy": {
+      const admin = await isOrderAdmin(cb.from.id);
+      if (!admin) return ack("មិនមានសិទ្ធិ", true);
+      if (msgId) tg("editMessageReplyMarkup", { chat_id: chatId, message_id: msgId, reply_markup: { inline_keyboard: [] } }).catch(() => {});
+      const r = await payments.markPaid(a, { by: admin._id });
+      return ack(r.already ? "បានកត់ថាបង់រួចហើយ" : "✅ បានកត់ថាបានបង់");
     }
     case "bo": {
       // Admin: bo:y:<orderId> / bo:n:<orderId>

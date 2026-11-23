@@ -31,6 +31,12 @@ router.get("/settings", c.getSettings);
 router.put("/settings", c.updateSettings);
 router.get("/receivables", c.receivables);
 
+// Wedding gifts I gave (ចំណងដៃ)
+router.get("/wedding-gifts", c.listWeddingGifts);
+router.post("/wedding-gifts", c.createWeddingGift);
+router.put("/wedding-gifts/:id", c.updateWeddingGift);
+router.delete("/wedding-gifts/:id", c.deleteWeddingGift);
+
 router.get("/plans", c.listPlans);
 router.get("/plan-invoices", c.planInvoices);
 router.post("/plans", c.createPlan);

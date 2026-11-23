@@ -42,6 +42,7 @@ import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminInvoices from "./pages/AdminInvoices";
 import InvoiceView from "./pages/InvoiceView";
 import AdminPurchasePlans from "./pages/AdminPurchasePlans";
+import AdminTournamentPlans from "./pages/AdminTournamentPlans";
 import CoachModePicker from "./pages/CoachModePicker";
 import AdminFinance from "./pages/AdminFinance";
 import AdminTelegram from "./pages/AdminTelegram";
@@ -213,6 +214,14 @@ export default function App() {
           element={
             <ProtectedRoute role="ADMIN">
               <AdminInvoices />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/tournament-plans"
+          element={
+            <ProtectedRoute role="ADMIN">
+              <AdminTournamentPlans />
             </ProtectedRoute>
           }
         />

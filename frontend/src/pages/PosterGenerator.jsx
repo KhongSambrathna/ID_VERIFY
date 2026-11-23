@@ -41,6 +41,20 @@ function sanitizeFilename(s) {
 export default function PosterGenerator() {
   const { t } = useLanguage();
   const posterRef = useRef(null);
+  // On a phone the 540px poster is shrunk to fit the screen (CSS scale only —
+  // the export below still renders it at full size).
+  const wrapRef = useRef(null);
+  const [fit, setFit] = useState(1);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      const w = el.parentElement ? el.parentElement.clientWidth : DISPLAY_SIZE;
+      setFit(Math.min(1, w / DISPLAY_SIZE));
+    });
+    ro.observe(el.parentElement || el);
+    return () => ro.disconnect();
+  }, []);
 
   const [teams, setTeams] = useState([]);
   const [loadingTeams, setLoadingTeams] = useState(true);
@@ -90,6 +104,9 @@ export default function PosterGenerator() {
   const downloadPng = async () => {
     if (!posterRef.current) return;
     setExporting(true);
+    // Remove the on-screen shrink while capturing, so the PNG is full size.
+    const prevTransform = posterRef.current.style.transform;
+    posterRef.current.style.transform = "none";
     try {
       const canvas = await html2canvas(posterRef.current, {
         useCORS: true,
@@ -109,6 +126,7 @@ export default function PosterGenerator() {
       console.error(err);
       alert(t("posterGenerator.exportFailed"));
     } finally {
+      if (posterRef.current) posterRef.current.style.transform = prevTransform;
       setExporting(false);
     }
   };
@@ -123,7 +141,7 @@ export default function PosterGenerator() {
           </Link>
         </div>
       </div>
-      <p className="help-text" style={{ marginTop: -8 }}>
+      <p className="help-text" style={{ marginTop: 4 }}>
         {t("posterGenerator.subtitle")}
       </p>
 
@@ -177,10 +195,12 @@ export default function PosterGenerator() {
           </button>
         </div>
 
-        <div className="poster-gen-canvas-wrap">
+        <div className="poster-gen-canvas-wrap" ref={wrapRef} style={{ width: DISPLAY_SIZE * fit, height: DISPLAY_SIZE * fit }}>
           <div
             ref={posterRef}
             style={{
+              transform: fit < 1 ? `scale(${fit})` : undefined,
+              transformOrigin: "top left",
               width: DISPLAY_SIZE,
               height: DISPLAY_SIZE,
               boxSizing: "border-box",

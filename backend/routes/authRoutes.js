@@ -1,9 +1,13 @@
 const express = require("express");
 const router = express.Router();
 const { requireAuth, requireRole } = require("../middleware/auth");
+const upload = require("../middleware/upload");
 const {
   register,
   login,
+  updateMyProfile,
+  uploadMyPhoto,
+  removeMyPhoto,
   listUsers,
   createUser,
   updateUser,
@@ -27,6 +31,10 @@ router.post("/forgot-password", forgotPassword); // Telegram-based self-service 
 
 // Any signed-in account — self-service, not tied to a role
 router.get("/me", requireAuth, me);
+// My name + photo in the top bar
+router.put("/me/profile", requireAuth, updateMyProfile);
+router.put("/me/photo", requireAuth, upload.single("photo"), uploadMyPhoto);
+router.delete("/me/photo", requireAuth, removeMyPhoto);
 router.post("/change-password", requireAuth, changePassword);
 router.put("/me/telegram", requireAuth, updateMyTelegram);
 // One-time code to link Telegram from inside the bot (username + code).

@@ -178,7 +178,27 @@ const investEntrySchema = new mongoose.Schema(
 );
 investEntrySchema.index({ investment: 1, date: -1 });
 
+// Wedding gifts I gave (ចំណងដៃ) — whose wedding, when, how much. If it was
+// also recorded as an expense, `txn` points to that Daily entry (category
+// "ceremony") so editing / deleting the gift keeps the ledger in step.
+const weddingGiftSchema = new mongoose.Schema(
+  {
+    owner: ref,
+    person: { type: String, required: true, trim: true }, // whose wedding (groom / bride / family)
+    relation: { type: String, trim: true, default: "" }, // friend, relative, colleague…
+    place: { type: String, trim: true, default: "" },
+    phone: { type: String, trim: true, default: "" },
+    date: { type: Date, required: true },
+    ...money,
+    note: { type: String, trim: true, default: "" },
+    txn: { type: mongoose.Schema.Types.ObjectId, ref: "FinanceTxn", default: null },
+  },
+  { timestamps: true }
+);
+weddingGiftSchema.index({ owner: 1, date: -1 });
+
 module.exports = {
+  FinanceWeddingGift: mongoose.model("FinanceWeddingGift", weddingGiftSchema),
   FinanceInvestment: mongoose.model("FinanceInvestment", investmentSchema),
   FinanceInvestEntry: mongoose.model("FinanceInvestEntry", investEntrySchema),
   FinanceAccount: mongoose.model("FinanceAccount", accountSchema),

@@ -22,6 +22,7 @@ const analyticsRoutes = require("./routes/analyticsRoutes");
 const invoiceRoutes = require("./routes/invoiceRoutes");
 const packageRoutes = require("./routes/packageRoutes");
 const purchasePlanRoutes = require("./routes/purchasePlanRoutes");
+const tournamentPlanRoutes = require("./routes/tournamentPlanRoutes");
 const financeRoutes = require("./routes/financeRoutes");
 const telegramRoutes = require("./routes/telegramRoutes");
 const geoRoutes = require("./routes/geoRoutes");
@@ -67,6 +68,8 @@ app.use("/api/invoices", invoiceRoutes);
 app.use("/api/packages", packageRoutes);
 // Purchase planning — costs, delivery dates and expected profit before buying.
 app.use("/api/purchase-plans", purchasePlanRoutes);
+// Trophy / tournament planning calendar.
+app.use("/api/tournament-plans", tournamentPlanRoutes);
 // Personal finance (Admin): daily income/expenses, debts, monthly plan.
 app.use("/api/finance", financeRoutes);
 // Telegram shop bot (webhook) + private alerts for the Admin.
@@ -107,4 +110,12 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.NODE_ENV !== "test") {
   const { runScheduled } = require("./utils/telegramAlerts");
   setTimeout(() => runScheduled().catch(() => {}), 30 * 1000);
   setInterval(() => runScheduled().catch(() => {}), 10 * 60 * 1000);
+  // KHQR: ask Bakong about unpaid QR codes every 20 seconds (does nothing
+  // when there are none).
+  const { runPaymentChecks } = require("./utils/orderPayments");
+  const { runFeeChecks } = require("./utils/feePayments");
+  setInterval(() => {
+    runPaymentChecks().catch(() => {}); // shop orders
+    runFeeChecks().catch(() => {}); // student debts + tournament entry fees
+  }, 20 * 1000);
 }

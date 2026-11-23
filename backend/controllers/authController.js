@@ -31,7 +31,26 @@ function publicAdmin(admin) {
     athleteId: admin.athleteId || null,
     mustChangePassword: !!admin.mustChangePassword,
     telegramChatId: admin.telegramChatId || "",
+    displayName: admin.displayName || "",
+    photoUrl: admin.photoUrl || "",
   };
+}
+
+// Name + photo for the top bar: the account's own, else (Player) the
+// athlete profile's, else just the username.
+async function profileOf(account) {
+  let name = account.displayName || "";
+  let photoUrl = account.photoUrl || "";
+  let khmerName = "";
+  if (account.athleteId && (!name || !photoUrl)) {
+    const a = await Athlete.findById(account.athleteId).select("fullName khmerName photoUrl").lean();
+    if (a) {
+      if (!name) name = a.fullName || "";
+      khmerName = a.khmerName || "";
+      if (!photoUrl) photoUrl = a.photoUrl || "";
+    }
+  }
+  return { name: name || account.username, khmerName, photoUrl, own: Boolean(account.displayName || account.photoUrl) };
 }
 
 // POST /api/auth/register
@@ -289,7 +308,55 @@ exports.me = async (req, res) => {
   try {
     const account = await Admin.findById(req.adminId);
     if (!account) return res.status(404).json({ message: "Account not found" });
-    res.json(publicAdmin(account));
+    res.json({ ...publicAdmin(account), profile: await profileOf(account) });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PUT /api/auth/me/profile { displayName } — my name in the top bar.
+exports.updateMyProfile = async (req, res) => {
+  try {
+    const account = await Admin.findById(req.adminId);
+    if (!account) return res.status(404).json({ message: "Account not found" });
+    if (req.body.displayName !== undefined) account.displayName = String(req.body.displayName || "").trim().slice(0, 60);
+    await account.save();
+    res.json({ ...publicAdmin(account), profile: await profileOf(account) });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PUT /api/auth/me/photo (multipart "photo") — my picture in the top bar.
+// DELETE /api/auth/me/photo — remove it.
+exports.uploadMyPhoto = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "A photo is required" });
+    if (!/^image\//.test(req.file.mimetype || "")) return res.status(400).json({ message: "Please choose an image" });
+    const account = await Admin.findById(req.adminId);
+    if (!account) return res.status(404).json({ message: "Account not found" });
+    const uploadBufferToCloudinary = require("../utils/uploadToCloudinary");
+    const old = account.photoPublicId;
+    const { url, publicId } = await uploadBufferToCloudinary(req.file.buffer, { folder: "athlete-verify/accounts", resourceType: "image" });
+    account.photoUrl = url;
+    account.photoPublicId = publicId || "";
+    await account.save();
+    if (old) require("../config/cloudinary").uploader.destroy(old).catch(() => {});
+    res.json({ ...publicAdmin(account), profile: await profileOf(account) });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+exports.removeMyPhoto = async (req, res) => {
+  try {
+    const account = await Admin.findById(req.adminId);
+    if (!account) return res.status(404).json({ message: "Account not found" });
+    const old = account.photoPublicId;
+    account.photoUrl = "";
+    account.photoPublicId = "";
+    await account.save();
+    if (old) require("../config/cloudinary").uploader.destroy(old).catch(() => {});
+    res.json({ ...publicAdmin(account), profile: await profileOf(account) });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

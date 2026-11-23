@@ -10,10 +10,10 @@
 //     Fonts: never cached — data must always be live.
 //
 // Bump CACHE_VERSION to force every installed copy to drop its old cache.
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2"; // v2: new logo / app icons
 const SHELL_CACHE = `cfid-shell-${CACHE_VERSION}`;
 const ASSET_CACHE = `cfid-assets-${CACHE_VERSION}`;
-const SHELL_URLS = ["/", "/index.html", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/favicon.ico"];
+const SHELL_URLS = ["/", "/index.html", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/icon-maskable-512.png", "/favicon.ico", "/logo.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

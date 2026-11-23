@@ -1,4 +1,5 @@
 import InvestTab from "../components/InvestTab";
+import WeddingGiftsTab from "../components/WeddingGiftsTab";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
@@ -38,7 +39,7 @@ const CAT_ICON = {
 export default function AdminFinance() {
   const { t } = useLanguage();
   const [params, setParams] = useSearchParams();
-  const tab = ["overview", "daily", "money", "owed", "debts", "plan", "invest"].includes(params.get("tab")) ? params.get("tab") : "overview";
+  const tab = ["overview", "daily", "money", "owed", "debts", "plan", "invest", "gifts"].includes(params.get("tab")) ? params.get("tab") : "overview";
   const setTab = (k) => setParams(k === "overview" ? {} : { tab: k }, { replace: true });
   const [month, setMonth] = useState(thisMonth());
   const catLabel = (c) => `${CAT_ICON[c] || "📦"} ${t(`finance.cat_${c}`, c)}`;
@@ -59,6 +60,7 @@ export default function AdminFinance() {
           ["debts", `💳 ${t("finance.tabDebts")}`],
           ["plan", `🗓 ${t("finance.tabPlan")}`],
           ["invest", `📈 ${t("invest.tab")}`],
+          ["gifts", `💌 ${t("wgift.tab")}`],
         ].map(([k, label]) => (
           <button key={k} className={`tab-btn ${tab === k ? "active" : ""}`} onClick={() => setTab(k)}>
             {label}
@@ -84,6 +86,7 @@ export default function AdminFinance() {
       {tab === "debts" && <Debts />}
       {tab === "plan" && <Plan catLabel={catLabel} month={month} />}
       {tab === "invest" && <InvestTab />}
+      {tab === "gifts" && <WeddingGiftsTab />}
     </div>
   );
 }

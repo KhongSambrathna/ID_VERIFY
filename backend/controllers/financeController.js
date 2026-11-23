@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const { FinanceTxn, FinanceDebt, FinancePlan, FinanceAccount, FinanceSettings, FinanceInvestEntry } = require("../models/Finance");
+const { FinanceTxn, FinanceDebt, FinancePlan, FinanceAccount, FinanceSettings, FinanceInvestEntry, FinanceWeddingGift } = require("../models/Finance");
 const Athlete = require("../models/Athlete");
 const Invoice = require("../models/Invoice");
 const { roundUSD } = require("../utils/currency");
@@ -172,6 +172,8 @@ exports.deleteTxn = wrap(async (req, res) => {
     // keep the debt in step: remove the matching repayment too
     await FinanceDebt.updateOne({ _id: t.debt, ...own(req) }, { $pull: { payments: { txn: t._id } } });
   }
+  // A wedding gift recorded as this expense keeps its record, just unlinked.
+  await FinanceWeddingGift.updateMany({ txn: t._id, ...own(req) }, { $set: { txn: null } });
   await t.deleteOne();
   res.json({ message: "Deleted" });
 });
@@ -863,4 +865,103 @@ async function computeReceivables(req) {
 }
 
 // Used by the Telegram alerts (utils/telegramAlerts.js).
+// ---------------- Wedding gifts I gave (ចំណងដៃ) ----------------
+
+// GET /api/finance/wedding-gifts?year=2026&q=name
+// List (newest first) + totals for the list shown.
+exports.listWeddingGifts = wrap(async (req, res) => {
+  const filter = own(req);
+  const y = Number(req.query.year);
+  if (Number.isInteger(y) && y > 1900) {
+    filter.date = { $gte: new Date(`${y}-01-01T00:00:00${TZ_OFFSET}`), $lt: new Date(`${y + 1}-01-01T00:00:00${TZ_OFFSET}`) };
+  }
+  const q = String(req.query.q || "").trim();
+  if (q) {
+    const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    filter.$or = [{ person: rx }, { place: rx }, { relation: rx }, { note: rx }];
+  }
+  const gifts = await FinanceWeddingGift.find(filter).sort({ date: -1, createdAt: -1 }).lean();
+  const sum = (c) => gifts.filter((g) => g.currency === c).reduce((s, g) => s + g.amount, 0);
+  // Years that have gifts, for the year filter.
+  const years = (await FinanceWeddingGift.find(own(req)).select("date").lean())
+    .map((g) => Number(new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric" }).format(g.date)))
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .sort((a, b) => b - a);
+  res.json({
+    gifts,
+    totals: { count: gifts.length, KHR: Math.round(sum("KHR")), USD: roundUSD(sum("USD")), totalUSD: roundUSD(gifts.reduce((s, g) => s + (g.amountUSD || 0), 0)) },
+    years,
+  });
+});
+
+function readGift(body, g) {
+  if (body.person !== undefined) g.person = String(body.person || "").trim();
+  ["relation", "place", "phone", "note"].forEach((k) => {
+    if (body[k] !== undefined) g[k] = String(body[k] || "").trim();
+  });
+  if (body.date !== undefined) g.date = day(body.date);
+  if (body.amount !== undefined || body.currency !== undefined) {
+    const err = readMoney({ amount: body.amount ?? g.amount, currency: body.currency ?? g.currency }, g);
+    if (err) return err;
+    if (!(g.amount > 0)) return "Enter how much you gave";
+  }
+  if (!g.person) return "Enter whose wedding it was";
+  return null;
+}
+
+// Keep the linked Daily expense in step with the gift (or create / remove it).
+async function syncGiftTxn(req, g, body) {
+  const want = body.recordExpense === undefined ? Boolean(g.txn) : body.recordExpense === true || body.recordExpense === "true";
+  let t = g.txn ? await FinanceTxn.findOne({ _id: g.txn, ...own(req) }) : null;
+  if (!want) {
+    if (t) await t.deleteOne();
+    g.txn = null;
+    return;
+  }
+  if (!t) t = new FinanceTxn({ owner: req.adminId, type: "expense" });
+  t.category = "ceremony";
+  t.amount = g.amount;
+  t.currency = g.currency;
+  t.amountUSD = g.amountUSD;
+  t.date = g.date;
+  t.note = `ចំណងដៃ — ${g.person}${g.place ? ` (${g.place})` : ""}`;
+  if (body.account !== undefined) {
+    const acc = await ownAccount(req, body.account);
+    t.account = acc ? acc._id : null;
+    t.method = acc ? (acc.kind === "cash" ? "cash" : "bank") : "cash";
+  }
+  await t.save();
+  g.txn = t._id;
+}
+
+exports.createWeddingGift = wrap(async (req, res) => {
+  const g = new FinanceWeddingGift({ owner: req.adminId, date: new Date() });
+  if (req.body.amount === undefined) return bad(res, "Enter how much you gave");
+  const err = readGift(req.body, g);
+  if (err) return bad(res, err);
+  await syncGiftTxn(req, g, req.body);
+  await g.save();
+  res.status(201).json(g);
+});
+
+exports.updateWeddingGift = wrap(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: "Not found" });
+  const g = await FinanceWeddingGift.findOne({ _id: req.params.id, ...own(req) });
+  if (!g) return res.status(404).json({ message: "Not found" });
+  const err = readGift(req.body, g);
+  if (err) return bad(res, err);
+  await syncGiftTxn(req, g, req.body);
+  await g.save();
+  res.json(g);
+});
+
+exports.deleteWeddingGift = wrap(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: "Not found" });
+  const g = await FinanceWeddingGift.findOne({ _id: req.params.id, ...own(req) });
+  if (!g) return res.status(404).json({ message: "Not found" });
+  if (g.txn) await FinanceTxn.deleteOne({ _id: g.txn, ...own(req) });
+  await g.deleteOne();
+  res.json({ message: "Deleted" });
+});
+
 exports.helpers = { computeReceivables, accountsWithBalance, debtView, syncAutoPayments, nextAutoDate, dueInMonth, ymKey, toUSD, KHR_PER_USD };

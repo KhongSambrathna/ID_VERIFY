@@ -50,7 +50,7 @@ export default function CoachModePicker() {
         </p>
       )}
       <div className="filter-row">
-        <input placeholder={`🔍 ${t("coachMode.search")}`} value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 260 }} />
+        <input placeholder={`🔍 ${t("coachMode.search")}`} value={q} onChange={(e) => setQ(e.target.value)} style={{ width: "100%", maxWidth: 320 }} />
       </div>
       {loading && <p>{t("common.loading")}</p>}
       {error && <p className="error-text">{error}</p>}

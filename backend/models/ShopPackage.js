@@ -10,6 +10,10 @@ const mongoose = require("mongoose");
 //                           the items, the difference is given as a discount
 //                           on the invoice. null = just the sum of the items.
 //   isPublic              → also show it on the public /shop page
+//   packed                → how many of this package are already packed and
+//                           waiting to be sold. Their stock items were taken
+//                           off the shelf when packed (utils/packageStock.js)
+//                           and go back when unpacked or the package is deleted.
 const packageItemSchema = new mongoose.Schema(
   {
     product: { type: mongoose.Schema.Types.ObjectId, ref: "Product", default: null },
@@ -28,6 +32,7 @@ const shopPackageSchema = new mongoose.Schema(
     price: { type: Number, min: 0, default: null },
     isPublic: { type: Boolean, default: true },
     active: { type: Boolean, default: true },
+    packed: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true }
 );

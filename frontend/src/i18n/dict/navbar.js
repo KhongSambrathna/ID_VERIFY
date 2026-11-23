@@ -1,5 +1,11 @@
 export const km = {
   "navbar.about": "អំពីយើង",
+  "navbar.studentDebts": "បំណុលសិស្ស",
+  "navbar.money": "លុយ",
+  "navbar.khqrPayments": "ទទួលប្រាក់ KHQR",
+  "navbar.sales": "ការលក់",
+  "navbar.goods": "ទំនិញ",
+  "navbar.cards": "កាត",
   "navbar.findPlayer": "ស្វែងរកកីឡាករ",
   "navbar.shop": "ហាង",
   "navbar.pricing": "តម្លៃសេវាកម្ម",
@@ -55,6 +61,12 @@ export const km = {
 
 export const en = {
   "navbar.about": "About",
+  "navbar.studentDebts": "Student debts",
+  "navbar.money": "Money",
+  "navbar.khqrPayments": "KHQR payments",
+  "navbar.sales": "Sales",
+  "navbar.goods": "Goods",
+  "navbar.cards": "Cards",
   "navbar.findPlayer": "Find a player",
   "navbar.shop": "Shop",
   "navbar.pricing": "Pricing",

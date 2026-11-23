@@ -8,6 +8,37 @@ const uploadBufferToCloudinary = require("../utils/uploadToCloudinary");
 const { notifyAdmins } = require("../utils/notify");
 const { DEFAULT_PLAYER_PASSWORD } = require("../utils/playerAccount");
 
+// Trim and collapse inner spaces in a typed name.
+function cleanName(v) {
+  return String(v || "").trim().replace(/\s+/g, " ");
+}
+
+// People whose English or Khmer name matches exactly (ignoring case and
+// extra spaces).
+async function findSameName(fullName, khmerName) {
+  const rx = (name) => new RegExp(`^${name.split(" ").map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+")}\\s*$`, "i");
+  const or = [{ fullName: rx(fullName) }];
+  if (khmerName) or.push({ khmerName: rx(khmerName) });
+  return Athlete.find({ $or: or })
+    .select("fullName khmerName verifyId photoUrl assignments dateOfBirth")
+    .lean();
+}
+
+// What a public registration page may see about a match: enough to tell
+// people apart (photo, names, ID, approved teams, birth year) — nothing more.
+function publicMatch(a) {
+  return {
+    _id: a._id,
+    fullName: a.fullName,
+    khmerName: a.khmerName,
+    verifyId: a.verifyId,
+    photoUrl: a.photoUrl,
+    teams: [...new Set((a.assignments || []).filter((x) => x.approvalStatus === "approved").map((x) => x.team))],
+    birthYear: a.dateOfBirth ? new Date(a.dateOfBirth).getFullYear() : null,
+  };
+}
+
+
 // Resolve which team an invite targets. A Head Coach is always forced to
 // their OWN team (req.adminTeam) — the team is never trusted from the request
 // body for them, so a coach can't create invites for another team. An Admin
@@ -228,13 +259,39 @@ exports.registerViaInvite = async (req, res) => {
     const { invite, error } = await loadUsableInvite(req.params.token);
     if (error) return res.status(error.status).json({ message: error.message });
 
-    const { fullName, khmerName, dateOfBirth, gender, address, addressCode, isAvailable } = req.body;
-    if (!fullName || !fullName.trim()) {
+    const { gender, address, addressCode, isAvailable } = req.body;
+    // Collapse double spaces so "SOK  DARA" and "Sok Dara" count as the same name.
+    const fullName = cleanName(req.body.fullName);
+    const khmerName = cleanName(req.body.khmerName);
+    const dateOfBirth = req.body.dateOfBirth || undefined;
+    if (!fullName) {
       return res.status(400).json({ message: "Full name is required" });
+    }
+    if (!dateOfBirth || Number.isNaN(new Date(dateOfBirth).getTime())) {
+      return res.status(400).json({ message: "Date of birth is required" });
     }
 
     const team = invite.team;
     const role = invite.role || "PLAYER";
+
+    // Look for people already in the system with the same English OR Khmer
+    // name, so one person doesn't end up as two profiles.
+    const candidates = await findSameName(fullName, khmerName);
+
+    // Already registered on THIS team (waiting for approval or approved) with
+    // the same name and birthday → this is the same person submitting twice.
+    // Always blocked — there is nothing to confirm.
+    const sameDay = (a) =>
+      a.dateOfBirth && new Date(a.dateOfBirth).toISOString().slice(0, 10) === String(dateOfBirth).slice(0, 10);
+    const onThisTeam = (a) => (a.assignments || []).some((asg) => asg.team === team && asg.approvalStatus !== "rejected");
+    const alreadyHere = candidates.find((a) => onThisTeam(a) && sameDay(a));
+    if (alreadyHere) {
+      return res.status(409).json({
+        code: "ALREADY_ON_TEAM",
+        message: `"${alreadyHere.fullName}" is already registered on ${team} (ID ${alreadyHere.verifyId}). Don't register again — ask your coach or the Admin if you lost your ID.`,
+        existing: [publicMatch(alreadyHere)],
+      });
+    }
 
     // If this name already belongs to an APPROVED athlete on ANOTHER team,
     // don't silently create a second profile — skip the auto-creation and
@@ -242,30 +299,19 @@ exports.registerViaInvite = async (req, res) => {
     // existing person ("this is me, add me to this team") or confirms they're
     // a different person and registers as new anyway (confirmDuplicate=true).
     if (req.body.confirmDuplicate !== true && req.body.confirmDuplicate !== "true") {
-      const nameEscaped = fullName.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const candidates = await Athlete.find({
-        fullName: new RegExp(`^${nameEscaped}$`, "i"),
-      })
-        .select("fullName khmerName verifyId photoUrl assignments")
-        .lean();
-
-      const existingOnOtherTeam = candidates.filter((a) =>
-        (a.assignments || []).some(
-          (asg) => asg.approvalStatus === "approved" && String(asg.team) !== team
-        )
+      // Same name on another team (approved), or on this team but with a
+      // different birthday — ask before making a second profile.
+      const existingOnOtherTeam = candidates.filter(
+        (a) =>
+          onThisTeam(a) ||
+          (a.assignments || []).some((asg) => asg.approvalStatus === "approved" && String(asg.team) !== team)
       );
 
       if (existingOnOtherTeam.length > 0) {
         return res.status(409).json({
           code: "DUPLICATE_IN_OTHER_TEAM",
           message: `The name "${fullName}" is already registered on another team. Confirm to proceed.`,
-          existing: existingOnOtherTeam.map((a) => ({
-            _id: a._id,
-            fullName: a.fullName,
-            khmerName: a.khmerName,
-            verifyId: a.verifyId,
-            photoUrl: a.photoUrl,
-          })),
+          existing: existingOnOtherTeam.map((a) => ({ ...publicMatch(a), onThisTeam: onThisTeam(a) })),
         });
       }
     }
@@ -274,8 +320,8 @@ exports.registerViaInvite = async (req, res) => {
 
     const athlete = new Athlete({
       verifyId,
-      fullName: fullName.trim(),
-      khmerName: khmerName ? khmerName.trim() : undefined,
+      fullName,
+      khmerName: khmerName || undefined,
       dateOfBirth,
       gender,
       address,

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import KhqrSettings from "../components/KhqrSettings";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -13,7 +14,7 @@ const fmtDateTime = (d) =>
 export default function AdminTelegram() {
   const { t } = useLanguage();
   const [params, setParams] = useSearchParams();
-  const tab = params.get("tab") === "orders" ? "orders" : "setup";
+  const tab = ["orders", "khqr"].includes(params.get("tab")) ? params.get("tab") : "setup";
   const setTab = (k) => setParams(k === "setup" ? {} : { tab: k }, { replace: true });
   const [st, setSt] = useState(null);
 
@@ -43,11 +44,13 @@ export default function AdminTelegram() {
           🛒 {t("tgBot.tabOrders")}
           {st && st.pendingOrders > 0 && <span className="tg-count">{st.pendingOrders}</span>}
         </button>
+        <button className={`tab-btn ${tab === "khqr" ? "active" : ""}`} onClick={() => setTab("khqr")}>💳 KHQR</button>
       </div>
       {st === null && <p>{t("common.loading")}</p>}
       {st === false && <p className="error-text">{t("tgBot.loadFailed")}</p>}
       {st && tab === "setup" && <Setup st={st} reload={loadStatus} setSt={setSt} />}
       {st && tab === "orders" && <Orders onChange={loadStatus} />}
+      {tab === "khqr" && <KhqrSettings />}
     </div>
   );
 }
@@ -276,6 +279,33 @@ function Orders({ onChange }) {
     }
   };
 
+  const checkPay = async (o) => {
+    setBusy(o._id);
+    try {
+      const { data } = await api.post(`/telegram/orders/${o._id}/check-payment`);
+      alert(data.message);
+      await load();
+      onChange();
+    } catch (e) {
+      alert(e.response?.data?.message || t("tgBot.failed"));
+    } finally {
+      setBusy(null);
+    }
+  };
+  const markPaid = async (o) => {
+    if (!confirm(t("khqr.confirmMarkPaid").replace("{n}", o.orderNo).replace("{amount}", formatUSD(o.total)))) return;
+    setBusy(o._id);
+    try {
+      await api.post(`/telegram/orders/${o._id}/mark-paid`);
+      await load();
+      onChange();
+    } catch (e) {
+      alert(e.response?.data?.message || t("tgBot.failed"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     <>
       <div className="tg-filter">
@@ -297,8 +327,19 @@ function Orders({ onChange }) {
             </div>
             <div className="tg-order-meta">
               <span className={`badge ${STATUS[o.status][1]}`}>{STATUS[o.status][0]} {t(`tgBot.st_${o.status}`)}</span>
+              {o.payment?.status && o.payment.status !== "none" && (
+                <span className={`badge ${o.payment.status === "paid" ? "verified" : o.payment.status === "unpaid" ? "pending" : "rejected"}`}>
+                  💳 {t(`khqr.pay_${o.payment.status}`)}
+                </span>
+              )}
               <span className="mini-empty">{fmtDateTime(o.createdAt)}</span>
             </div>
+            {o.payment?.status === "paid" && (o.payment.fromAccount || o.payment.hash) && (
+              <div className="mini-empty" style={{ fontSize: 13, overflowWrap: "anywhere" }}>
+                {o.payment.fromAccount && <>↪️ {o.payment.fromAccount} </>}
+                {o.payment.hash && <>#️⃣ {o.payment.hash.slice(0, 16)}…</>}
+              </div>
+            )}
             <div className="tg-order-cust">
               👤 <b>{o.customer?.name || "—"}</b>
               {o.username && (
@@ -321,6 +362,12 @@ function Orders({ onChange }) {
               <div className="package-actions">
                 <button className="btn btn-primary" disabled={busy === o._id} onClick={() => act(o, "confirm")}>✅ {t("tgBot.confirm")}</button>
                 <button className="btn btn-outline" disabled={busy === o._id} onClick={() => act(o, "reject")}>❌ {t("tgBot.reject")}</button>
+                {o.payment?.status === "unpaid" && (
+                  <button className="link-btn" disabled={busy === o._id} onClick={() => checkPay(o)}>💳 {t("khqr.checkPay")}</button>
+                )}
+                {o.payment?.status !== "paid" && (
+                  <button className="link-btn" disabled={busy === o._id} onClick={() => markPaid(o)}>💰 {t("khqr.markPaid")}</button>
+                )}
               </div>
             ) : (
               o.invoice && (

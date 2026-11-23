@@ -7,6 +7,8 @@ const { tg, getBotInfo, hasToken } = require("../utils/telegramApi");
 const bot = require("../bot/shopBot");
 const alerts = require("../utils/telegramAlerts");
 const { verifyInitData, miniAppUrl } = require("../utils/telegramWebApp");
+const pay = require("../utils/khqrPay");
+const payments = require("../utils/orderPayments");
 
 // The webhook URL carries a secret so nobody else can post fake updates.
 function webhookSecret() {
@@ -48,7 +50,9 @@ exports.webhook = async (req, res) => {
 // server awake and runs the timed alerts)
 exports.tick = wrap(async (req, res) => {
   if (req.query.key !== tickKey()) return res.sendStatus(403);
-  res.json(await alerts.runScheduled());
+  const payChecks = await payments.runPaymentChecks().catch((e) => ({ error: e.message }));
+  const feeChecks = await require("../utils/feePayments").runFeeChecks().catch((e) => ({ error: e.message }));
+  res.json({ ...(await alerts.runScheduled()), payChecks, feeChecks });
 });
 
 // GET /api/telegram/public — the bot's @username for the shop page button.
@@ -70,6 +74,7 @@ exports.status = wrap(async (req, res) => {
     alerts: st.alerts,
     tickUrl: hasToken() ? `${publicApiBase(req)}/api/telegram/tick?key=${tickKey()}` : "",
     pendingOrders: await BotOrder.countDocuments({ status: "pending" }),
+    unpaidOrders: await BotOrder.countDocuments({ status: "pending", "payment.status": "unpaid" }),
   };
   if (out.tokenSet) {
     const info = await getBotInfo();
@@ -164,6 +169,106 @@ exports.listOrders = wrap(async (req, res) => {
   const list = await BotOrder.find(filter).sort({ createdAt: -1 }).limit(200).populate("invoice", "invoiceNo total paidAmount").lean();
   res.json(list.map(({ adminMessages, ...o }) => o));
 });
+// Check one order's KHQR payment now (website button).
+exports.checkOrderPayment = wrap(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid id" });
+  const order = await BotOrder.findById(req.params.id);
+  if (!order) return res.status(404).json({ message: "Order not found" });
+  const r = await payments.verify(order.orderNo);
+  res.json({ message: r.text.replace(/<[^>]+>/g, ""), payment: (await BotOrder.findById(order._id).lean()).payment });
+});
+
+// Mark paid by hand (Admin saw the money in the bank app).
+exports.markOrderPaid = wrap(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid id" });
+  const r = await payments.markPaid(req.params.id, { by: req.adminId });
+  if (!r.order) return res.status(404).json({ message: "Order not found" });
+  res.json({ already: Boolean(r.already), order: r.order, invoice: r.confirmed ? { _id: r.confirmed._id, invoiceNo: r.confirmed.invoiceNo } : null });
+});
+
+// ---- KHQR payment settings (Admin) ----
+const payView = (s) => ({
+  enabled: s.enabled,
+  bakongAccountId: s.bakongAccountId,
+  merchantName: s.merchantName,
+  merchantCity: s.merchantCity,
+  currency: s.currency,
+  expiresMinutes: s.expiresMinutes,
+  autoConfirm: s.autoConfirm,
+  tokenSet: Boolean(s.token),
+  tokenHint: s.token ? `…${s.token.slice(-6)}` : "",
+  tokenEmail: s.tokenEmail,
+  tokenRenewedAt: s.tokenRenewedAt,
+  groupChatId: s.groupChatId,
+  groupTitle: s.groupTitle,
+  lastCheckError: s.lastCheckError,
+  lastCheckAt: s.lastCheckAt,
+});
+exports.getPaySettings = wrap(async (req, res) => res.json(payView(await pay.getSettings())));
+exports.updatePaySettings = wrap(async (req, res) => {
+  const s = await pay.getSettings();
+  const b = req.body || {};
+  if (b.bakongAccountId !== undefined) {
+    const id = String(b.bakongAccountId || "").trim().toLowerCase();
+    if (id && !/^[a-z0-9._-]+@[a-z0-9]+$/.test(id)) return res.status(400).json({ message: "Bakong account ID looks like name@bank (e.g. brathna@aclb)" });
+    s.bakongAccountId = id;
+  }
+  ["merchantName", "merchantCity", "tokenEmail"].forEach((k) => {
+    if (b[k] !== undefined) s[k] = String(b[k] || "").trim();
+  });
+  if (b.merchantName !== undefined && !s.merchantName) return res.status(400).json({ message: "Enter the shop name shown to payers" });
+  if (b.currency !== undefined) s.currency = b.currency === "KHR" ? "KHR" : "USD";
+  if (b.expiresMinutes !== undefined) {
+    const n = Number(b.expiresMinutes);
+    if (!Number.isInteger(n) || n < 3 || n > 1440) return res.status(400).json({ message: "QR time: 3–1440 minutes" });
+    s.expiresMinutes = n;
+  }
+  if (b.autoConfirm !== undefined) s.autoConfirm = Boolean(b.autoConfirm);
+  if (b.token !== undefined && String(b.token).trim()) {
+    s.token = String(b.token).trim();
+    s.tokenRenewedAt = new Date();
+  }
+  if (b.clearGroup) {
+    s.groupChatId = "";
+    s.groupTitle = "";
+  }
+  if (b.enabled !== undefined) {
+    if (b.enabled && !s.bakongAccountId) return res.status(400).json({ message: "Enter your Bakong account ID first" });
+    s.enabled = Boolean(b.enabled);
+  }
+  // Make sure a QR can actually be made with these details.
+  if (s.bakongAccountId) {
+    try {
+      pay.makeQr(s, { amount: 1, currency: s.currency, billNumber: "TEST" });
+    } catch (err) {
+      return res.status(400).json({ message: err.message });
+    }
+  }
+  await s.save();
+  res.json(payView(s));
+});
+
+// Test: does the Bakong API answer with this token, and does the account exist?
+exports.testPaySettings = wrap(async (req, res) => {
+  const s = await pay.getSettings();
+  const out = { qr: null, token: null, account: null, error: "" };
+  try {
+    const q = pay.makeQr(s, { amount: s.currency === "KHR" ? 100 : 0.01, currency: s.currency, billNumber: "TEST" });
+    out.qr = q.qr;
+  } catch (err) {
+    out.error = err.message;
+    return res.json(out);
+  }
+  try {
+    out.account = await pay.accountExists(s, s.bakongAccountId);
+    out.token = true;
+  } catch (err) {
+    out.token = false;
+    out.error = err.message;
+  }
+  res.json(out);
+});
+
 exports.confirmOrder = wrap(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid id" });
   const r = await bot.confirmOrder(req.params.id, req.adminId);
@@ -192,5 +297,34 @@ exports.webAppOrder = wrap(async (req, res) => {
   if (!user) return res.status(401).json({ message: "សូមបើកទំព័រនេះពីក្នុង Telegram bot" });
   const r = await bot.placeWebAppOrder(user, req.body || {});
   if (r.error) return res.status(400).json({ message: r.error });
-  res.json({ orderNo: r.order.orderNo, total: r.order.total });
+  res.json({ id: r.order._id, orderNo: r.order.orderNo, total: r.order.total, payment: webPay(r.order.payment) });
 });
+
+// What the Mini App may see of a payment (the QR to show + status).
+const webPay = (p) =>
+  p && p.status && p.status !== "none"
+    ? { status: p.status, qr: p.status === "unpaid" ? p.qr : "", amount: p.amount, currency: p.currency, expiresAt: p.expiresAt, paidAt: p.paidAt }
+    : null;
+
+// POST /api/telegram/webapp/payment { initData, orderId, check?, renew? }
+// The Mini App polls this while the customer pays.
+exports.webAppPayment = wrap(async (req, res) => {
+  const user = verifyInitData(req.body?.initData);
+  if (!user) return res.status(401).json({ message: "សូមបើកទំព័រនេះពីក្នុង Telegram bot" });
+  if (!mongoose.isValidObjectId(req.body?.orderId)) return res.status(400).json({ message: "Invalid order" });
+  let order = await BotOrder.findOne({ _id: req.body.orderId, chatId: String(user.id) });
+  if (!order) return res.status(404).json({ message: "Order not found" });
+  if (req.body.renew && order.status === "pending" && ["expired", "unpaid"].includes(order.payment?.status) && new Date(order.payment.expiresAt) < new Date()) {
+    await payments.offerPayment(order);
+  } else if (req.body.check && order.payment?.status === "unpaid") {
+    // At most one Bakong check per order every 4 s.
+    const last = lastWebCheck.get(String(order._id)) || 0;
+    if (Date.now() - last > 4000) {
+      lastWebCheck.set(String(order._id), Date.now());
+      await payments.runPaymentChecks({ orderIds: [order._id] }).catch(() => {});
+    }
+  }
+  order = await BotOrder.findById(order._id).lean();
+  res.json({ orderNo: order.orderNo, status: order.status, payment: webPay(order.payment) });
+});
+const lastWebCheck = new Map();

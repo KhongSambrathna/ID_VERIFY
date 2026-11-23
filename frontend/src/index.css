@@ -2781,6 +2781,8 @@ html:lang(km) body {
 }
 .poster-gen-canvas-wrap {
   flex: 0 0 auto;
+  max-width: 100%;
+  overflow: hidden;
 }
 .poster-gen-checkbox-label {
   display: flex;
@@ -3041,7 +3043,7 @@ html:lang(km) body {
   margin-bottom: 16px;
 }
 .jersey-status-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.jersey-status-actions input { min-width: 240px; }
+.jersey-status-actions input { min-width: min(240px, 100%); }
 
 /* ---------- Shop invoices ---------- */
 .invoice-form { max-width: 900px; }
@@ -3061,8 +3063,11 @@ html:lang(km) body {
 .invoice-line-desc { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .invoice-line-total { font-weight: 600; text-align: right; padding-top: 8px; }
 @media (max-width: 700px) {
-  .invoice-line { grid-template-columns: 1fr 1fr; }
+  /* minmax(0, …) lets the columns shrink below a long dropdown option */
+  .invoice-line { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .invoice-line-kind, .invoice-line-desc { grid-column: 1 / -1; }
+  .invoice-line > * { min-width: 0; }
+  .invoice-line input, .invoice-line select { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
   .invoice-line-total { text-align: left; }
 }
 .invoice-form-bottom { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
@@ -3183,7 +3188,7 @@ html:lang(km) body {
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  min-width: 280px;
+  min-width: min(280px, 100%);
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -3242,7 +3247,9 @@ html:lang(km) body {
 .plan-num { text-align: right; padding-top: 8px; font-weight: 600; }
 .plan-num small { display: block; font-weight: 400; color: #777; }
 @media (max-width: 900px) {
-  .plan-line { grid-template-columns: 1fr 1fr 1fr; }
+  .plan-line { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .plan-line > * { min-width: 0; }
+  .plan-line input, .plan-line select { width: 100%; min-width: 0; box-sizing: border-box; }
   .plan-line-product { grid-column: 1 / -1; }
   .plan-line-head { display: none; }
 }
@@ -3437,3 +3444,102 @@ tr.inv-excluded td:first-child { opacity: 1; }
 .plan-inv.off { opacity: 0.6; }
 .plan-inv-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
 .plan-inv-toggle { display: flex; gap: 6px; align-items: center; font-size: 14px; cursor: pointer; }
+
+/* Player registration — "this name already exists" screen: one box per person */
+.duplicate-people { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
+.duplicate-person { display: flex; gap: 12px; align-items: flex-start; padding: 10px; border: 1px solid var(--line, #ddd); border-radius: 10px; }
+.duplicate-person-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.duplicate-avatar { width: 64px; height: 80px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+.duplicate-avatar-empty { display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.05); font-size: 24px; }
+
+/* Trophy / tournament plan */
+.tplan-month { margin-bottom: 22px; }
+.tplan-month-h { margin: 6px 0 10px; font-size: 17px; }
+.tplan-days { list-style: none; padding: 0; margin: 6px 0; display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
+.tplan-days li.next { font-weight: 700; }
+.tplan-days li.past { opacity: 0.55; text-decoration: line-through; }
+
+/* Tournament registrations (admin): one clear box per player */
+.reg-cards { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-direction: column; gap: 10px; }
+.reg-card { background: #fff; border: 1px solid var(--line, #ddd); border-left: 4px solid var(--gold, #c9a227); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.reg-card.open { box-shadow: 0 0 0 2px var(--gold, #c9a227); }
+.reg-card-who { display: flex; gap: 10px; align-items: flex-start; }
+.reg-card-no { min-width: 26px; height: 26px; border-radius: 50%; background: var(--navy, #13294b); color: #fff; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.reg-card-photo { width: 44px; height: 56px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+.reg-card-name { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.reg-card-name strong { font-size: 15px; }
+.reg-card-name small { opacity: 0.75; }
+.reg-card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+.reg-card-tags:empty { display: none; }
+.reg-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 8px; border-top: 1px dashed var(--line, #ddd); }
+
+/* Phones: shop card price + order button stack instead of overflowing */
+@media (max-width: 640px) {
+  .shop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .shop-card { min-width: 0; }
+  .shop-card-footer { flex-wrap: wrap; }
+  .shop-order-btn { width: 100%; text-align: center; box-sizing: border-box; }
+}
+
+/* Trophy plan — play-day row: number + date + time on one line, note below */
+.tplan-day-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) 110px 28px; gap: 8px; align-items: center; padding: 8px; background: var(--cream); border-radius: 8px; margin-bottom: 6px; }
+.tplan-day-row .tplan-day-note { grid-column: 2 / 4; }
+.tplan-day-row input { width: 100%; min-width: 0; box-sizing: border-box; }
+@media (max-width: 420px) {
+  .tplan-day-row { grid-template-columns: 22px minmax(0, 1fr) 92px 24px; gap: 6px; }
+}
+
+/* Phones: nothing wider than the screen — long dropdown options, inputs and
+   pictures shrink to fit instead of pushing the page sideways. */
+@media (max-width: 700px) {
+  select, input, textarea { max-width: 100%; }
+  img, video, canvas { max-width: 100%; }
+  .invoice-form-bottom { flex-direction: column; align-items: stretch; }
+  .invoice-form-bottom > * { min-width: 0 !important; width: 100%; flex: none !important; }
+  .invoice-totals-box { min-width: 0; }
+  .poster-gen-controls { min-width: 0; }
+}
+
+/* Finance → wedding gifts */
+.wgift-tile { padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; min-width: 120px; flex: 1; }
+.wgift-tile b { font-size: 18px; }
+.wgift-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.wgift-quick .chip { border: 1px solid var(--line, #ddd); background: #fff; border-radius: 999px; padding: 4px 10px; font-size: 13px; cursor: pointer; }
+.wgift-quick .chip.active { background: var(--navy, #13294b); color: #fff; border-color: transparent; }
+.wgift-list { display: flex; flex-direction: column; gap: 8px; }
+.wgift-row { display: flex; justify-content: space-between; gap: 10px; padding: 10px 14px; align-items: flex-start; }
+.wgift-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.wgift-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+.wgift-amount { font-size: 17px; color: var(--danger, #b3261e); white-space: nowrap; }
+
+/* KHQR settings */
+.success-text { color: #1b7f3b; font-weight: 600; }
+.khqr-test { list-style: none; padding: 0; margin: 0 0 8px; display: flex; flex-direction: column; gap: 4px; }
+.khqr-settings textarea { width: 100%; box-sizing: border-box; font-family: monospace; font-size: 12px; }
+
+/* Debt report → record a debt */
+.add-debt-list { list-style: none; margin: 4px 0 0; padding: 0; border: 1px solid var(--line, #ddd); border-radius: 8px; background: #fff; max-height: 260px; overflow-y: auto; }
+.add-debt-list li + li { border-top: 1px solid var(--line, #eee); }
+.add-debt-list button { width: 100%; text-align: left; background: none; border: 0; padding: 9px 10px; cursor: pointer; font: inherit; overflow-wrap: anywhere; }
+.add-debt-list button:hover { background: var(--cream, #f6f3ea); }
+.add-debt-pick { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--line, #ddd); border-radius: 8px; background: var(--cream, #f6f3ea); overflow-wrap: anywhere; }
+
+/* Account button: photo + name */
+.avatar { border-radius: 50%; object-fit: cover; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; }
+.avatar-initials { background: var(--gold, #c9a227); color: var(--navy-deep, #0c1d36); font-weight: 800; letter-spacing: .5px; }
+.nav-account { display: inline-flex; align-items: center; gap: 8px; }
+.nav-account-name { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-profile { display: flex; gap: 10px; align-items: center; padding: 10px 14px 12px; border-bottom: 1px solid rgba(0,0,0,.08); margin-bottom: 4px; min-width: 220px; }
+.nav-profile > div { display: flex; flex-direction: column; min-width: 0; }
+.nav-profile b { overflow-wrap: anywhere; }
+.nav-profile small { opacity: .7; font-size: 12px; overflow-wrap: anywhere; }
+
+/* Brand: logo + name */
+.navbar .brand { display: inline-flex; align-items: center; gap: 9px; min-width: 0; }
+.navbar .brand .brand-logo { width: 36px; height: 36px; border-radius: 50%; background: #fff; object-fit: contain; padding: 2px; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(255,255,255,.25); }
+.navbar .brand .brand-text { display: flex; flex-direction: column; line-height: 1.05; font-size: 15px; }
+.navbar .brand .brand-text span { font-size: 13px; }
+@media (max-width: 420px) {
+  .navbar .brand { font-size: 16px; }
+  .navbar .brand .brand-logo { width: 32px; height: 32px; }
+}
