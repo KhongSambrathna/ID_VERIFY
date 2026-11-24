@@ -392,3 +392,112 @@ exports.hide = async (req, res) => {
     fail(res, err);
   }
 };
+
+// GET /api/chat/suggestions — people I might want to chat with:
+//   • teammates I haven't talked to yet (chat right away)
+//   • people on other teams, ranked by mutual friends, tournaments our
+//     teams played together, and being a team's Head Coach (add friend).
+exports.suggestions = async (req, res) => {
+  try {
+    const meP = await me(req);
+    if (!meP) return res.status(401).json({ message: "Account not found" });
+    const Tournament = require("../models/Tournament");
+
+    // Everyone I'm already linked with (friend / request either way).
+    const myFr = await Friendship.find({ $or: [{ requester: req.adminId }, { recipient: req.adminId }] }).lean();
+    const linked = new Set(myFr.map((f) => String(String(f.requester) === meP._id ? f.recipient : f.requester)));
+    const friendIds = myFr.filter((f) => f.status === "accepted").map((f) => String(String(f.requester) === meP._id ? f.recipient : f.requester));
+    const talked = new Set(
+      (await ChatConversation.find({ members: req.adminId, "last.at": { $ne: null } }).select("members").lean())
+        .flatMap((c) => c.members.map(String))
+        .filter((id) => id !== meP._id)
+    );
+
+    const score = new Map(); // id → { points, reasons }
+    const add = (id, pts, reason) => {
+      id = String(id);
+      if (id === meP._id) return;
+      const s = score.get(id) || { points: 0, reasons: [] };
+      s.points += pts;
+      if (reason && !s.reasons.includes(reason)) s.reasons.push(reason);
+      score.set(id, s);
+    };
+
+    // Friends of my friends.
+    if (friendIds.length) {
+      const fof = await Friendship.find({
+        status: "accepted",
+        $or: [{ requester: { $in: friendIds } }, { recipient: { $in: friendIds } }],
+      }).lean();
+      const mutual = new Map();
+      for (const f of fof) {
+        for (const [x, y] of [[f.requester, f.recipient], [f.recipient, f.requester]]) {
+          if (friendIds.includes(String(x)) && !friendIds.includes(String(y))) mutual.set(String(y), (mutual.get(String(y)) || 0) + 1);
+        }
+      }
+      for (const [id, n] of mutual) add(id, 3 * n, `mutual:${n}`);
+    }
+
+    // Teams that played the same tournaments as my teams.
+    const otherTeams = new Map(); // team → tournament name
+    if (meP.teams.length) {
+      const ts = await Tournament.find({ "registrations.team": { $in: meP.teams } })
+        .select("name registrations.team createdAt")
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .lean();
+      for (const t of ts)
+        for (const r of t.registrations || []) if (r.team && !meP.teams.includes(r.team) && !otherTeams.has(r.team)) otherTeams.set(r.team, t.name);
+    }
+    const coachQuery = [{ role: "HEAD_COACH", team: { $nin: meP.teams } }];
+    const coaches = await Admin.find({ $or: coachQuery }).select(PERSON_FIELDS).limit(200).lean();
+    for (const c of coaches) {
+      if (otherTeams.has(c.team)) add(c._id, 4, `tournament:${otherTeams.get(c.team)}`);
+      add(c._id, 1, `coach:${c.team}`);
+    }
+    // Players of those tournament teams (a few).
+    if (otherTeams.size) {
+      const aths = await Athlete.find({ "assignments.team": { $in: [...otherTeams.keys()] } }).select("_id assignments.team").limit(300).lean();
+      const accs = await Admin.find({ athleteId: { $in: aths.map((a) => a._id) } }).select("_id athleteId").lean();
+      const teamOf = new Map(aths.map((a) => [String(a._id), (a.assignments || []).map((x) => x.team).find((t) => otherTeams.has(t))]));
+      for (const a of accs) {
+        const tm = teamOf.get(String(a.athleteId));
+        if (tm) add(a._id, 2, `tournament:${otherTeams.get(tm)}`);
+      }
+    }
+
+    // Drop people I'm already linked with.
+    for (const id of linked) score.delete(id);
+
+    const topIds = [...score.entries()].sort((a, b) => b[1].points - a[1].points).slice(0, 12).map(([id]) => id);
+    const accounts = await Admin.find({ _id: { $in: topIds } }).select(PERSON_FIELDS).lean();
+    let others = await relationsFor(meP, await peopleOf(accounts));
+    others = others
+      .filter((p) => p.relation === "none" || (["team", "admin"].includes(p.relation) && !talked.has(p._id)))
+      .map((p) => ({ ...p, reasons: score.get(p._id)?.reasons || [], points: score.get(p._id)?.points || 0 }))
+      .sort((a, b) => b.points - a.points);
+
+    // Teammates I haven't chatted with yet.
+    let mates = [];
+    if (meP.teams.length) {
+      const teamAthletes = await Athlete.find({ "assignments.team": { $in: meP.teams }, "assignments.approvalStatus": { $ne: "pending" } })
+        .select("_id")
+        .limit(300)
+        .lean();
+      const accs = await Admin.find({
+        _id: { $ne: req.adminId, $nin: [...talked] },
+        $or: [{ team: { $in: meP.teams } }, { athleteId: { $in: teamAthletes.map((a) => a._id) } }],
+      })
+        .select(PERSON_FIELDS)
+        .limit(8)
+        .lean();
+      mates = (await relationsFor(meP, await peopleOf(accs)))
+        .filter((p) => p.relation === "team")
+        .map((p) => ({ ...p, reasons: ["team"] }));
+    }
+
+    res.json({ items: [...mates.slice(0, 6), ...others].slice(0, 12) });
+  } catch (err) {
+    fail(res, err);
+  }
+};

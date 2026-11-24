@@ -7,6 +7,7 @@ const c = require("../controllers/chatController");
 // team: friend request first; Admin: anyone.
 router.use(requireAuth);
 router.get("/people", c.people);
+router.get("/suggestions", c.suggestions);
 router.post("/friends", c.requestFriend);
 router.post("/friends/:id/accept", c.acceptFriend);
 router.post("/friends/:id/decline", c.declineFriend);

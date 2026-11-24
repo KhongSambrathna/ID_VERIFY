@@ -39,6 +39,12 @@ export const km = {
   "chat.needFriend": "អ្នកនៅក្រុមផ្សេងគ្នា — ត្រូវធ្វើជាមិត្តសិន ទើបអាចឆាតបាន",
   "chat.waitingAccept": "បានផ្ញើសំណើធ្វើជាមិត្តហើយ — រង់ចាំគេទទួលយក",
   "chat.failed": "មិនបានសម្រេច — សូមព្យាយាមម្តងទៀត",
+  "chat.suggest": "អ្នកដែលអ្នកប្រហែលស្គាល់",
+  "chat.startChat": "ឆាត",
+  "chat.hide": "លាក់",
+  "chat.why.mutual": "មិត្តរួម {n} នាក់",
+  "chat.why.tournament": "លេងពាន {name} ជាមួយគ្នា",
+  "chat.why.coach": "គ្រូបង្វឹក {team}",
 };
 export const en = {
   "chat.title": "Chat",
@@ -80,4 +86,10 @@ export const en = {
   "chat.needFriend": "You're on different teams — add each other as friends to chat",
   "chat.waitingAccept": "Friend request sent — waiting for them to accept",
   "chat.failed": "Didn't work — please try again",
+  "chat.suggest": "People you may know",
+  "chat.startChat": "Chat",
+  "chat.hide": "Hide",
+  "chat.why.mutual": "{n} mutual friends",
+  "chat.why.tournament": "Played {name} together",
+  "chat.why.coach": "Coach of {team}",
 };

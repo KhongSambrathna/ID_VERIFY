@@ -23,6 +23,14 @@ export default function ChatPage() {
   const [active, setActive] = useState(null); // { _id, other, canSend }
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
+  const [suggest, setSuggest] = useState(null);
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("chatHiddenSuggest") || "[]");
+    } catch {
+      return [];
+    }
+  });
 
   const loadConvs = useCallback(() => {
     api
@@ -40,9 +48,17 @@ export default function ChatPage() {
       .catch(() => setPeople((v) => v || []));
   }, []);
 
+  const loadSuggest = useCallback(() => {
+    api
+      .get("/chat/suggestions")
+      .then(({ data }) => setSuggest(data.items || []))
+      .catch(() => setSuggest((v) => v || []));
+  }, []);
+
   useEffect(() => {
     loadConvs();
     loadPeople();
+    loadSuggest();
     const id = setInterval(() => !document.hidden && loadConvs(), LIST_POLL);
     return () => clearInterval(id);
   }, [loadConvs, loadPeople]);
@@ -93,6 +109,7 @@ export default function ChatPage() {
         await api.delete(`/chat/friends/${person._id}`);
       }
       loadPeople(q.trim());
+      if (what === "add") setSuggest((list) => (list || []).map((x) => (x._id === person._id ? { ...x, relation: "sent" } : x)));
       if (active?.other?._id === person._id) openWith(person._id);
     } catch (err) {
       setError(err.response?.data?.message || t("chat.failed"));
@@ -126,6 +143,61 @@ export default function ChatPage() {
       : p.relation === "sent"
       ? `⏳ ${t("chat.requestSent")}`
       : "";
+
+  const hideSuggest = (id) => {
+    const next = [...hidden, id].slice(-200);
+    setHidden(next);
+    try {
+      localStorage.setItem("chatHiddenSuggest", JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
+  };
+  const reasonText = (r) => {
+    const [k, ...rest] = String(r).split(":");
+    const v = rest.join(":");
+    if (k === "mutual") return `🤝 ${t("chat.why.mutual").replace("{n}", v)}`;
+    if (k === "tournament") return `🏆 ${t("chat.why.tournament").replace("{name}", v)}`;
+    if (k === "coach") return `🧢 ${t("chat.why.coach").replace("{team}", v)}`;
+    if (k === "team") return `👥 ${t("chat.sameTeam")}`;
+    return "";
+  };
+  const shownSuggest = (suggest || []).filter((p) => !hidden.includes(p._id));
+
+  const Suggestions = () =>
+    shownSuggest.length > 0 && (
+      <div className="chat-suggest">
+        <div className="chat-group-label">✨ {t("chat.suggest")}</div>
+        <div className="chat-suggest-row">
+          {shownSuggest.map((p) => {
+            const direct = ["team", "admin", "friend"].includes(p.relation);
+            return (
+              <div key={p._id} className="chat-suggest-card">
+                <button type="button" className="chat-suggest-x" onClick={() => hideSuggest(p._id)} aria-label={t("chat.hide")} title={t("chat.hide")}>
+                  ×
+                </button>
+                <Avatar name={p.name} photoUrl={p.photoUrl} size={54} />
+                <div className="chat-suggest-name">{p.name}</div>
+                <div className="chat-suggest-why">{reasonText(p.reasons?.[0]) || p.teams.join(", ")}</div>
+                {direct ? (
+                  <button type="button" className="chat-btn primary" onClick={() => openWith(p._id)}>
+                    💬 {t("chat.startChat")}
+                  </button>
+                ) : p.relation === "sent" ? (
+                  <button type="button" className="chat-btn muted" disabled>
+                    ⏳ {t("chat.requestSent")}
+                  </button>
+                ) : (
+                  <button type="button" className="chat-btn" disabled={busy === p._id} onClick={() => friendAction(p, "add")}>
+                    ➕ {t("chat.addFriend")}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
 
   const PersonRow = ({ p }) => (
     <div className="chat-person">
@@ -187,6 +259,7 @@ export default function ChatPage() {
         {tab === "chats" && (
           <div className="chat-list">
             {convs === null && <div className="chat-empty">{t("chat.loading")}</div>}
+            {convs?.length === 0 && <Suggestions />}
             {convs?.length === 0 && (
               <div className="chat-empty">
                 {t("chat.noChats")}
@@ -231,6 +304,7 @@ export default function ChatPage() {
                 ))}
               </>
             )}
+            {!q.trim() && <Suggestions />}
             {people === null && <div className="chat-empty">{t("chat.loading")}</div>}
             {groups.map(
               (g) =>
