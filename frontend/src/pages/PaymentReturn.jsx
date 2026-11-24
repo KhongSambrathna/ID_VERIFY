@@ -4,7 +4,7 @@ import QRCode from "qrcode";
 import api from "../api/axios";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useAuth } from "../context/AuthContext";
-import { formatUSD } from "../utils/currency";
+import { formatUSDwithKHR } from "../utils/currency";
 import { KHQR_CSS } from "../components/KhqrPayCard";
 
 // KHQR payment page for student debts and tournament entry fees
@@ -12,7 +12,7 @@ import { KHQR_CSS } from "../components/KhqrPayCard";
 // and asks the server every 5 s — the server checks with the Bakong API and
 // takes the payment off what's owed once the money arrives.
 const fmt = (amount, currency) =>
-  currency === "USD" ? formatUSD(amount) : `៛${Math.round(Number(amount) || 0).toLocaleString("en-US")}`;
+  currency === "USD" ? formatUSDwithKHR(amount) : `៛${Math.round(Number(amount) || 0).toLocaleString("en-US")}`;
 
 export default function BakongPaymentReturn() {
   const { t } = useLanguage();

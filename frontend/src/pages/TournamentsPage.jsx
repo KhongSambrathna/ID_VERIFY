@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
-import { formatKHR } from "../utils/currency";
+import { formatUSDwithKHR } from "../utils/currency";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
 import { rulesSummaryLines } from "../components/TournamentRulesFields";
@@ -121,7 +121,7 @@ export default function TournamentsPage() {
                       </span>
                     )}
                   </td>
-                  <td data-label={t("tournamentsPage.entryFeeHeader")}>{formatKHR(tour.entryFee || 0)}</td>
+                  <td data-label={t("tournamentsPage.entryFeeHeader")}>{formatUSDwithKHR(tour.entryFee || 0)}</td>
                   <td data-label={t("tournamentsPage.datesHeader")}>
                     {tour.matchDates?.length ? tour.matchDates.map(formatDate).join(", ") : "—"}
                   </td>

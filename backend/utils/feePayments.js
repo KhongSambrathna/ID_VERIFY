@@ -1,7 +1,8 @@
 // KHQR payments for student debts (owed fees) and tournament entry fees.
 //
 //   staff / player presses "pay by KHQR" → createFeeQr / createTournamentQr
-//   makes a KHQR in Riel for what's owed and saves a PENDING Payment →
+//   makes a KHQR in US dollars for what's owed (student money is kept in
+//   dollars) and saves a PENDING Payment →
 //   the student scans it with any bank app → runFeeChecks() (every ~20 s,
 //   and whenever the payment page asks) checks with the Bakong API →
 //   paid: the debt is reduced (or the entry fee marked paid), the Payment
@@ -18,8 +19,11 @@ const pay = require("./khqrPay");
 const { tg, esc } = require("./telegramApi");
 
 const GRACE_MS = 10 * 60 * 1000;
-const khr = (n) => `៛${Math.round(Number(n) || 0).toLocaleString("en-US")}`;
-const feeOwedOf = (assignment) => (assignment.fees || []).reduce((sum, f) => sum + (f.amount || 0), 0);
+const RATE = 4000;
+const cents = (n) => Math.round((Number(n) || 0) * 100) / 100;
+// "$5.00 (≈ ៛20,000)"
+const money = (n) => `$${cents(n).toFixed(2)} (≈ ៛${(Math.round((cents(n) * RATE) / 100) * 100).toLocaleString("en-US")})`;
+const feeOwedOf = (assignment) => Math.round((assignment.fees || []).reduce((sum, f) => sum + (f.amount || 0), 0) * 100) / 100;
 const send = (chatId, text) => tg("sendMessage", { chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true });
 
 function notReady() {
@@ -31,16 +35,16 @@ function notReady() {
 async function newQr({ amount, billNumber }) {
   const s = await pay.getSettings();
   if (!s.bakongAccountId) throw notReady();
-  // Fees are kept in Riel, so the QR is always in Riel.
-  return pay.makeQr(s, { amount: Math.round(amount), currency: "KHR", billNumber });
+  // Student fees are kept in US dollars, so the QR is in dollars.
+  return pay.makeQr(s, { amount: cents(amount), currency: "USD", billNumber });
 }
 
 // Debt: pay (part of) what's owed on one team assignment.
 async function createFeeQr({ athlete, assignment, amount, by }) {
   const owed = feeOwedOf(assignment);
-  amount = Math.round(Number(amount ?? owed));
-  if (!Number.isFinite(amount) || amount < 100) throw Object.assign(new Error("Amount must be at least ៛100"), { status: 400 });
-  if (amount > owed) throw Object.assign(new Error("Amount is more than what's currently owed"), { status: 400 });
+  amount = cents(amount ?? owed);
+  if (!Number.isFinite(amount) || amount < 0.01) throw Object.assign(new Error("Amount must be at least $0.01"), { status: 400 });
+  if (amount > cents(owed) + 0.001) throw Object.assign(new Error("Amount is more than what's currently owed"), { status: 400 });
   const q = await newQr({ amount, billNumber: `FEE-${athlete.verifyId || String(athlete._id).slice(-6)}` });
   return Payment.create({
     athlete: athlete._id,
@@ -48,7 +52,7 @@ async function createFeeQr({ athlete, assignment, amount, by }) {
     assignmentId: assignment._id,
     team: assignment.team,
     amount: q.amount,
-    currency: "KHR",
+    currency: "USD",
     method: "BAKONG",
     status: "PENDING",
     reference: q.md5,
@@ -65,8 +69,8 @@ async function createTournamentQr({ tournament, row, by }) {
   if (row.convertedToDebt) {
     throw Object.assign(new Error("This entry fee has already moved to the student's debts — pay it from the debts instead"), { status: 409 });
   }
-  const amount = Math.round((tournament.entryFee || 0) - (row.feePaidAmount || 0));
-  if (amount < 100) throw Object.assign(new Error("Nothing left to pay for this entry fee"), { status: 400 });
+  const amount = cents((tournament.entryFee || 0) - (row.feePaidAmount || 0));
+  if (amount < 0.01) throw Object.assign(new Error("Nothing left to pay for this entry fee"), { status: 400 });
   const q = await newQr({ amount, billNumber: `TR-${String(row._id).slice(-8)}` });
   return Payment.create({
     athlete: row.athlete,
@@ -75,7 +79,7 @@ async function createTournamentQr({ tournament, row, by }) {
     registrationId: row._id,
     team: row.team,
     amount: q.amount,
-    currency: "KHR",
+    currency: "USD",
     method: "BAKONG",
     status: "PENDING",
     reference: q.md5,
@@ -97,7 +101,7 @@ async function reduceFees(athlete, assignment, amount) {
       remaining -= fee.amount;
       assignment.fees = assignment.fees.filter((f) => String(f._id) !== String(fee._id));
     } else {
-      fee.amount = Math.round(fee.amount - remaining);
+      fee.amount = cents(fee.amount - remaining);
       remaining = 0;
     }
   }
@@ -129,7 +133,7 @@ async function applyPaid(paymentId, { tx = null, by = null } = {}) {
     const t = await Tournament.findById(p.tournament);
     const row = t && t.registrations.id(p.registrationId);
     if (row && !row.convertedToDebt) {
-      row.feePaidAmount = Math.min(t.entryFee, (row.feePaidAmount || 0) + p.amount);
+      row.feePaidAmount = cents(Math.min(t.entryFee, (row.feePaidAmount || 0) + p.amount));
       row.feePaid = row.feePaidAmount >= t.entryFee && t.entryFee > 0;
       row.feePaidAt = new Date();
       row.feePaidBy = by || row.feePaidBy || null;
@@ -149,8 +153,8 @@ async function applyPaid(paymentId, { tx = null, by = null } = {}) {
 
   const name = athlete ? athlete.fullName : p.label;
   const text =
-    `💰 <b>បានទទួលលុយ ${khr(p.amount)}</b> (KHQR)\n👤 ${esc(name)} · ${esc(p.team)}\n🧾 ${what}` +
-    (left !== null ? `\n📉 នៅជំពាក់ ${khr(left)}` : "") +
+    `💰 <b>បានទទួលលុយ ${money(p.amount)}</b> (KHQR)\n👤 ${esc(name)} · ${esc(p.team)}\n🧾 ${what}` +
+    (left !== null ? `\n📉 នៅជំពាក់ ${money(left)}` : "") +
     (p.fromAccount ? `\n↪️ ពី ${esc(p.fromAccount)}` : "") +
     (by ? "\n✍️ កត់ដោយដៃ" : "\n🏦 ផ្ទៀងផ្ទាត់ជាមួយ Bakong");
 
@@ -173,7 +177,7 @@ async function applyPaid(paymentId, { tx = null, by = null } = {}) {
     for (const a of own) {
       if (sent.has(String(a.telegramChatId))) continue;
       sent.add(String(a.telegramChatId));
-      await send(a.telegramChatId, `✅ <b>បានទទួលការបង់ប្រាក់ ${khr(p.amount)}</b>\n🧾 ${what}${left !== null ? `\n📉 នៅជំពាក់ ${khr(left)}` : ""}\n\nសូមអរគុណ! 🙏`);
+      await send(a.telegramChatId, `✅ <b>បានទទួលការបង់ប្រាក់ ${money(p.amount)}</b>\n🧾 ${what}${left !== null ? `\n📉 នៅជំពាក់ ${money(left)}` : ""}\n\nសូមអរគុណ! 🙏`);
     }
   }
   return { payment: p, left };

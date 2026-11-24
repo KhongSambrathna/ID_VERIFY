@@ -37,9 +37,9 @@ const paymentSchema = new mongoose.Schema(
     // md5 when checking transaction status or displaying the QR image.
     reference: { type: String, index: true },
     // KHQR made locally (utils/khqrPay.js): the QR text to show, its
-    // currency (fees are in Riel), when it stops working, and — once paid —
+    // currency (student fees are in US dollars), when it stops working, and — once paid —
     // the bank transaction hash and the payer's account.
-    currency: { type: String, enum: ["USD", "KHR"], default: "KHR" },
+    currency: { type: String, enum: ["USD", "KHR"], default: "USD" },
     qr: { type: String, default: "" },
     expiresAt: { type: Date, default: null },
     label: { type: String, default: "" }, // "Sok Dara · NOKOR PHEAS UNITED · entry fee"

@@ -1,7 +1,7 @@
 // KHQR payments for the Telegram shop (Telegram bot page → 💳 KHQR tab).
 export const km = {
   "khqr.title": "ទទួលប្រាក់តាម KHQR",
-  "khqr.intro": "ពេលអតិថិជនកម្មង់ក្នុង bot (ឬ Mini App) bot នឹងផ្ញើ QR KHQR ដែលមានចំនួនលុយត្រឹមត្រូវ។ សិស្សក៏អាចសងបំណុល និងបង់ថ្លៃចូលរួមពានតាម KHQR ដែរ (ជារៀល)។ ស្កេនដោយកម្មវិធីធនាគារណាមួយ ហើយប្រព័ន្ធផ្ទៀងផ្ទាត់ជាមួយ Bakong (ធនាគារជាតិ) ដោយស្វ័យប្រវត្តិ រួចប្រាប់អ្នក គ្រូបង្វឹក ក្រុម និងសិស្ស។",
+  "khqr.intro": "ពេលអតិថិជនកម្មង់ក្នុង bot (ឬ Mini App) bot នឹងផ្ញើ QR KHQR ដែលមានចំនួនលុយត្រឹមត្រូវ។ សិស្សក៏អាចសងបំណុល និងបង់ថ្លៃចូលរួមពានតាម KHQR ដែរ (ជាដុល្លារ)។ ស្កេនដោយកម្មវិធីធនាគារណាមួយ ហើយប្រព័ន្ធផ្ទៀងផ្ទាត់ជាមួយ Bakong (ធនាគារជាតិ) ដោយស្វ័យប្រវត្តិ រួចប្រាប់អ្នក គ្រូបង្វឹក ក្រុម និងសិស្ស។",
   "khqr.enabled": "បើកការបង់ប្រាក់ KHQR",
   "khqr.whereTitle": "លុយចូលទៅណា",
   "khqr.accountId": "Bakong Account ID",
@@ -43,7 +43,7 @@ export const km = {
 
 export const en = {
   "khqr.title": "Get paid by KHQR",
-  "khqr.intro": "When a customer orders in the bot (or Mini App), the bot sends a KHQR with the exact amount. Students can also pay their debts and tournament entry fees by KHQR (in Riel). Any bank app can pay; it's verified with Bakong (National Bank of Cambodia) automatically, and you, the coach, your group and the student are told.",
+  "khqr.intro": "When a customer orders in the bot (or Mini App), the bot sends a KHQR with the exact amount. Students can also pay their debts and tournament entry fees by KHQR (in dollars). Any bank app can pay; it's verified with Bakong (National Bank of Cambodia) automatically, and you, the coach, your group and the student are told.",
   "khqr.enabled": "Turn on KHQR payments",
   "khqr.whereTitle": "Where the money goes",
   "khqr.accountId": "Bakong Account ID",

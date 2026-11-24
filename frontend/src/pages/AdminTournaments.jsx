@@ -2,7 +2,7 @@ import { Fragment, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { resolveFileUrl } from "../utils/fileUrl";
-import { formatKHR } from "../utils/currency";
+import { formatUSDwithKHR } from "../utils/currency";
 import { useAuth } from "../context/AuthContext";
 import TournamentRulesFields, { emptyRules, rulesFromTournament, rulesPayload, rulesSummaryLines } from "../components/TournamentRulesFields";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -393,7 +393,7 @@ export default function AdminTournaments() {
           </div>
           <div className="field">
             <label>{t("adminTournaments.entryFeeLabel")}</label>
-            <input type="number" min="0" step="100" value={form.entryFee} onChange={update("entryFee")} />
+            <input type="number" min="0" step="any" inputMode="decimal" value={form.entryFee} onChange={update("entryFee")} placeholder="5" />
           </div>
           <div className="field">
             <label>{t("adminTournaments.matchDatesLabel")}</label>
@@ -523,7 +523,7 @@ export default function AdminTournaments() {
                     <td data-label={t("common.team")}>
                       {tour.team || (tour.allowedTeams?.length ? tour.allowedTeams.join(", ") : t("adminTournaments.allTeams"))}
                     </td>
-                    <td data-label={t("adminTournaments.entryFeeHeader")}>{formatKHR(tour.entryFee || 0)}</td>
+                    <td data-label={t("adminTournaments.entryFeeHeader")}>{formatUSDwithKHR(tour.entryFee || 0)}</td>
                     <td data-label={t("adminTournaments.datesHeader")}>
                       {tour.matchDates?.length ? tour.matchDates.map(formatDate).join(", ") : "—"}
                     </td>
@@ -714,7 +714,7 @@ export default function AdminTournaments() {
                                           {staffRoleLabel(a.role, t)}
                                         </span>
                                       )}
-                                      {a.feeOwed > 0 ? ` (${t("adminTournaments.owes")} ${formatKHR(a.feeOwed)})` : ""}
+                                      {a.feeOwed > 0 ? ` (${t("adminTournaments.owes")} ${formatUSDwithKHR(a.feeOwed)})` : ""}
                                     </span>
                                     <button
                                       className="action-btn positive"

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/axios";
-import { formatKHR } from "../utils/currency";
+import { formatUSDwithKHR } from "../utils/currency";
 import { useAuth } from "../context/AuthContext";
 import AddDebtCard from "../components/AddDebtCard";
 import { resolveFileUrl } from "../utils/fileUrl";
@@ -121,7 +121,7 @@ export default function DebtReportPage() {
   // debt is FOR, not just the total.
   const feeBreakdownText = (a) =>
     (a.fees || []).length
-      ? a.fees.map((f) => `${formatKHR(f.amount)}${f.note ? ` — ${f.note}` : ""}`).join(", ")
+      ? a.fees.map((f) => `${formatUSDwithKHR(f.amount)}${f.note ? ` — ${f.note}` : ""}`).join(", ")
       : t("debtReport.noFeeBreakdown");
 
   // Pre-composes a ready-to-send debt reminder for one person and copies it
@@ -233,7 +233,7 @@ export default function DebtReportPage() {
                   owing.length === 1
                     ? t("debtReport.owingCountLabelSingular")
                     : t("debtReport.owingCountLabelPlural")
-                } — ${formatKHR(total)} ${t("debtReport.totalLabel")}`}
+                } — ${formatUSDwithKHR(total)} ${t("debtReport.totalLabel")}`}
           </p>
 
           {owing.length > 0 && (
@@ -266,11 +266,11 @@ export default function DebtReportPage() {
                       <td data-label={t("common.team")} className="caps-display">{a.team || "—"}</td>
                       <td data-label={t("common.role")}>{a.role || "—"}</td>
                       <td data-label={t("debtReport.owes")}>
-                        <span className="badge rejected">{formatKHR(a.feeOwed)}</span>
+                        <span className="badge rejected">{formatUSDwithKHR(a.feeOwed)}</span>
                       </td>
                       <td data-label={t("debtReport.note")}>
                         {(a.fees || []).length
-                          ? a.fees.map((f) => `${formatKHR(f.amount)}${f.note ? ` — ${f.note}` : ""}`).join(", ")
+                          ? a.fees.map((f) => `${formatUSDwithKHR(f.amount)}${f.note ? ` — ${f.note}` : ""}`).join(", ")
                           : "—"}
                       </td>
                       <td data-label={t("common.actions")} className="actions-cell no-print">

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/axios";
-import { formatKHR } from "../utils/currency";
+import { formatUSDwithKHR } from "../utils/currency";
 import { useAuth } from "../context/AuthContext";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -169,7 +169,7 @@ export default function PlayerDashboard() {
                     className="badge rejected fee-toggle"
                     onClick={() => toggleExpanded(athlete.assignmentId)}
                   >
-                    {t("playerDashboard.owes")} {formatKHR(athlete.feeOwed)} {expandedIds.has(athlete.assignmentId) ? "▲" : "▼"}
+                    {t("playerDashboard.owes")} {formatUSDwithKHR(athlete.feeOwed)} {expandedIds.has(athlete.assignmentId) ? "▲" : "▼"}
                   </button>
                 ) : (
                   <span className="badge verified">{t("playerDashboard.feePaid")}</span>
@@ -206,7 +206,7 @@ export default function PlayerDashboard() {
                         style={{ width: 180, height: 180, objectFit: "contain", display: "block", marginBottom: 6 }}
                       />
                       <p className="help-text" style={{ margin: 0 }}>
-                        {t("playerDashboard.khqrInstructionsPrefix")} <strong>{formatKHR(athlete.feeOwed)}</strong>{" "}
+                        {t("playerDashboard.khqrInstructionsPrefix")} <strong>{formatUSDwithKHR(athlete.feeOwed)}</strong>{" "}
                         {t("playerDashboard.khqrInstructionsSuffix")}
                       </p>
                     </>

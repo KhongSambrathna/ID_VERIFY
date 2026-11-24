@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import api from "../api/axios";
 import { useLanguage } from "../i18n/LanguageContext";
-import { formatKHR } from "../utils/currency";
+import { formatUSD, formatUSDwithKHR } from "../utils/currency";
 
-// Debt report → "➕ Record a debt": add an owed amount (in Riel) to one
+// Debt report → "➕ Record a debt": add an owed amount (in dollars) to one
 // student — or to everyone on a team at once (e.g. a jersey fee). Uses the
 // same per-assignment fee rows as the athlete Edit page, so the debt shows
 // up everywhere (debt report, dashboards, KHQR payment).
-const QUICK = [5000, 10000, 20000, 40000, 50000];
+const QUICK = [1, 2, 5, 10, 20];
 
 export default function AddDebtCard({ rows, teams, onDone }) {
   const { t } = useLanguage();
@@ -47,11 +47,11 @@ export default function AddDebtCard({ rows, teams, onDone }) {
     e.preventDefault();
     setErr("");
     setMsg("");
-    const n = Math.round(Number(amount));
+    const n = Math.round(Number(amount) * 100) / 100;
     if (!Number.isFinite(n) || n <= 0) return setErr(t("addDebt.enterAmount"));
     const targets = mode === "one" ? (pick ? [pick] : []) : teamRows;
     if (!targets.length) return setErr(mode === "one" ? t("addDebt.pickStudent") : t("addDebt.noOneInTeam"));
-    if (mode === "team" && !confirm(t("addDebt.confirmTeam").replace("{n}", targets.length).replace("{amount}", formatKHR(n)).replace("{team}", team))) return;
+    if (mode === "team" && !confirm(t("addDebt.confirmTeam").replace("{n}", targets.length).replace("{amount}", formatUSDwithKHR(n)).replace("{team}", team))) return;
     setSaving(true);
     let done = 0;
     const failed = [];
@@ -66,7 +66,7 @@ export default function AddDebtCard({ rows, teams, onDone }) {
     setSaving(false);
     if (failed.length) setErr(`${t("addDebt.failedFor")}: ${failed.join(", ")}`);
     if (done) {
-      setMsg(t("addDebt.saved").replace("{n}", done).replace("{amount}", formatKHR(n)));
+      setMsg(t("addDebt.saved").replace("{n}", done).replace("{amount}", formatUSDwithKHR(n)));
       reset();
       onDone();
     }
@@ -100,7 +100,7 @@ export default function AddDebtCard({ rows, teams, onDone }) {
               <span>
                 <b className="caps-display">{pick.fullName}</b>
                 {pick.khmerName ? ` (${pick.khmerName})` : ""} · <span className="caps-display">{pick.team}</span> · {pick.verifyId}
-                {pick.feeOwed > 0 && <small className="mini-empty"> · {t("addDebt.alreadyOwes")} {formatKHR(pick.feeOwed)}</small>}
+                {pick.feeOwed > 0 && <small className="mini-empty"> · {t("addDebt.alreadyOwes")} {formatUSDwithKHR(pick.feeOwed)}</small>}
               </span>
               <button type="button" className="link-btn" onClick={() => setPick(null)}>✕</button>
             </div>
@@ -140,12 +140,13 @@ export default function AddDebtCard({ rows, teams, onDone }) {
 
       <div className="filter-row" style={{ marginBottom: 0 }}>
         <div className="field" style={{ flex: 1, minWidth: 140 }}>
-          <label>{t("addDebt.amount")} (៛) *</label>
-          <input type="number" min="0" step="100" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <label>{t("addDebt.amount")} ($) *</label>
+          <input type="number" min="0" step="any" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="5" />
+          {Number(amount) > 0 && <small className="mini-empty">{formatUSDwithKHR(Number(amount))}</small>}
           <div className="wgift-quick">
             {QUICK.map((v) => (
               <button type="button" key={v} className={`chip ${Number(amount) === v ? "active" : ""}`} onClick={() => setAmount(String(v))}>
-                {formatKHR(v)}
+                {formatUSD(v)}
               </button>
             ))}
           </div>

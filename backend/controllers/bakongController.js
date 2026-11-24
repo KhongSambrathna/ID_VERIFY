@@ -37,7 +37,7 @@ const view = (p) => ({
   status: p.status,
   kind: p.kind || "FEE",
   amount: p.amount,
-  currency: p.currency || "KHR",
+  currency: p.currency || "USD",
   qr: p.status === "PENDING" ? p.qr : "",
   md5: p.reference,
   expiresAt: p.expiresAt,
@@ -48,7 +48,7 @@ const view = (p) => ({
 });
 
 // POST /api/bakong/payment/create  { athleteId, assignmentId, amount? }
-// KHQR (in Riel) for what this athlete owes on that team (or part of it).
+// KHQR (in US dollars) for what this athlete owes on that team (or part of it).
 exports.createBakongPayment = async (req, res) => {
   try {
     const { athleteId, assignmentId, amount } = req.body;
