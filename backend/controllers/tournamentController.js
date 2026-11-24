@@ -1,4 +1,9 @@
 const Tournament = require("../models/Tournament");
+
+// Money for entry fees: riel or dollars, per tournament.
+const KHR_PER_USD = 4000;
+const feeText = (t, n) =>
+  Tournament.feeCurrency(t) === "KHR" ? `៛${Math.round(Number(n) || 0).toLocaleString("en-US")}` : `$${(Number(n) || 0).toFixed(2)}`;
 const Athlete = require("../models/Athlete");
 const Admin = require("../models/Admin");
 const Lineup = require("../models/Lineup");
@@ -137,6 +142,7 @@ function summarize(t, athleteId) {
     name: t.name,
     description: t.description,
     entryFee: t.entryFee,
+    entryFeeCurrency: Tournament.feeCurrency(t),
     matchDates: t.matchDates,
     team: t.team || "",
     allowedTeams: t.allowedTeams || [],
@@ -224,7 +230,9 @@ async function settleUnpaidToDebt(tournament, { force = false } = {}) {
   );
   for (const r of unpaid) {
     try {
-      const remaining = tournament.entryFee - (r.feePaidAmount || 0);
+      // Student debts are kept in dollars — a riel entry fee is converted.
+      const left = tournament.entryFee - (r.feePaidAmount || 0);
+      const remaining = Tournament.feeCurrency(tournament) === "KHR" ? Math.round((left / KHR_PER_USD) * 100) / 100 : left;
       const athlete = await Athlete.findById(r.athlete);
       if (!athlete) continue;
       const assignment = athlete.assignments.find((a) => a.team === r.team);
@@ -401,6 +409,7 @@ exports.createTournament = async (req, res) => {
       name: name.trim(),
       description: description || "",
       entryFee: Number(entryFee) || 0,
+      entryFeeCurrency: req.body.entryFeeCurrency === "USD" ? "USD" : "KHR",
       matchDates: Array.isArray(matchDates) ? matchDates.filter(Boolean) : [],
       team: scopedTeam,
       ...ageRule,
@@ -533,6 +542,7 @@ exports.updateTournament = async (req, res) => {
     if (name !== undefined) tournament.name = name.trim();
     if (description !== undefined) tournament.description = description;
     if (entryFee !== undefined) tournament.entryFee = Number(entryFee) || 0;
+    if (req.body.entryFeeCurrency === "USD" || req.body.entryFeeCurrency === "KHR") tournament.entryFeeCurrency = req.body.entryFeeCurrency;
     if (matchDates !== undefined) tournament.matchDates = Array.isArray(matchDates) ? matchDates.filter(Boolean) : [];
     // `team` is intentionally not editable after creation — changing it
     // could suddenly hide/expose an existing registration list to the
@@ -959,7 +969,7 @@ exports.setRegistrationPaid = async (req, res) => {
       return res.status(400).json({ message: "Invalid amount" });
     }
     if (amount > tournament.entryFee) {
-      return res.status(400).json({ message: `Amount can't exceed the entry fee ($${tournament.entryFee})` });
+      return res.status(400).json({ message: `Amount can't exceed the entry fee (${feeText(tournament, tournament.entryFee)})` });
     }
 
     row.feePaidAmount = amount;
@@ -1041,7 +1051,7 @@ exports.exportRegistrationsCsv = async (req, res) => {
           tournament.entryFee > 0
             ? r.convertedToDebt
               ? "Converted to debt"
-              : `$${r.feePaidAmount || 0} of $${tournament.entryFee}`
+              : `${feeText(tournament, r.feePaidAmount || 0)} of ${feeText(tournament, tournament.entryFee)}`
             : "",
         ]
           .map(escapeCsv)

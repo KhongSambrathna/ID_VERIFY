@@ -28,3 +28,17 @@ export function approxKHR(usd) {
 export function formatUSDwithKHR(usd) {
   return `${formatUSD(usd)} ${approxKHR(usd)}`;
 }
+
+// A tournament entry fee in its own currency (each tournament is in riel or
+// dollars): "៛13,000 (≈ $3.25)" or "$5.00 ≈ ៛20,000".
+export function formatFee(amount, currency) {
+  if (currency === "KHR") {
+    const usd = Math.round(((Number(amount) || 0) / USD_TO_KHR) * 100) / 100;
+    return `${formatKHR(amount)} (≈ ${formatUSD(usd)})`;
+  }
+  return formatUSDwithKHR(amount);
+}
+// Short form for badges: "៛13,000" or "$5.00".
+export function formatFeeShort(amount, currency) {
+  return currency === "KHR" ? formatKHR(amount) : formatUSD(amount);
+}

@@ -81,6 +81,10 @@ const tournamentSchema = new mongoose.Schema(
     description: { type: String, default: "" },
     // What it costs to enter — shown to players before they register.
     entryFee: { type: Number, default: 0, min: 0 },
+    // Currency of entryFee (and of each registration's feePaidAmount):
+    // "KHR" riel or "USD" dollars. Older tournaments don't have it saved —
+    // feeCurrency() below decides for them (100 or more = riel).
+    entryFeeCurrency: { type: String, enum: ["KHR", "USD"] },
     // One or more dates this tournament is played on.
     matchDates: { type: [Date], default: [] },
     // null/"" = open to every team. Set = only that team's players may
@@ -178,4 +182,21 @@ const tournamentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("Tournament", tournamentSchema);
+// The entry fee's currency, for tournaments saved before it was stored:
+// the form used to say ៛, so a fee of 100 or more is riel; a small number
+// (like 2.5) was typed as dollars.
+function feeCurrency(t) {
+  if (t && (t.entryFeeCurrency === "KHR" || t.entryFeeCurrency === "USD")) return t.entryFeeCurrency;
+  return Number(t?.entryFee || 0) >= 100 ? "KHR" : "USD";
+}
+// Always send the currency to the website, saved or worked out.
+const withCurrency = (doc, ret) => {
+  ret.entryFeeCurrency = feeCurrency(ret);
+  return ret;
+};
+tournamentSchema.set("toJSON", { transform: withCurrency });
+tournamentSchema.set("toObject", { transform: withCurrency });
+
+const Tournament = mongoose.model("Tournament", tournamentSchema);
+Tournament.feeCurrency = feeCurrency;
+module.exports = Tournament;

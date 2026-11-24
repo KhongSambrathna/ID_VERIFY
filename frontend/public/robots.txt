@@ -1,0 +1,16 @@
+# Countryside Football ID Verify — https://id.brathna.com
+User-agent: *
+Allow: /
+# Private parts of the app (need a login) and one-time links
+Disallow: /admin
+Disallow: /coach
+Disallow: /player
+Disallow: /referee
+Disallow: /settings
+Disallow: /register/
+Disallow: /payment/
+Disallow: /debt-report
+Disallow: /tg-shop
+Disallow: /api/
+
+Sitemap: https://id.brathna.com/sitemap.xml

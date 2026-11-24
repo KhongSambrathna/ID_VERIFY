@@ -2,7 +2,7 @@ import { Fragment, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { resolveFileUrl } from "../utils/fileUrl";
-import { formatUSDwithKHR } from "../utils/currency";
+import { formatUSDwithKHR, formatFee, formatFeeShort } from "../utils/currency";
 import { useAuth } from "../context/AuthContext";
 import TournamentRulesFields, { emptyRules, rulesFromTournament, rulesPayload, rulesSummaryLines } from "../components/TournamentRulesFields";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -53,6 +53,7 @@ const emptyForm = {
   name: "",
   description: "",
   entryFee: "",
+  entryFeeCurrency: "KHR",
   team: "",
   matchDates: [""],
   ageLimitYear: "",
@@ -135,6 +136,7 @@ export default function AdminTournaments() {
       name: tour.name || "",
       description: tour.description || "",
       entryFee: tour.entryFee ? String(tour.entryFee) : "",
+      entryFeeCurrency: tour.entryFeeCurrency || "KHR",
       team: tour.team || "",
       matchDates: tour.matchDates?.length ? tour.matchDates.map(formatDate) : [""],
       ageLimitYear: tour.ageLimitYear ? String(tour.ageLimitYear) : "",
@@ -175,6 +177,7 @@ export default function AdminTournaments() {
           name: form.name,
           description: form.description,
           entryFee: form.entryFee === "" ? 0 : form.entryFee,
+          entryFeeCurrency: form.entryFeeCurrency,
           matchDates: form.matchDates.filter(Boolean),
           ageLimitYear: form.ageLimitYear,
           overageRules: form.ageLimitYear ? form.overageRules : [],
@@ -190,6 +193,7 @@ export default function AdminTournaments() {
         name: form.name,
         description: form.description,
         entryFee: form.entryFee,
+        entryFeeCurrency: form.entryFeeCurrency,
         matchDates: form.matchDates.filter(Boolean),
         team: undefined,
         ageLimitYear: form.ageLimitYear,
@@ -393,7 +397,23 @@ export default function AdminTournaments() {
           </div>
           <div className="field">
             <label>{t("adminTournaments.entryFeeLabel")}</label>
-            <input type="number" min="0" step="any" inputMode="decimal" value={form.entryFee} onChange={update("entryFee")} placeholder="5" />
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                inputMode="decimal"
+                value={form.entryFee}
+                onChange={update("entryFee")}
+                placeholder={form.entryFeeCurrency === "KHR" ? "10000" : "5"}
+                style={{ flex: 1, minWidth: 0 }}
+              />
+              <select value={form.entryFeeCurrency} onChange={update("entryFeeCurrency")} style={{ width: 100 }}>
+                <option value="KHR">៛ រៀល</option>
+                <option value="USD">$ USD</option>
+              </select>
+            </div>
+            {Number(form.entryFee) > 0 && <small className="mini-empty">{formatFee(Number(form.entryFee), form.entryFeeCurrency)}</small>}
           </div>
           <div className="field">
             <label>{t("adminTournaments.matchDatesLabel")}</label>
@@ -523,7 +543,7 @@ export default function AdminTournaments() {
                     <td data-label={t("common.team")}>
                       {tour.team || (tour.allowedTeams?.length ? tour.allowedTeams.join(", ") : t("adminTournaments.allTeams"))}
                     </td>
-                    <td data-label={t("adminTournaments.entryFeeHeader")}>{formatUSDwithKHR(tour.entryFee || 0)}</td>
+                    <td data-label={t("adminTournaments.entryFeeHeader")}>{formatFee(tour.entryFee || 0, tour.entryFeeCurrency)}</td>
                     <td data-label={t("adminTournaments.datesHeader")}>
                       {tour.matchDates?.length ? tour.matchDates.map(formatDate).join(", ") : "—"}
                     </td>
@@ -645,8 +665,8 @@ export default function AdminTournaments() {
                                         ) : r.feePaidAmount > 0 ? (
                                           <span className="badge pending">
                                             {t("adminTournaments.partialBadge")
-                                              .replace("{amount}", r.feePaidAmount)
-                                              .replace("{fee}", detail.entryFee)}
+                                              .replace("{amount}", formatFeeShort(r.feePaidAmount, detail.entryFeeCurrency))
+                                              .replace("{fee}", formatFeeShort(detail.entryFee, detail.entryFeeCurrency))}
                                           </span>
                                         ) : (
                                           <span className="badge pending">{t("adminTournaments.unpaidBadge")}</span>
@@ -662,7 +682,7 @@ export default function AdminTournaments() {
                                     </div>
                                     {payOpenId === r._id && (
                                       <div className="field" style={{ maxWidth: 260 }}>
-                                        <label>{t("adminTournaments.payAmountLabel").replace("{fee}", detail.entryFee)}</label>
+                                        <label>{t("adminTournaments.payAmountLabel").replace("{fee}", formatFeeShort(detail.entryFee, detail.entryFeeCurrency))}</label>
                                         <input
                                           type="number"
                                           min="0"

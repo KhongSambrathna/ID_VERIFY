@@ -49,6 +49,7 @@ import AdminTelegram from "./pages/AdminTelegram";
 import TgShop from "./pages/TgShop";
 import CoachModeBanner from "./components/CoachModeBanner";
 import WelcomeGuide from "./components/WelcomeGuide";
+import RouteMeta from "./components/RouteMeta";
 import UpdateBanner from "./components/UpdateBanner";
 import usePageTracking from "./hooks/usePageTracking";
 
@@ -71,6 +72,7 @@ export default function App() {
       <Navbar />
       <CoachModeBanner />
       <WelcomeGuide />
+      <RouteMeta />
       <UpdateBanner />
       <Routes>
         <Route

@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import api from "../api/axios";
+import { formatFeeShort } from "../utils/currency";
 import { useAuth } from "../context/AuthContext";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -526,8 +527,8 @@ export default function TournamentSquadPage() {
                     ) : r.feePaidAmount > 0 ? (
                       <span className="badge pending">
                         {t("tournamentSquadPage.partialBadge")
-                          .replace("{amount}", r.feePaidAmount)
-                          .replace("{fee}", tournament.entryFee)}
+                          .replace("{amount}", formatFeeShort(r.feePaidAmount, tournament.entryFeeCurrency))
+                          .replace("{fee}", formatFeeShort(tournament.entryFee, tournament.entryFeeCurrency))}
                       </span>
                     ) : (
                       <span className="badge pending">{t("tournamentSquadPage.unpaidBadge")}</span>
@@ -571,7 +572,7 @@ export default function TournamentSquadPage() {
                 </div>
                 {payOpenId === r._id && (
                   <div className="field" style={{ maxWidth: 260, marginLeft: 44 }}>
-                    <label>{t("tournamentSquadPage.payAmountLabel").replace("{fee}", tournament.entryFee)}</label>
+                    <label>{t("tournamentSquadPage.payAmountLabel").replace("{fee}", formatFeeShort(tournament.entryFee, tournament.entryFeeCurrency))}</label>
                     <input
                       type="number"
                       min="0"

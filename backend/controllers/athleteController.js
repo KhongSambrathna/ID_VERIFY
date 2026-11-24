@@ -1071,6 +1071,23 @@ exports.checkDuplicateName = async (req, res) => {
 // for anyone whose QR scanner isn't cooperating. Only approved assignments
 // are ever shown here — a record with zero approved assignments (still
 // pending, or all its assignments were removed) doesn't appear at all.
+// GET /api/athletes/seo-list — public: every approved athlete's ID + last
+// change, for the sitemap search engines read (frontend /sitemap.xml). Only
+// what's already public on each /verify page; nothing else.
+exports.seoList = async (req, res) => {
+  try {
+    const rows = await Athlete.find({ "assignments.approvalStatus": "approved" })
+      .select("verifyId updatedAt")
+      .sort({ updatedAt: -1 })
+      .limit(45000)
+      .lean();
+    res.set("Cache-Control", "public, max-age=3600");
+    res.json(rows.filter((r) => r.verifyId).map((r) => ({ id: r.verifyId, updated: r.updatedAt })));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 exports.searchAthletes = async (req, res) => {
   try {
     const q = (req.query.q || "").trim();

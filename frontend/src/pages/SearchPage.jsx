@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { resolveFileUrl } from "../utils/fileUrl";
 import { useLanguage } from "../i18n/LanguageContext";
 
 export default function SearchPage() {
   const { t } = useLanguage();
-  const [query, setQuery] = useState("");
+  // ?q=name opens with that search (links from Google's search box, shares).
+  const [params, setParams] = useSearchParams();
+  const [query, setQuery] = useState(() => params.get("q") || "");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -14,6 +16,8 @@ export default function SearchPage() {
 
   useEffect(() => {
     const q = query.trim();
+    // Keep ?q= in the address so a search can be shared or bookmarked.
+    if ((params.get("q") || "") !== q) setParams(q ? { q } : {}, { replace: true });
     if (q.length < 2) {
       setResults([]);
       setError("");

@@ -3563,3 +3563,7 @@ tr.inv-excluded td:first-child { opacity: 1; }
 /* New version bar */
 .update-banner { position: fixed; left: 12px; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 1900; margin: 0 auto; max-width: 520px; border: 0; border-radius: 12px; padding: 12px 16px; background: var(--navy, #13294b); color: #fff; font: inherit; font-size: 15px; box-shadow: 0 8px 24px rgba(0,0,0,.3); cursor: pointer; text-align: center; }
 .update-banner b { color: var(--gold, #e0b84c); }
+
+/* Analytics: who */
+.who-cell { display: inline-flex; gap: 8px; align-items: center; text-align: left; }
+.who-sub { display: block; font-size: 12px; color: #777; overflow-wrap: anywhere; }

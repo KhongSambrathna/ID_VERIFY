@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../api/axios";
+import Avatar from "../components/Avatar";
 import { useLanguage } from "../i18n/LanguageContext";
 import { BarChart, HBarList, StatTile } from "../components/MiniCharts";
 
@@ -60,7 +61,9 @@ export default function AdminAnalytics() {
   );
 
   const q = userSearch.trim().toLowerCase();
-  const users = (data?.users || []).filter((u) => !q || (u.username || "").toLowerCase().includes(q));
+  const users = (data?.users || []).filter(
+    (u) => !q || [u.username, u.name, u.khmerName, u.team].some((x) => (x || "").toLowerCase().includes(q))
+  );
 
   return (
     <div className="container dash-body">
@@ -178,7 +181,19 @@ export default function AdminAnalytics() {
               <tbody>
                 {users.map((u) => (
                   <tr key={u._id}>
-                    <td data-label={t("adminAnalytics.user")}><b>{u.username}</b></td>
+                    <td data-label={t("adminAnalytics.user")}>
+                      <span className="who-cell">
+                        <Avatar name={u.name || u.username} photoUrl={u.photoUrl} size={32} />
+                        <span>
+                          <b>{u.name || u.username}</b>
+                          {u.khmerName && <small> · {u.khmerName}</small>}
+                          <small className="who-sub">
+                            @{u.username}
+                            {u.team ? ` · ${u.team}` : ""}
+                          </small>
+                        </span>
+                      </span>
+                    </td>
                     <td data-label={t("adminAnalytics.role")}>{roleName(u.role)}</td>
                     <td data-label={t("adminAnalytics.pageViews")}>{u.views}</td>
                     <td data-label={t("adminAnalytics.lastSeen")}>{timeAgo(u.lastSeen, t)}</td>
@@ -218,7 +233,10 @@ export default function AdminAnalytics() {
                     <td data-label={t("adminAnalytics.page")} style={{ fontSize: 13 }}>{v.path}</td>
                     <td data-label={t("adminAnalytics.who")}>
                       {v.username ? (
-                        <b>{v.username}</b>
+                        <span>
+                          <b>{v.name || v.username}</b>
+                          {v.name && <small className="who-sub">@{v.username}</small>}
+                        </span>
                       ) : (
                         <span style={{ color: "#888" }}>{t("adminAnalytics.guest")} #{String(v.visitorId).slice(0, 4)}</span>
                       )}

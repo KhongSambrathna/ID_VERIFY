@@ -26,6 +26,7 @@ const {
   previewDeleteAthlete,
   verifyAthlete,
   searchAthletes,
+  seoList,
   checkDuplicateName,
 } = require("../controllers/athleteController");
 
@@ -33,6 +34,8 @@ const {
 router.get("/verify/:verifyId", verifyAthlete);
 // Public - lets anyone find a player by name or ID number without scanning anything.
 router.get("/search", searchAthletes);
+// Public list of approved athlete IDs for the search-engine sitemap.
+router.get("/seo-list", seoList);
 
 // Signed-in below this line. A Head Coach/Player is scoped to just their
 // own team by the controller (see athleteController.js) — every route here

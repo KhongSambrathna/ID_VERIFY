@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const PageView = require("../models/PageView");
 const Admin = require("../models/Admin");
+const Athlete = require("../models/Athlete");
 const { parseUserAgent, isBot, clientIp, lookupGeo } = require("../utils/visitorInfo");
 
 const TZ = "Asia/Phnom_Penh";
@@ -181,7 +182,7 @@ exports.summary = async (req, res) => {
       PageView.find(match)
         .sort({ createdAt: -1 })
         .limit(50)
-        .select("path username role city region country device os browser createdAt visitorId")
+        .select("path user username role city region country device os browser createdAt visitorId")
         .lean(),
       PageView.aggregate([
         { $match: match },
@@ -203,6 +204,33 @@ exports.summary = async (req, res) => {
       hour: h,
       views: hours.find((x) => x._id === h)?.views || 0,
     }));
+
+    // Real names for signed-in users: the account's own name, or (Player
+    // accounts) the athlete's name; plus team and photo.
+    const ids = [...new Set([...users.map((u) => String(u._id)), ...recent.filter((v) => v.user).map((v) => String(v.user))])].filter((x) =>
+      mongoose.isValidObjectId(x)
+    );
+    const accounts = await Admin.find({ _id: { $in: ids } }).select("username displayName photoUrl team athleteId").lean();
+    const athletes = await Athlete.find({ _id: { $in: accounts.map((a) => a.athleteId).filter(Boolean) } })
+      .select("fullName khmerName photoUrl")
+      .lean();
+    const athById = new Map(athletes.map((a) => [String(a._id), a]));
+    const who = new Map(
+      accounts.map((a) => {
+        const ath = a.athleteId ? athById.get(String(a.athleteId)) : null;
+        return [
+          String(a._id),
+          {
+            name: a.displayName || ath?.fullName || "",
+            khmerName: ath?.khmerName || "",
+            team: a.team || "",
+            photoUrl: a.photoUrl || ath?.photoUrl || "",
+          },
+        ];
+      })
+    );
+    for (const u of users) Object.assign(u, who.get(String(u._id)) || {});
+    for (const v of recent) if (v.user) Object.assign(v, who.get(String(v.user)) || {});
 
     const loggedInVisitors = users.length;
     res.json({

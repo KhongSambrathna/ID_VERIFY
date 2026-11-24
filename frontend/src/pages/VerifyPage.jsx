@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { setPageMeta } from "../components/RouteMeta";
 import { useParams } from "react-router-dom";
 import api from "../api/axios";
 import { resolveFileUrl } from "../utils/fileUrl";
@@ -55,7 +56,16 @@ export default function VerifyPage() {
   useEffect(() => {
     api
       .get(`/athletes/verify/${verifyId}`)
-      .then(({ data }) => setAthlete(data))
+      .then(({ data }) => {
+        setAthlete(data);
+        // Tab title + description for this player (search engines read it too).
+        const teams = (data.memberships || []).map((m) => m.team).filter(Boolean).join(", ") || data.team || "";
+        const name = data.khmerName ? `${data.fullName} (${data.khmerName})` : data.fullName;
+        setPageMeta(
+          `${name}${teams ? ` — ${teams}` : ""} | Countryside Football ID Verify`,
+          `${name}${teams ? ` · ${teams}` : ""} — ផ្ទៀងផ្ទាត់អត្តសញ្ញាណកីឡាករបាល់ទាត់ ID ${data.verifyId}. Verified football player ID, Siem Reap.`
+        );
+      })
       .catch((err) => setError(err.response?.data?.message || t("recordNotFound")));
   }, [verifyId]);
 

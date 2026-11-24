@@ -32,12 +32,18 @@ function notReady() {
   return e;
 }
 
-async function newQr({ amount, billNumber }) {
+async function newQr({ amount, billNumber, currency = "USD" }) {
   const s = await pay.getSettings();
   if (!s.bakongAccountId) throw notReady();
-  // Student fees are kept in US dollars, so the QR is in dollars.
-  return pay.makeQr(s, { amount: cents(amount), currency: "USD", billNumber });
+  // Student debts are kept in US dollars; a tournament's entry fee is in
+  // that tournament's own currency (riel or dollars).
+  return currency === "KHR"
+    ? pay.makeQr(s, { amount: Math.round(amount), currency: "KHR", billNumber })
+    : pay.makeQr(s, { amount: cents(amount), currency: "USD", billNumber });
 }
+const khr = (n) => `៛${Math.round(Number(n) || 0).toLocaleString("en-US")}`;
+// Payment amount in its own currency.
+const moneyIn = (n, cur) => (cur === "KHR" ? `${khr(n)} (≈ $${cents(n / RATE).toFixed(2)})` : money(n));
 
 // Debt: pay (part of) what's owed on one team assignment.
 async function createFeeQr({ athlete, assignment, amount, by }) {
@@ -69,9 +75,11 @@ async function createTournamentQr({ tournament, row, by }) {
   if (row.convertedToDebt) {
     throw Object.assign(new Error("This entry fee has already moved to the student's debts — pay it from the debts instead"), { status: 409 });
   }
-  const amount = cents((tournament.entryFee || 0) - (row.feePaidAmount || 0));
-  if (amount < 0.01) throw Object.assign(new Error("Nothing left to pay for this entry fee"), { status: 400 });
-  const q = await newQr({ amount, billNumber: `TR-${String(row._id).slice(-8)}` });
+  const currency = Tournament.feeCurrency(tournament);
+  const left = (tournament.entryFee || 0) - (row.feePaidAmount || 0);
+  const amount = currency === "KHR" ? Math.round(left) : cents(left);
+  if (amount < (currency === "KHR" ? 100 : 0.01)) throw Object.assign(new Error("Nothing left to pay for this entry fee"), { status: 400 });
+  const q = await newQr({ amount, currency, billNumber: `TR-${String(row._id).slice(-8)}` });
   return Payment.create({
     athlete: row.athlete,
     kind: "TOURNAMENT",
@@ -79,7 +87,7 @@ async function createTournamentQr({ tournament, row, by }) {
     registrationId: row._id,
     team: row.team,
     amount: q.amount,
-    currency: "USD",
+    currency,
     method: "BAKONG",
     status: "PENDING",
     reference: q.md5,
@@ -129,20 +137,25 @@ async function applyPaid(paymentId, { tx = null, by = null } = {}) {
   const athlete = await Athlete.findById(p.athlete);
   let what = "";
   let left = null;
+  let leftCur = "USD";
   if (p.kind === "TOURNAMENT") {
     const t = await Tournament.findById(p.tournament);
     const row = t && t.registrations.id(p.registrationId);
     if (row && !row.convertedToDebt) {
-      row.feePaidAmount = cents(Math.min(t.entryFee, (row.feePaidAmount || 0) + p.amount));
+      const paidNow = (row.feePaidAmount || 0) + p.amount;
+      row.feePaidAmount = p.currency === "KHR" ? Math.round(Math.min(t.entryFee, paidNow)) : cents(Math.min(t.entryFee, paidNow));
       row.feePaid = row.feePaidAmount >= t.entryFee && t.entryFee > 0;
       row.feePaidAt = new Date();
       row.feePaidBy = by || row.feePaidBy || null;
       await t.save();
       left = Math.max(0, t.entryFee - row.feePaidAmount);
+      leftCur = p.currency;
     } else if (row && athlete) {
       // Moved to debts meanwhile → pay the debt instead.
       const asg = athlete.assignments.find((a) => a.team === row.team);
-      if (asg) left = await reduceFees(athlete, asg, Math.min(p.amount, feeOwedOf(asg)));
+      // Debts are in dollars — convert a riel payment first.
+      const usdAmount = p.currency === "KHR" ? cents(p.amount / RATE) : p.amount;
+      if (asg) left = await reduceFees(athlete, asg, Math.min(usdAmount, feeOwedOf(asg)));
     }
     what = `ថ្លៃចូលរួម ${t ? esc(t.name) : "ពាន"}`;
   } else if (athlete) {
@@ -152,9 +165,11 @@ async function applyPaid(paymentId, { tx = null, by = null } = {}) {
   }
 
   const name = athlete ? athlete.fullName : p.label;
+  // What's still owed: a tournament fee in its own currency, a debt in dollars.
+  const leftText = (n) => (leftCur === "KHR" ? moneyIn(n, "KHR") : money(n));
   const text =
-    `💰 <b>បានទទួលលុយ ${money(p.amount)}</b> (KHQR)\n👤 ${esc(name)} · ${esc(p.team)}\n🧾 ${what}` +
-    (left !== null ? `\n📉 នៅជំពាក់ ${money(left)}` : "") +
+    `💰 <b>បានទទួលលុយ ${moneyIn(p.amount, p.currency)}</b> (KHQR)\n👤 ${esc(name)} · ${esc(p.team)}\n🧾 ${what}` +
+    (left !== null ? `\n📉 នៅជំពាក់ ${leftText(left)}` : "") +
     (p.fromAccount ? `\n↪️ ពី ${esc(p.fromAccount)}` : "") +
     (by ? "\n✍️ កត់ដោយដៃ" : "\n🏦 ផ្ទៀងផ្ទាត់ជាមួយ Bakong");
 
@@ -177,7 +192,7 @@ async function applyPaid(paymentId, { tx = null, by = null } = {}) {
     for (const a of own) {
       if (sent.has(String(a.telegramChatId))) continue;
       sent.add(String(a.telegramChatId));
-      await send(a.telegramChatId, `✅ <b>បានទទួលការបង់ប្រាក់ ${money(p.amount)}</b>\n🧾 ${what}${left !== null ? `\n📉 នៅជំពាក់ ${money(left)}` : ""}\n\nសូមអរគុណ! 🙏`);
+      await send(a.telegramChatId, `✅ <b>បានទទួលការបង់ប្រាក់ ${moneyIn(p.amount, p.currency)}</b>\n🧾 ${what}${left !== null ? `\n📉 នៅជំពាក់ ${leftText(left)}` : ""}\n\nសូមអរគុណ! 🙏`);
     }
   }
   return { payment: p, left };
