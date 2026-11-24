@@ -187,6 +187,12 @@ async function applyPaid(paymentId, { tx = null, by = null } = {}) {
   };
   for (const a of staff) await to(a.telegramChatId);
   if (s.groupChatId) await to(s.groupChatId);
+  // 🔔 on the website too.
+  const web = require("./webNotify");
+  web.webNotifyAdmins(text, { kind: "payment" });
+  web.webNotifyTeamCoaches(p.team, text, { kind: "payment" });
+  if (athlete)
+    web.webNotifyAthlete(athlete._id, `✅ បានទទួលការបង់ប្រាក់ ${moneyIn(p.amount, p.currency)}\n🧾 ${what}${left !== null ? `\n📉 នៅជំពាក់ ${leftText(left)}` : ""}`, { kind: "payment" });
   if (athlete) {
     const own = await Admin.find({ athleteId: athlete._id, telegramChatId: { $nin: ["", null] } }).select("telegramChatId");
     for (const a of own) {

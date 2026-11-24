@@ -79,6 +79,11 @@ function webLink(path) {
 // ---------------- Instant alerts ----------------
 
 async function alertNewOrder(order) {
+  // 🔔 on the website for every Admin (even without Telegram linked).
+  require("./webNotify").webNotifyAdmins(
+    `🛒 ការកម្មង់ថ្មី ${order.orderNo}\n👤 ${order.customer?.name || order.username || ""} · 💰 ${usd(order.total)}`,
+    { kind: "order", link: "/admin/telegram?tab=orders" }
+  );
   const to = await recipients("orders");
   if (!to.length) return;
   let text = `🛒 <b>ការកម្មង់ថ្មី ${order.orderNo}</b> (Telegram)\n\n`;

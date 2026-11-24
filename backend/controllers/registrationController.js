@@ -6,6 +6,11 @@ const generateShortId = require("../utils/generateShortId");
 const generateAthleteQR = require("../utils/generateQR");
 const uploadBufferToCloudinary = require("../utils/uploadToCloudinary");
 const { notifyAdmins } = require("../utils/notify");
+// ✅ / ❌ on the Admin's 🔔 notice.
+const pendingAction = (athlete, team) => {
+  const a = athlete.assignments.find((x) => x.team === team && x.approvalStatus === "pending");
+  return a ? { action: { type: "assignment", athleteId: String(athlete._id), assignmentId: String(a._id) } } : undefined;
+};
 const { DEFAULT_PLAYER_PASSWORD } = require("../utils/playerAccount");
 
 // Trim and collapse inner spaces in a typed name.
@@ -369,7 +374,7 @@ exports.registerViaInvite = async (req, res) => {
     consumeInviteUse(invite, athlete._id);
     await invite.save();
 
-    notifyAdmins(`🆕 ${athlete.fullName} self-registered for ${team} — needs approval.`);
+    notifyAdmins(`🆕 ${athlete.fullName} self-registered for ${team} — needs approval.`, pendingAction(athlete, team));
 
     // The ID + default password are what the player writes down now. The
     // account is only created once an Admin approves, at which point they can
@@ -462,7 +467,7 @@ exports.claimExisting = async (req, res) => {
     consumeInviteUse(invite, athlete._id);
     await invite.save();
 
-    notifyAdmins(`🆕 ${athlete.fullName} joined ${team} via a registration link — needs approval.`);
+    notifyAdmins(`🆕 ${athlete.fullName} joined ${team} via a registration link — needs approval.`, pendingAction(athlete, team));
 
     res.status(201).json({
       message: "Joined team — pending admin approval",

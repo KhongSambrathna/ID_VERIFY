@@ -9,6 +9,16 @@ const uploadBufferToCloudinary = require("../utils/uploadToCloudinary");
 const cloudinary = require("../config/cloudinary");
 const flattenAssignments = require("../utils/flattenAssignments");
 const { notifyAdmins, notifyTeamCoaches } = require("../utils/notify");
+const { resolveRef } = require("../utils/webNotify");
+// ✅ / ❌ buttons on the Admin's 🔔 notice for this person's pending
+// assignment on a team (null if nothing is pending there).
+const approvalAction = (athlete, team, role) => {
+  const a = athlete.assignments.find(
+    (x) => x.team === team && (!role || x.role === role) && (x.approvalStatus === "pending" || x.pendingRemoval)
+  );
+  return a ? { action: { type: "assignment", athleteId: String(athlete._id), assignmentId: String(a._id) } } : undefined;
+};
+exports.approvalAction = approvalAction;
 const { ensurePlayerAccountForAthlete } = require("../utils/playerAccount");
 
 function toBool(value) {
@@ -156,7 +166,7 @@ exports.createAthlete = async (req, res) => {
     await athlete.save();
 
     if (isHeadCoach && team) {
-      notifyAdmins(`🆕 ${athlete.fullName} was added to ${team} by a Head Coach — needs approval.`);
+      notifyAdmins(`🆕 ${athlete.fullName} was added to ${team} by a Head Coach — needs approval.`, approvalAction(athlete, team));
     }
 
     res.status(201).json(athlete);
@@ -544,7 +554,7 @@ exports.updateAthlete = async (req, res) => {
     await athlete.save();
 
     if (isHeadCoach) {
-      notifyAdmins(`✏️ ${athlete.fullName}'s record on ${req.adminTeam} was edited — needs re-approval.`);
+      notifyAdmins(`✏️ ${athlete.fullName}'s record on ${req.adminTeam} was edited — needs re-approval.`, approvalAction(athlete, req.adminTeam));
     } else if (isPlayerSelf) {
       const text = `✏️ ${athlete.fullName} updated their own profile — needs re-approval.`;
       notifyAdmins(text);
@@ -615,7 +625,7 @@ exports.addAssignment = async (req, res) => {
     await athlete.save();
 
     if (isHeadCoach) {
-      notifyAdmins(`🆕 ${athlete.fullName} was added to ${team} (${role}) by a Head Coach — needs approval.`);
+      notifyAdmins(`🆕 ${athlete.fullName} was added to ${team} (${role}) by a Head Coach — needs approval.`, approvalAction(athlete, team, role));
     }
 
     res.status(201).json(athlete);
@@ -845,14 +855,21 @@ exports.removeAssignment = async (req, res) => {
       if (assignment.team !== req.adminTeam) {
         return res.status(403).json({ message: "Access denied" });
       }
+      if (assignment.pendingRemoval) return res.json(athlete); // already asked
       assignment.pendingRemoval = true;
       await athlete.save();
+      const why = String(req.body?.reason || "").trim();
+      notifyAdmins(
+        `🗑️ Head Coach asked to remove ${athlete.fullName} from ${assignment.team} (${assignment.role})${why ? ` — ${why}` : ""}. Confirm or decline.`,
+        { kind: "removal", action: { type: "assignment", athleteId: String(athlete._id), assignmentId: String(assignment._id) } }
+      );
       return res.json(athlete);
     }
 
     const reason = String(req.body?.reason || "").trim();
     const team = assignment.team;
     const fullName = athlete.fullName;
+    resolveRef(`assignment:${assignment._id}`, "approve", req.adminId);
     const wasLast = athlete.assignments.length === 1;
     athlete.assignments = athlete.assignments.filter((a) => String(a._id) !== String(assignment._id));
     if (wasLast) {
@@ -888,6 +905,7 @@ exports.approveAssignment = async (req, res) => {
 
     const team = assignment.team;
     const fullName = athlete.fullName;
+    resolveRef(`assignment:${assignment._id}`, "approve", req.adminId);
 
     if (assignment.pendingRemoval) {
       const wasLast = athlete.assignments.length === 1;
@@ -953,6 +971,7 @@ exports.rejectAssignment = async (req, res) => {
     const team = assignment.team;
     const fullName = athlete.fullName;
     const reason = String(req.body?.reason || "").trim();
+    resolveRef(`assignment:${assignment._id}`, "reject", req.adminId);
 
     if (assignment.pendingRemoval) {
       assignment.pendingRemoval = false;

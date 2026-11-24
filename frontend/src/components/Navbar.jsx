@@ -4,6 +4,8 @@ import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
 import api from "../api/axios";
 import Avatar from "./Avatar";
+import NotificationBell from "./NotificationBell";
+import ChatNavButton from "./ChatNavButton";
 
 // Is this link the page we're on? A link with "?tab=…" only matches that
 // exact tab; a plain link matches its path when no tab is selected — so
@@ -172,6 +174,9 @@ export default function Navbar() {
             Countryside <span>Football ID Verify</span>
           </div>
         </Link>
+
+        {isAuthed && <ChatNavButton />}
+        {isAuthed && <NotificationBell />}
 
         <button
           type="button"

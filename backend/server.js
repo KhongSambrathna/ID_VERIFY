@@ -23,6 +23,8 @@ const invoiceRoutes = require("./routes/invoiceRoutes");
 const packageRoutes = require("./routes/packageRoutes");
 const purchasePlanRoutes = require("./routes/purchasePlanRoutes");
 const tournamentPlanRoutes = require("./routes/tournamentPlanRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+const chatRoutes = require("./routes/chatRoutes");
 const financeRoutes = require("./routes/financeRoutes");
 const telegramRoutes = require("./routes/telegramRoutes");
 const geoRoutes = require("./routes/geoRoutes");
@@ -70,6 +72,10 @@ app.use("/api/packages", packageRoutes);
 app.use("/api/purchase-plans", purchasePlanRoutes);
 // Trophy / tournament planning calendar.
 app.use("/api/tournament-plans", tournamentPlanRoutes);
+// In-website notifications (🔔 in the top bar).
+app.use("/api/notifications", notificationRoutes);
+// 💬 Chat between accounts.
+app.use("/api/chat", chatRoutes);
 // Personal finance (Admin): daily income/expenses, debts, monthly plan.
 app.use("/api/finance", financeRoutes);
 // Telegram shop bot (webhook) + private alerts for the Admin.

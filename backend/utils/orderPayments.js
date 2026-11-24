@@ -131,6 +131,7 @@ async function markPaid(orderId, { tx = null, by = null } = {}) {
   const to = await recipients("orders");
   for (const a of to) await send(a.telegramChatId, text);
   if (s.groupChatId) await send(s.groupChatId, text);
+  require("./webNotify").webNotifyAdmins(text, { kind: "order", link: "/admin/telegram?tab=orders" });
 
   // Confirm → paid invoice
   let confirmed = null;

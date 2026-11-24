@@ -12,6 +12,7 @@ import AllCardsPage from "./pages/AllCardsPage";
 import PrintCardBacksPage from "./pages/PrintCardBacksPage";
 import VerifyPage from "./pages/VerifyPage";
 import SearchPage from "./pages/SearchPage";
+import ChatPage from "./pages/ChatPage";
 import AboutUs from "./pages/AboutUs";
 import CoachDashboard from "./pages/CoachDashboard";
 import AdminUsers from "./pages/AdminUsers";
@@ -107,6 +108,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ChangePasswordPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/chat"
+          element={
+            <ProtectedRoute>
+              <ChatPage />
             </ProtectedRoute>
           }
         />

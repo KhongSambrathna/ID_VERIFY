@@ -10,6 +10,7 @@ const Lineup = require("../models/Lineup");
 const Team = require("../models/Team");
 const gazetteer = require("../utils/gazetteer");
 const { notifyAdmins, notifyTeamCoaches } = require("../utils/notify");
+const { resolveRef } = require("../utils/webNotify");
 
 // Finds (or creates) the auto-managed Lineup — the same "Squad list" the My
 // Team > Squad list tab manages — for one team's registrations in this
@@ -886,13 +887,18 @@ exports.unregister = async (req, res) => {
       row.pendingRemoval = true;
       await tournament.save();
       const text = `🚪 ${row.fullName} asked to withdraw from "${tournament.name}" (${row.team}) — needs Admin/Head Coach confirmation.`;
-      notifyAdmins(text);
-      notifyTeamCoaches(row.team, text);
+      const opts = {
+        kind: "tournament",
+        action: { type: "withdrawal", tournamentId: String(tournament._id), registrationId: String(row._id) },
+      };
+      notifyAdmins(text, opts);
+      notifyTeamCoaches(row.team, text, opts);
       return res.json(tournament);
     }
 
     const removedAthleteId = row.athlete;
     const removedTeam = row.team;
+    if (row.pendingRemoval) resolveRef(`withdrawal:${row._id}`, "approve", req.adminId);
     row.deleteOne();
     await tournament.save();
 
@@ -930,6 +936,7 @@ exports.keepRegistration = async (req, res) => {
 
     row.pendingRemoval = false;
     await tournament.save();
+    resolveRef(`withdrawal:${row._id}`, "reject", req.adminId);
     notifyTeamCoaches(row.team, `↩️ ${row.fullName}'s withdrawal request from "${tournament.name}" was declined — they stay registered.`);
     res.json(tournament);
   } catch (err) {

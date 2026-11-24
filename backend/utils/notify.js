@@ -34,8 +34,9 @@ async function sendTelegramMessage(chatId, text) {
   }
 }
 
-// Every Admin account that has a telegramChatId saved.
-async function notifyAdmins(text) {
+// Every Admin: in the website (🔔) and, if linked, Telegram.
+async function notifyAdmins(text, opts) {
+  require("./webNotify").webNotifyAdmins(text, opts);
   try {
     const admins = await Admin.find({ role: "ADMIN", telegramChatId: { $nin: ["", null] } }).select(
       "telegramChatId"
@@ -46,9 +47,10 @@ async function notifyAdmins(text) {
   }
 }
 
-// Every Head Coach account for one team that has a telegramChatId saved.
-async function notifyTeamCoaches(team, text) {
+// Every Head Coach of one team: in the website (🔔) and, if linked, Telegram.
+async function notifyTeamCoaches(team, text, opts) {
   if (!team) return;
+  require("./webNotify").webNotifyTeamCoaches(team, text, opts);
   try {
     const coaches = await Admin.find({
       role: "HEAD_COACH",
