@@ -41,6 +41,9 @@ api.interceptors.response.use(
         /* storage unavailable — keep using the current token */
       }
     }
+    // The Admin changed this account's role/team — refresh who I am, then
+    // reload so the menus and pages match the new role.
+    if (res.headers?.["x-account-changed"]) accountChanged();
     return res;
   },
   (err) => {
@@ -56,5 +59,32 @@ api.interceptors.response.use(
     return Promise.reject(err);
   }
 );
+
+let reloading = false;
+function accountChanged() {
+  if (reloading) return;
+  try {
+    const last = Number(sessionStorage.getItem("accountReloadAt") || 0);
+    if (Date.now() - last < 15000) return;
+    sessionStorage.setItem("accountReloadAt", String(Date.now()));
+  } catch {
+    /* ignore */
+  }
+  reloading = true;
+  api
+    .get("/auth/me")
+    .then(({ data }) => {
+      try {
+        localStorage.setItem("user", JSON.stringify({ ...data, id: data.id || data._id }));
+        localStorage.removeItem("coachTeam");
+      } catch {
+        /* ignore */
+      }
+      window.location.reload();
+    })
+    .catch(() => {
+      reloading = false;
+    });
+}
 
 export default api;

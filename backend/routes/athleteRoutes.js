@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { coachCan } = require("../middleware/coachPerms");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const upload = require("../middleware/upload");
 const {
@@ -65,6 +66,7 @@ router.get("/:id/scan-logs", requireRole("ADMIN", "HEAD_COACH"), getScanLogs);
 router.post(
   "/",
   requireRole("ADMIN", "HEAD_COACH"),
+  coachCan("athletes"),
   upload.fields([
     { name: "photo", maxCount: 1 },
     { name: "documents", maxCount: 10 },
@@ -77,6 +79,7 @@ router.post(
 router.put(
   "/:id",
   requireRole("ADMIN", "HEAD_COACH", "PLAYER"),
+  coachCan("athletes"),
   upload.fields([
     { name: "photo", maxCount: 1 },
     { name: "documents", maxCount: 10 },
@@ -97,9 +100,9 @@ router.put(
 // several on the same team, e.g. Player + Assistant Coach). Add/edit/remove
 // act on ONE assignment at a time; approve/reject (admin-only) are how an
 // Admin signs off on a Head Coach's pending add or pending removal request.
-router.post("/:id/assignments", requireRole("ADMIN", "HEAD_COACH"), addAssignment);
-router.put("/:id/assignments/:assignmentId", requireRole("ADMIN", "HEAD_COACH"), updateAssignment);
-router.delete("/:id/assignments/:assignmentId", requireRole("ADMIN", "HEAD_COACH"), removeAssignment);
+router.post("/:id/assignments", requireRole("ADMIN", "HEAD_COACH"), coachCan("athletes"), addAssignment);
+router.put("/:id/assignments/:assignmentId", requireRole("ADMIN", "HEAD_COACH"), coachCan("athletes"), updateAssignment);
+router.delete("/:id/assignments/:assignmentId", requireRole("ADMIN", "HEAD_COACH"), coachCan("athletes"), removeAssignment);
 router.put("/:id/assignments/:assignmentId/approve", requireRole("ADMIN"), approveAssignment);
 router.put("/:id/assignments/:assignmentId/reject", requireRole("ADMIN"), rejectAssignment);
 
@@ -108,9 +111,9 @@ router.put("/:id/assignments/:assignmentId/reject", requireRole("ADMIN"), reject
 // removed independently. Same Admin/Head Coach (own team) access as the
 // assignment routes above; a Player account only ever GETs this data via
 // the flattened total + breakdown, never through these.
-router.post("/:id/assignments/:assignmentId/fees", requireRole("ADMIN", "HEAD_COACH"), addFee);
-router.put("/:id/assignments/:assignmentId/fees/:feeId", requireRole("ADMIN", "HEAD_COACH"), updateFee);
-router.delete("/:id/assignments/:assignmentId/fees/:feeId", requireRole("ADMIN", "HEAD_COACH"), removeFee);
+router.post("/:id/assignments/:assignmentId/fees", requireRole("ADMIN", "HEAD_COACH"), coachCan("debts"), addFee);
+router.put("/:id/assignments/:assignmentId/fees/:feeId", requireRole("ADMIN", "HEAD_COACH"), coachCan("debts"), updateFee);
+router.delete("/:id/assignments/:assignmentId/fees/:feeId", requireRole("ADMIN", "HEAD_COACH"), coachCan("debts"), removeFee);
 
 // Character/behavior notes on one assignment — same Admin/Head Coach (own
 // team) access as fees above. A note can carry a "warning" or "banned"

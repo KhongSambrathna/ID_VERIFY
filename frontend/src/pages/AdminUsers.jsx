@@ -5,12 +5,62 @@ import TeamSelect from "../components/TeamSelect";
 import { useLanguage } from "../i18n/LanguageContext";
 import TelegramLinkCode from "../components/TelegramLinkCode";
 
+// Inline "change role" editor — Coach / Player / Referee + team.
+function RoleEditor({ account, roleOptions, onDone, t }) {
+  const [open, setOpen] = useState(false);
+  const [role, setRole] = useState(account.role || "PLAYER");
+  const [team, setTeam] = useState(account.team || "");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  if (account.role === "ADMIN") return null;
+  const save = async () => {
+    setSaving(true);
+    setErr("");
+    try {
+      await api.put(`/auth/users/${account._id}`, { role, team: role === "REFEREE" ? "" : team });
+      setOpen(false);
+      onDone?.(t("roleChange.done"));
+    } catch (e) {
+      setErr(e.response?.data?.message || t("common.failedToSave"));
+    } finally {
+      setSaving(false);
+    }
+  };
+  if (!open)
+    return (
+      <button type="button" className="action-btn" onClick={() => setOpen(true)}>
+        🔁 {t("roleChange.button")}
+      </button>
+    );
+  return (
+    <div className="role-editor">
+      <select value={role} onChange={(e) => setRole(e.target.value)} aria-label={t("roleChange.role")}>
+        {roleOptions.map((r) => (
+          <option key={r.value} value={r.value}>
+            {r.label}
+          </option>
+        ))}
+      </select>
+      {role !== "REFEREE" && <TeamSelect value={team} onChange={setTeam} required={role === "HEAD_COACH"} />}
+      {err && <div className="error-text">{err}</div>}
+      <div className="role-editor-actions">
+        <button type="button" className="btn btn-primary btn-sm" disabled={saving || (role === "HEAD_COACH" && !team)} onClick={save}>
+          {saving ? t("common.saving") : t("roleChange.save")}
+        </button>
+        <button type="button" className="link-btn" onClick={() => setOpen(false)}>
+          {t("roleChange.cancel")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminUsers() {
   const { t } = useLanguage();
   const { user: currentUser, isAdmin } = useAuth();
 
+  // Only one Admin (the owner) — new accounts are Coach / Player / Referee.
   const ROLE_OPTIONS = [
-    { value: "ADMIN", label: t("adminUsers.roleAdmin") },
     { value: "HEAD_COACH", label: t("adminUsers.roleHeadCoach") },
     { value: "PLAYER", label: t("adminUsers.rolePlayer") },
     { value: "REFEREE", label: t("adminUsers.roleReferee") },
@@ -45,6 +95,12 @@ export default function AdminUsers() {
   const [generateSummary, setGenerateSummary] = useState(null);
   const [resettingId, setResettingId] = useState(null);
   const [playerSearch, setPlayerSearch] = useState("");
+  const [roleMsg, setRoleMsg] = useState("");
+  const roleChanged = (msg) => {
+    setRoleMsg(msg);
+    load();
+    loadPlayerAccounts();
+  };
 
   const load = async () => {
     setLoading(true);
@@ -216,6 +272,7 @@ export default function AdminUsers() {
         </button>
       </form>
 
+      {roleMsg && <p className="help-text" style={{ color: "#1f7a43", fontWeight: 600 }}>{roleMsg}</p>}
       {loading && <p>{t("common.loading")}</p>}
       {error && <p className="error-text">{error}</p>}
 
@@ -234,7 +291,10 @@ export default function AdminUsers() {
             <tbody>
               {users.map((u) => (
                 <tr key={u._id}>
-                  <td data-label={t("common.username")}>{u.username}</td>
+                  <td data-label={t("common.username")}>
+                    {u.username}
+                    {u.fullName && <div className="help-text" style={{ margin: 0 }}>{u.fullName}</div>}
+                  </td>
                   <td data-label={t("common.role")}>{ROLE_LABELS[u.role] || t("adminUsers.roleAdmin")}</td>
                   <td data-label={t("common.team")} className="caps-display">{u.team || "—"}</td>
                   <td data-label={t("adminUsers.telegramChatId")}>
@@ -259,6 +319,7 @@ export default function AdminUsers() {
                   </td>
                   <td data-label={t("common.actions")} className="actions-cell">
                     <TelegramLinkCode compact endpoint={`/auth/users/${u._id}/telegram-code`} />
+                    {isAdmin && <RoleEditor account={u} roleOptions={ROLE_OPTIONS} onDone={roleChanged} t={t} />}
                     {u._id !== currentUser?.id && (
                       <button className="link-btn" onClick={() => remove(u._id)}>
                         {t("common.delete")}
@@ -345,6 +406,7 @@ export default function AdminUsers() {
                       {resettingId === a._id ? t("adminUsers.resetting") : t("adminUsers.resetPassword")}
                     </button>
                     <TelegramLinkCode compact endpoint={`/auth/player-accounts/${a._id}/telegram-code`} />
+                    {isAdmin && <RoleEditor account={{ ...a, role: "PLAYER" }} roleOptions={ROLE_OPTIONS} onDone={roleChanged} t={t} />}
                   </td>
                 </tr>
               ))}

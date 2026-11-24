@@ -40,7 +40,7 @@ connectDB();
 
 // exposedHeaders lets the browser read the renewed login token the auth
 // middleware sends back (sliding session — see middleware/auth.js).
-app.use(cors({ exposedHeaders: ["X-Refresh-Token"] }));
+app.use(cors({ exposedHeaders: ["X-Refresh-Token", "X-Account-Changed"] }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

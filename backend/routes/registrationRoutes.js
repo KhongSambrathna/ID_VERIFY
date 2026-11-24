@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { coachCan } = require("../middleware/coachPerms");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const upload = require("../middleware/upload");
 const {
@@ -44,10 +45,13 @@ router.post("/invites/:token/claim/:athleteId", claimExisting);
 router.use(requireAuth);
 
 router.get("/invites", requireRole("ADMIN", "HEAD_COACH"), listInvites);
-// Admin only — also when an Admin is working in coach mode (link for that team).
+// Create a link.
 router.post(
   "/invites",
-  (req, res, next) => (req.adminRole === "ADMIN" || req.isAdminCoachMode ? next() : res.status(403).json({ message: "Only an Admin can create registration links" })),
+  // Admin always; a Head Coach only when the Admin switched "registration
+  // links" on for their team (Teams page → coach permissions).
+  requireRole("ADMIN", "HEAD_COACH"),
+  coachCan("invites"),
   createInvite
 );
 router.delete("/invites/:id", requireRole("ADMIN", "HEAD_COACH"), revokeInvite);

@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { coachCan } = require("../middleware/coachPerms");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const upload = require("../middleware/upload");
 const {
@@ -16,6 +17,7 @@ const {
   removeMyLogo,
   uploadTeamLogo,
   removeTeamLogo,
+  updateCoachPerms,
 } = require("../controllers/teamController");
 const {
   listMyJerseyOrders,
@@ -74,36 +76,42 @@ router.post(
   "/mine/jersey-orders/register-admin",
   requireAuth,
   requireRole("HEAD_COACH"),
+  coachCan("jersey"),
   registerJerseyOrderOnBehalfMine
 );
 router.patch(
   "/mine/jersey-orders/:orderId",
   requireAuth,
   requireRole("HEAD_COACH", "PLAYER"),
+  coachCan("jersey"),
   updateMyTeamJerseyOrder
 );
 router.patch(
   "/mine/jersey-orders/:orderId/paid",
   requireAuth,
   requireRole("HEAD_COACH"),
+  coachCan("jersey"),
   setMyTeamJerseyOrderPaid
 );
 router.patch(
   "/mine/jersey-orders/:orderId/sync",
   requireAuth,
   requireRole("HEAD_COACH"),
+  coachCan("jersey"),
   syncMyTeamJerseyOrder
 );
 router.delete(
   "/mine/jersey-orders/:orderId",
   requireAuth,
   requireRole("HEAD_COACH", "PLAYER"),
+  coachCan("jersey"),
   removeMyTeamJerseyOrder
 );
 router.patch(
   "/mine/jersey-orders/:orderId/keep",
   requireAuth,
   requireRole("HEAD_COACH"),
+  coachCan("jersey"),
   keepMyTeamJerseyOrder
 );
 
@@ -124,6 +132,8 @@ router.get("/:id/delete-preview", previewDeleteTeam);
 router.delete("/:id", deleteTeam);
 router.put("/:id/logo", upload.single("logo"), uploadTeamLogo);
 router.delete("/:id/logo", removeTeamLogo);
+// What this team's Head Coach may do (switches on the Teams page).
+router.put("/:id/coach-perms", updateCoachPerms);
 
 // Admin flavor of the jersey-order routes above — any team, by Team._id.
 router.get("/:id/jersey-orders", listTeamJerseyOrders);

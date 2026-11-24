@@ -44,6 +44,20 @@ async function teamExists(name) {
   return ok;
 }
 
+// Current role/team of an account (cached briefly).
+const accountCache = new Map();
+async function liveAccount(id) {
+  const hit = accountCache.get(String(id));
+  if (hit && Date.now() - hit.at < 20 * 1000) return hit.acc;
+  const Admin = require("../models/Admin");
+  const acc = await Admin.findById(id).select("role team athleteId").lean();
+  if (accountCache.size > 2000) accountCache.clear();
+  accountCache.set(String(id), { at: Date.now(), acc });
+  return acc;
+}
+// Call after changing an account's role/team so it applies at once.
+const forgetAccount = (id) => accountCache.delete(String(id));
+
 async function requireAuth(req, res, next) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith("Bearer ")) {
@@ -63,7 +77,28 @@ async function requireAuth(req, res, next) {
   // for tournament self-registration) — a legacy shared team-wide Player
   // login has no single athlete to point at, so this stays null.
   req.athleteId = decoded.athleteId || null;
-  renewIfOld(decoded, res);
+
+  // The Admin can change someone's role/team (Users page) — use what the
+  // account is NOW, not what it was when they signed in, and hand them a
+  // fresh token right away (X-Account-Changed tells the app to reload).
+  try {
+    const live = await liveAccount(decoded.id);
+    if (!live) return res.status(401).json({ message: "Account no longer exists", code: "TOKEN_EXPIRED" });
+    const liveRole = live.role || "ADMIN";
+    const liveTeam = live.team || null;
+    const liveAthlete = live.athleteId ? String(live.athleteId) : null;
+    if (liveRole !== req.adminRole || liveTeam !== req.adminTeam || liveAthlete !== (req.athleteId ? String(req.athleteId) : null)) {
+      req.adminRole = liveRole;
+      req.adminTeam = liveTeam;
+      req.athleteId = liveAthlete;
+      renewIfOld({ id: decoded.id, role: liveRole, team: liveTeam, athleteId: liveAthlete, iat: 1 }, res);
+      res.setHeader("X-Account-Changed", "1");
+    } else {
+      renewIfOld(decoded, res);
+    }
+  } catch (err) {
+    renewIfOld(decoded, res); // database hiccup — fall back to the token
+  }
 
   // Sent URI-encoded, since team names are often in Khmer (headers must be ASCII).
   let coachTeam = String(req.headers["x-coach-team"] || "");
@@ -98,4 +133,4 @@ function requireRole(...allowedRoles) {
   };
 }
 
-module.exports = { requireAuth, requireRole };
+module.exports = { requireAuth, requireRole, forgetAccount };

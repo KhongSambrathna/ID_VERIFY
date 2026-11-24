@@ -24,7 +24,16 @@ function formatDob(dob) {
 
 export default function CoachDashboard() {
   const { t } = useLanguage();
-  const { team } = useAuth();
+  const { team, inCoachMode } = useAuth();
+  // What the Admin switched off for this team (Teams page → coach permissions).
+  const [permsOff, setPermsOff] = useState([]);
+  useEffect(() => {
+    if (inCoachMode) return;
+    api
+      .get("/auth/me")
+      .then(({ data }) => setPermsOff(Object.entries(data.coachPerms || {}).filter(([, v]) => v === false).map(([k]) => k)))
+      .catch(() => {});
+  }, [inCoachMode]);
   const [athletes, setAthletes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -343,6 +352,11 @@ export default function CoachDashboard() {
       <div className="container"><p className="error-text">{error}</p></div>
     ) : (
     <div className="container dash-body">
+      {permsOff.length > 0 && (
+        <div className="perms-banner">
+          🔒 {t("coachPerms.bannerOff")} {permsOff.map((k) => t(`coachPerms.${k}`)).join(" · ")}
+        </div>
+      )}
       <div className="dash-header">
         <h2>{t("coachDashboard.title")}</h2>
         <p>

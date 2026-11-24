@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { coachCan } = require("../middleware/coachPerms");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const {
   createTournament,
@@ -24,10 +25,10 @@ router.use(requireAuth);
 // REFEREE only gets this list (name/dates/rules/spots, no per-player
 // registration or fee detail) — see listTournaments' role-scoping comment.
 router.get("/", requireRole("ADMIN", "HEAD_COACH", "PLAYER", "REFEREE"), listTournaments);
-router.post("/", requireRole("ADMIN", "HEAD_COACH"), createTournament);
+router.post("/", requireRole("ADMIN", "HEAD_COACH"), coachCan("tournaments"), createTournament);
 router.get("/:id", requireRole("ADMIN", "HEAD_COACH", "PLAYER"), getTournament);
-router.put("/:id", requireRole("ADMIN", "HEAD_COACH"), updateTournament);
-router.delete("/:id", requireRole("ADMIN", "HEAD_COACH"), deleteTournament);
+router.put("/:id", requireRole("ADMIN", "HEAD_COACH"), coachCan("tournaments"), updateTournament);
+router.delete("/:id", requireRole("ADMIN", "HEAD_COACH"), coachCan("tournaments"), deleteTournament);
 router.get("/:id/export.csv", requireRole("ADMIN", "HEAD_COACH"), exportRegistrationsCsv);
 
 // Self-registration — individual Player login only (the controller checks
@@ -36,18 +37,18 @@ router.get("/:id/export.csv", requireRole("ADMIN", "HEAD_COACH"), exportRegistra
 router.post("/:id/register", requireRole("PLAYER"), registerSelf);
 router.delete("/:id/registrations/:registrationId", requireRole("ADMIN", "HEAD_COACH", "PLAYER"), unregister);
 // Decline a player's own pending withdrawal request — keeps them registered.
-router.patch("/:id/registrations/:registrationId/keep", requireRole("ADMIN", "HEAD_COACH"), keepRegistration);
+router.patch("/:id/registrations/:registrationId/keep", requireRole("ADMIN", "HEAD_COACH"), coachCan("tournaments"), keepRegistration);
 
 // Admin/Head Coach registering someone who has no login of their own.
-router.post("/:id/register-admin", requireRole("ADMIN", "HEAD_COACH"), registerOnBehalf);
+router.post("/:id/register-admin", requireRole("ADMIN", "HEAD_COACH"), coachCan("tournaments"), registerOnBehalf);
 
 // Note "paid their entry fee on match day" / force-settle unpaid → debt.
-router.patch("/:id/registrations/:registrationId/paid", requireRole("ADMIN", "HEAD_COACH"), setRegistrationPaid);
+router.patch("/:id/registrations/:registrationId/paid", requireRole("ADMIN", "HEAD_COACH"), coachCan("tournaments"), setRegistrationPaid);
 // Tag a player with the tournament's custom categories (per-team limits).
-router.patch("/:id/registrations/:registrationId/categories", requireRole("ADMIN", "HEAD_COACH"), setRegistrationCategories);
-router.post("/:id/settle-debts", requireRole("ADMIN", "HEAD_COACH"), settleTournamentNow);
+router.patch("/:id/registrations/:registrationId/categories", requireRole("ADMIN", "HEAD_COACH"), coachCan("tournaments"), setRegistrationCategories);
+router.post("/:id/settle-debts", requireRole("ADMIN", "HEAD_COACH"), coachCan("tournaments"), settleTournamentNow);
 
 // Open/close self-service registration for this tournament.
-router.patch("/:id/registration-status", requireRole("ADMIN", "HEAD_COACH"), setRegistrationClosed);
+router.patch("/:id/registration-status", requireRole("ADMIN", "HEAD_COACH"), coachCan("tournaments"), setRegistrationClosed);
 
 module.exports = router;

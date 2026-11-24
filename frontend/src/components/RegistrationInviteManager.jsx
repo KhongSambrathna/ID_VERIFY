@@ -16,10 +16,21 @@ import { useLanguage } from "../i18n/LanguageContext";
 // "pending" until an Admin approves.
 export default function RegistrationInviteManager() {
   const { t } = useLanguage();
-  const { isAdmin, isRealAdmin, inCoachMode, coachTeam } = useAuth();
+  const { isAdmin, isRealAdmin, inCoachMode, isHeadCoach, team: myTeam } = useAuth();
   // An Admin in coach mode makes links for the team they're working on.
   const coachModeAdmin = isRealAdmin && inCoachMode;
-  const canCreate = isAdmin || coachModeAdmin;
+  // A Head Coach can too, when the Admin switched "registration links" on
+  // for their team (Teams page → coach permissions).
+  const [coachAllowed, setCoachAllowed] = useState(false);
+  useEffect(() => {
+    if (!isHeadCoach || coachModeAdmin) return;
+    api
+      .get("/auth/me")
+      .then(({ data }) => setCoachAllowed(data.coachPerms?.invites === true))
+      .catch(() => {});
+  }, [isHeadCoach, coachModeAdmin]);
+  const coachTeam = myTeam;
+  const canCreate = isAdmin || coachModeAdmin || coachAllowed;
   const [invites, setInvites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

@@ -253,3 +253,19 @@ exports.deleteTeam = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+// PUT /api/teams/:id/coach-perms  (Admin) — { athletes, debts, tournaments,
+// invites, jersey } booleans: what this team's Head Coach may do.
+exports.updateCoachPerms = async (req, res) => {
+  try {
+    const { PERM_KEYS, forgetTeam } = require("../middleware/coachPerms");
+    const team = await Team.findById(req.params.id);
+    if (!team) return res.status(404).json({ message: "Team not found" });
+    for (const k of PERM_KEYS) if (typeof req.body?.[k] === "boolean") team.coachPerms[k] = req.body[k];
+    await team.save();
+    forgetTeam(team.name);
+    res.json({ _id: team._id, name: team.name, coachPerms: team.coachPerms });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

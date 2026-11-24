@@ -3,6 +3,7 @@ import api from "../api/axios";
 import { resolveFileUrl } from "../utils/fileUrl";
 import DeleteForeverButton from "../components/DeleteForeverButton";
 import { useLanguage } from "../i18n/LanguageContext";
+import CoachPermsCard from "../components/CoachPermsCard";
 
 // Admin only — every team in the system: add a team, change its logo, and
 // delete a team permanently (with everything that belongs to it — see
@@ -17,6 +18,7 @@ export default function AdminTeams() {
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState("");
   const [uploadingId, setUploadingId] = useState(null);
+  const [coachAccounts, setCoachAccounts] = useState([]);
 
   const load = async () => {
     setLoading(true);
@@ -32,6 +34,10 @@ export default function AdminTeams() {
   };
 
   useEffect(() => {
+    api
+      .get("/auth/users", { noCoachMode: true })
+      .then(({ data }) => setCoachAccounts((data || []).filter((u) => u.role === "HEAD_COACH")))
+      .catch(() => {});
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -117,6 +123,7 @@ export default function AdminTeams() {
                   />
                 </label>
               </div>
+              <CoachPermsCard team={team} coaches={coachAccounts.filter((c) => c.team === team.name)} />
               <div style={{ marginTop: 10 }}>
                 <DeleteForeverButton
                   kind="team"

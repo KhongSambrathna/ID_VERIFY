@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { coachCan } = require("../middleware/coachPerms");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const {
   createBakongPayment,
@@ -28,9 +29,9 @@ router.get("/qr-image", getBakongQrImage);
 router.post("/check-transaction", checkBakongTransaction);
 
 // Mark a KHQR as paid by hand (saw it in the bank app) — Admin / Head Coach.
-router.post("/mark-paid", requireRole("ADMIN", "HEAD_COACH"), markBakongPaid);
+router.post("/mark-paid", requireRole("ADMIN", "HEAD_COACH"), coachCan("debts"), markBakongPaid);
 
 // Manual record of a Bakong payment — Admin / Head Coach only.
-router.post("/record", requireRole("ADMIN", "HEAD_COACH"), recordBakongPayment);
+router.post("/record", requireRole("ADMIN", "HEAD_COACH"), coachCan("debts"), recordBakongPayment);
 
 module.exports = router;

@@ -121,6 +121,15 @@ const teamSchema = new mongoose.Schema(
     // "Synchronize" still work. jerseyOrdersClosedNote is an optional
     // message shown to the team ("Closed — next round opens in January").
     jerseyOrdersOpen: { type: Boolean, default: true },
+    // What this team's Head Coach is allowed to do — the Admin turns each
+    // on/off on the Teams page (⚙️ System → Teams). See middleware/coachPerms.js.
+    coachPerms: {
+      athletes: { type: Boolean, default: true }, // add / edit / ask to remove players
+      debts: { type: Boolean, default: true }, // student debts + recording payments
+      tournaments: { type: Boolean, default: true }, // tournaments: create, register, fees, close
+      invites: { type: Boolean, default: false }, // registration links for players
+      jersey: { type: Boolean, default: true }, // team jersey orders
+    },
     jerseyOrdersClosedNote: { type: String, trim: true, default: "" },
   },
   { timestamps: true }

@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const { createLinkCode } = require("../utils/accountLink");
 const Admin = require("../models/Admin");
+const Team = require("../models/Team");
 const Athlete = require("../models/Athlete");
 const { sendTelegramMessage } = require("../utils/notify");
 
@@ -106,10 +107,13 @@ exports.login = async (req, res) => {
 // GET /api/auth/player-accounts for those instead.
 exports.listUsers = async (req, res) => {
   try {
-    const users = await Admin.find({ athleteId: null })
-      .select("username role team telegramChatId createdAt")
-      .sort({ createdAt: -1 });
-    res.json(users);
+    // Staff logins + any player login the Admin promoted (e.g. to Head Coach).
+    const users = await Admin.find({ $or: [{ athleteId: null }, { role: { $ne: "PLAYER" } }] })
+      .select("username role team telegramChatId createdAt athleteId displayName")
+      .populate("athleteId", "fullName")
+      .sort({ createdAt: -1 })
+      .lean();
+    res.json(users.map((u) => ({ ...u, fullName: u.displayName || u.athleteId?.fullName || "", athleteId: u.athleteId?._id || null })));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -308,7 +312,10 @@ exports.me = async (req, res) => {
   try {
     const account = await Admin.findById(req.adminId);
     if (!account) return res.status(404).json({ message: "Account not found" });
-    res.json({ ...publicAdmin(account), profile: await profileOf(account) });
+    const out = { ...publicAdmin(account), profile: await profileOf(account) };
+    // A Head Coach's permissions (what the Admin switched on for their team).
+    if (account.role === "HEAD_COACH") out.coachPerms = await require("../middleware/coachPerms").permsOf(account.team);
+    res.json(out);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -403,6 +410,27 @@ exports.updateUser = async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
     if (req.body.telegramChatId !== undefined) {
       user.telegramChatId = String(req.body.telegramChatId || "").trim();
+    }
+    // Change role / team — e.g. a Player made Head Coach, or a Head Coach
+    // moved to another team or back to Player. There is only one Admin, so
+    // nobody can be made Admin here, and the Admin's own role is fixed.
+    if (req.body.role !== undefined || req.body.team !== undefined) {
+      if (String(user._id) === String(req.adminId) || user.role === "ADMIN") {
+        return res.status(400).json({ message: "The Admin account's role can't be changed" });
+      }
+      const role = req.body.role !== undefined ? String(req.body.role) : user.role;
+      if (!["HEAD_COACH", "PLAYER", "REFEREE"].includes(role)) {
+        return res.status(400).json({ message: "Role must be HEAD_COACH, PLAYER or REFEREE" });
+      }
+      let team = req.body.team !== undefined ? String(req.body.team || "").trim() : user.team || "";
+      if (role === "REFEREE") team = "";
+      if (role === "HEAD_COACH" || (role === "PLAYER" && !user.athleteId)) {
+        if (!team) return res.status(400).json({ message: "Pick a team" });
+      }
+      if (team && !(await Team.exists({ name: team }))) return res.status(400).json({ message: `Team "${team}" not found` });
+      user.role = role;
+      user.team = team || undefined;
+      require("../middleware/auth").forgetAccount(user._id);
     }
     await user.save();
     res.json(publicAdmin(user));
