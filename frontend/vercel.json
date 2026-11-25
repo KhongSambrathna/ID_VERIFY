@@ -1,4 +1,11 @@
 {
+  "redirects": [
+    {
+      "source": "/shop",
+      "destination": "https://shop.brathna.com/",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/sw.js",

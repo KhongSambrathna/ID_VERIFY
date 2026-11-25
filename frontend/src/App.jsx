@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { LanguageProvider } from "./i18n/LanguageContext";
 import Navbar from "./components/Navbar";
@@ -20,7 +21,6 @@ import AdminTeams from "./pages/AdminTeams";
 import AdminSponsors from "./pages/AdminSponsors";
 import AdminMatchDay from "./pages/AdminMatchDay";
 import AdminShop from "./pages/AdminShop";
-import ShopPage from "./pages/ShopPage";
 import DebtReportPage from "./pages/DebtReportPage";
 import StatsPage from "./pages/StatsPage";
 import PlayerDashboard from "./pages/PlayerDashboard";
@@ -53,6 +53,16 @@ import WelcomeGuide from "./components/WelcomeGuide";
 import RouteMeta from "./components/RouteMeta";
 import UpdateBanner from "./components/UpdateBanner";
 import usePageTracking from "./hooks/usePageTracking";
+
+// The shop is its own app now (shop.brathna.com). In-app links to /shop
+// land here and leave for the shop site; direct visits are redirected by vercel.json.
+const SHOP_URL = import.meta.env.VITE_SHOP_URL || "https://shop.brathna.com/";
+function GoToShop() {
+  useEffect(() => {
+    window.location.replace(SHOP_URL);
+  }, []);
+  return null;
+}
 
 export default function App() {
   // Counts every page opened, for the admin Analytics page.
@@ -133,7 +143,8 @@ export default function App() {
             the URL authorizes it; see PlayerRegister.jsx. */}
         <Route path="/register/:token" element={<PlayerRegister />} />
         <Route path="/search" element={<SearchPage />} />
-        <Route path="/shop" element={<ShopPage />} />
+        {/* The shop moved to its own site (shop-project) — send visitors there */}
+        <Route path="/shop" element={<GoToShop />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/about" element={<AboutUs />} />
         <Route
