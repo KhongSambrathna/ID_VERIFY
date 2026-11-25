@@ -28,6 +28,7 @@ const chatRoutes = require("./routes/chatRoutes");
 const financeRoutes = require("./routes/financeRoutes");
 const telegramRoutes = require("./routes/telegramRoutes");
 const geoRoutes = require("./routes/geoRoutes");
+const linkRoutes = require("./routes/linkRoutes");
 
 const app = express();
 
@@ -81,6 +82,8 @@ app.use("/api/finance", financeRoutes);
 // Telegram shop bot (webhook) + private alerts for the Admin.
 app.use("/api/telegram", telegramRoutes);
 app.use("/api/geo", geoRoutes);
+// read-only team/player API for your other apps (Tournament, Shop)
+app.use("/api/link/v1", linkRoutes);
 // Social-media share/preview pages — paste these into Facebook/Telegram
 // instead of the plain frontend links to get a real preview image
 // (see shareController.js for why the SPA can't provide this on its own).
