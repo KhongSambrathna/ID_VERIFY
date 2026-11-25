@@ -131,6 +131,11 @@ const teamSchema = new mongoose.Schema(
       jersey: { type: Boolean, default: true }, // team jersey orders
     },
     jerseyOrdersClosedNote: { type: String, trim: true, default: "" },
+    // Linked team in the Tournament app (tournament.brathna.com) — set when
+    // Tournament sends its teams here (linkController.pushTeams).
+    // ភ្ជាប់ជាមួយក្រុមក្នុងកម្មវិធី Tournament
+    tournamentClubId: { type: String, default: null },
+    nameKm: { type: String, trim: true, default: "" },
   },
   { timestamps: true }
 );

@@ -40,19 +40,21 @@ async function memberCounts(names) {
 const teamOut = (t, counts) => ({
   id: String(t._id),
   name: t.name,
+  nameKm: t.nameKm || "",
+  tournamentClubId: t.tournamentClubId || null,
   logoUrl: t.logoUrl || null,
   players: counts?.get(t.name)?.players || 0,
   staff: counts?.get(t.name)?.staff || 0,
   updatedAt: t.updatedAt,
 });
 
-// GET /api/link/v1/teams?search=&limit=20
+// GET /api/link/v1/teams?search=&limit=20   (limit up to 1000 → whole list)
 exports.listTeams = async (req, res) => {
   try {
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 1000);
     const q = String(req.query.search || "").trim();
     const filter = q ? { name: { $regex: escapeRe(q), $options: "i" } } : {};
-    const teams = await Team.find(filter).select("name logoUrl updatedAt").sort({ name: 1 }).limit(limit).lean();
+    const teams = await Team.find(filter).select("name nameKm logoUrl tournamentClubId updatedAt").sort({ name: 1 }).limit(limit).lean();
     const counts = await memberCounts(teams.map((t) => t.name));
     res.json({ teams: teams.map((t) => teamOut(t, counts)) });
   } catch (err) {
@@ -97,6 +99,59 @@ exports.getTeam = async (req, res) => {
     );
     const counts = await memberCounts([team.name]);
     res.json({ team: { ...teamOut(team, counts), members } });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/**
+ * POST /api/link/v1/teams/push   (Tournament app only)
+ * { teams: [{ ref, name, nameKm?, logoUrl?, mergeInto? }] }
+ *   ref       = the Tournament club id (kept on the ID team as tournamentClubId)
+ *   mergeInto = an ID team id to link to (when the names are spelled differently)
+ * For each: linked already → keep; same name here → merge (link + fill a missing
+ * logo / Khmer name); otherwise → create a new team. Players are then added in ID.
+ * ទទួលក្រុមពី Tournament៖ ឈ្មោះដូចគ្នា → បញ្ចូលគ្នា, ថ្មី → បង្កើត
+ */
+exports.pushTeams = async (req, res) => {
+  try {
+    if (req.linkApp !== "tournament") return res.status(403).json({ message: "Only the Tournament app may send teams" });
+    const list = Array.isArray(req.body?.teams) ? req.body.teams.slice(0, 500) : [];
+    const results = [];
+    for (const t of list) {
+      const ref = String(t.ref || "").trim();
+      const name = String(t.name || "").trim().slice(0, 100);
+      const logoUrl = /^https:\/\//.test(t.logoUrl || "") ? t.logoUrl : null;
+      const nameKm = String(t.nameKm || "").trim().slice(0, 100);
+      if (!ref || !name) {
+        results.push({ ref, error: "name and ref are required" });
+        continue;
+      }
+      try {
+        let team = null;
+        let action = "merged";
+        if (t.mergeInto) team = await Team.findById(t.mergeInto).catch(() => null);
+        if (!team) team = await Team.findOne({ tournamentClubId: ref });
+        if (team && team.tournamentClubId === ref && !t.mergeInto) action = "linked";
+        if (!team) team = await Team.findOne({ name: new RegExp(`^${escapeRe(name)}$`, "i") });
+        if (team && team.tournamentClubId && team.tournamentClubId !== ref) {
+          results.push({ ref, error: `"${team.name}" is already linked to another Tournament team` });
+          continue;
+        }
+        if (!team) {
+          team = new Team({ name });
+          action = "created";
+        }
+        team.tournamentClubId = ref;
+        if (!team.logoUrl && logoUrl) team.logoUrl = logoUrl; // never replace a logo set in ID
+        if (!team.nameKm && nameKm) team.nameKm = nameKm;
+        await team.save();
+        results.push({ ref, id: String(team._id), name: team.name, logoUrl: team.logoUrl || null, action });
+      } catch (err) {
+        results.push({ ref, error: err.code === 11000 ? `"${name}" already exists` : err.message });
+      }
+    }
+    res.json({ results });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
