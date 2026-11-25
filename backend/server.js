@@ -10,7 +10,6 @@ const athleteRoutes = require("./routes/athleteRoutes");
 const coachRoutes = require("./routes/coachRoutes");
 const teamRoutes = require("./routes/teamRoutes");
 const sponsorRoutes = require("./routes/sponsorRoutes");
-const productRoutes = require("./routes/productRoutes");
 const shareRoutes = require("./routes/shareRoutes");
 const tournamentRoutes = require("./routes/tournamentRoutes");
 const serviceRoutes = require("./routes/serviceRoutes");
@@ -25,8 +24,8 @@ const chatRoutes = require("./routes/chatRoutes");
 const telegramRoutes = require("./routes/telegramRoutes");
 const geoRoutes = require("./routes/geoRoutes");
 const linkRoutes = require("./routes/linkRoutes");
-// Shop admin (invoices, packages, purchase plans) and money (finance) moved to
-// the shop app (shop-project). The Telegram bot here still uses their code.
+// The shop (products, stock, invoices, packages, purchase plans, money, KHQR
+// settings, shop bot + Mini App) is its own app now: shop-project.
 
 const app = express();
 
@@ -51,7 +50,6 @@ app.use("/api/athletes", athleteRoutes);
 app.use("/api/coach", coachRoutes);
 app.use("/api/teams", teamRoutes);
 app.use("/api/sponsors", sponsorRoutes);
-app.use("/api/products", productRoutes);
 app.use("/api/tournaments", tournamentRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/payments", paymentRoutes);
@@ -107,18 +105,9 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
 
-// Timed Telegram alerts (debt pay days, weekly "owed to me", daily summary).
-// Checked every 10 minutes while the server is awake; each alert is sent once.
-if (process.env.TELEGRAM_BOT_TOKEN && process.env.NODE_ENV !== "test") {
-  const { runScheduled } = require("./utils/telegramAlerts");
-  setTimeout(() => runScheduled().catch(() => {}), 30 * 1000);
-  setInterval(() => runScheduled().catch(() => {}), 10 * 60 * 1000);
-  // KHQR: ask Bakong about unpaid QR codes every 20 seconds (does nothing
-  // when there are none).
-  const { runPaymentChecks } = require("./utils/orderPayments");
+// KHQR: ask Bakong about unpaid student-fee / entry-fee QR codes every 20 s
+// (does nothing when there are none). Shop orders + money alerts run in the shop app.
+if (process.env.NODE_ENV !== "test") {
   const { runFeeChecks } = require("./utils/feePayments");
-  setInterval(() => {
-    runPaymentChecks().catch(() => {}); // shop orders
-    runFeeChecks().catch(() => {}); // student debts + tournament entry fees
-  }, 20 * 1000);
+  setInterval(() => runFeeChecks().catch(() => {}), 20 * 1000);
 }

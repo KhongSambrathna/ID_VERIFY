@@ -42,7 +42,6 @@ import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminTournamentPlans from "./pages/AdminTournamentPlans";
 import CoachModePicker from "./pages/CoachModePicker";
 import AdminTelegram from "./pages/AdminTelegram";
-import TgShop from "./pages/TgShop";
 import CoachModeBanner from "./components/CoachModeBanner";
 import WelcomeGuide from "./components/WelcomeGuide";
 import RouteMeta from "./components/RouteMeta";
@@ -68,13 +67,10 @@ export default function App() {
   usePageTracking();
   const { pathname } = useLocation();
 
-  // Telegram Mini App shop — full screen inside Telegram, no site navbar.
+  // The Telegram Mini App shop moved to the shop site.
   if (pathname.startsWith("/tg-shop")) {
-    return (
-      <LanguageProvider>
-        <TgShop />
-      </LanguageProvider>
-    );
+    window.location.replace(`${SHOP_URL}${pathname}${window.location.search}${window.location.hash}`);
+    return null;
   }
 
   return (

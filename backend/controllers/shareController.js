@@ -1,5 +1,4 @@
 const Athlete = require("../models/Athlete");
-const Product = require("../models/Product");
 
 const SITE_NAME = "Countryside Football ID Verify";
 const FRONTEND_URL = (process.env.PUBLIC_BASE_URL || "https://id-verify-liart.vercel.app").replace(/\/$/, "");
@@ -53,29 +52,8 @@ function renderSharePage(res, { title, description, image, redirectTo }) {
 </html>`);
 }
 
-// GET /share/shop — previews the shop with an actual product photo (the
-// most recently added item) so a shared link shows real merchandise
-// instead of a generic logo.
-exports.shareShop = async (req, res) => {
-  try {
-    const product = await Product.findOne().sort({ createdAt: -1 });
-    renderSharePage(res, {
-      title: `Equipment Shop — ${SITE_NAME}`,
-      description: product
-        ? `${product.name} — $${Number(product.price).toFixed(2)}, and more sports equipment for sale.`
-        : "Browse our sports equipment shop.",
-      image: product?.imageUrl || DEFAULT_IMAGE,
-      redirectTo: "/shop",
-    });
-  } catch (err) {
-    renderSharePage(res, {
-      title: `Equipment Shop — ${SITE_NAME}`,
-      description: "Browse our sports equipment shop.",
-      image: DEFAULT_IMAGE,
-      redirectTo: "/shop",
-    });
-  }
-};
+// GET /share/shop — the shop is its own site now (shop.brathna.com).
+exports.shareShop = (req, res) => res.redirect(301, (process.env.SHOP_URL || "https://shop.brathna.com").replace(/\/$/, "") + "/");
 
 // GET /share/verify/:verifyId — previews a specific athlete's ID card with
 // their own photo, for verify/QR links shared outside the app.

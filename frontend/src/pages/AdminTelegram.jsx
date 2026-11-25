@@ -4,21 +4,17 @@ import api from "../api/axios";
 import { useLanguage } from "../i18n/LanguageContext";
 
 const SHOP_URL = (import.meta.env.VITE_SHOP_URL || "https://shop.brathna.com").replace(/\/$/, "");
-import { formatUSD, approxKHR } from "../utils/currency";
 
-// 🤖 Telegram bot — the shop bot customers order from, and the Admin's own
-// private alerts (orders, stock, debts, owed to me, daily summary).
-const TZ = "Asia/Phnom_Penh";
-const fmtDateTime = (d) =>
-  d ? new Date(d).toLocaleString("en-GB", { timeZone: TZ, day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+// 🤖 ID Telegram bot — players, coaches and Admins link their account here to
+// get the site's notices (fees owed, approvals…) and reset a forgotten password.
+// The shop has its own bot now (shop.brathna.com → Telegram).
 
 export default function AdminTelegram() {
   const { t } = useLanguage();
-  const [params, setParams] = useSearchParams();
-  // KHQR settings moved to the shop site (shop.brathna.com/admin/khqr)
-  if (params.get("tab") === "khqr") window.location.replace(`${SHOP_URL}/admin/khqr`);
-  const tab = params.get("tab") === "orders" ? "orders" : "setup";
-  const setTab = (k) => setParams(k === "setup" ? {} : { tab: k }, { replace: true });
+  const [params] = useSearchParams();
+  // KHQR settings and bot orders live on the shop site now
+  if (params.get("tab") === "khqr") window.location.replace(`${SHOP_URL}/admin/telegram?tab=khqr`);
+  if (params.get("tab") === "orders") window.location.replace(`${SHOP_URL}/admin/telegram?tab=orders`);
   const [st, setSt] = useState(null);
 
   const loadStatus = async () => {
@@ -42,17 +38,12 @@ export default function AdminTelegram() {
         <p>{t("tgBot.intro")}</p>
       </div>
       <div className="tabs">
-        <button className={`tab-btn ${tab === "setup" ? "active" : ""}`} onClick={() => setTab("setup")}>⚙️ {t("tgBot.tabSetup")}</button>
-        <button className={`tab-btn ${tab === "orders" ? "active" : ""}`} onClick={() => setTab("orders")}>
-          🛒 {t("tgBot.tabOrders")}
-          {st && st.pendingOrders > 0 && <span className="tg-count">{st.pendingOrders}</span>}
-        </button>
-        <a className="tab-btn" href={`${SHOP_URL}/admin/khqr`}>💳 KHQR ↗</a>
+        <span className="tab-btn active">⚙️ {t("tgBot.tabSetup")}</span>
+        <a className="tab-btn" href={`${SHOP_URL}/admin/telegram`}>🛒 {t("tgBot.tabOrders")} · KHQR ↗</a>
       </div>
       {st === null && <p>{t("common.loading")}</p>}
       {st === false && <p className="error-text">{t("tgBot.loadFailed")}</p>}
-      {st && tab === "setup" && <Setup st={st} reload={loadStatus} setSt={setSt} />}
-      {st && tab === "orders" && <Orders onChange={loadStatus} />}
+      {st && <Setup st={st} reload={loadStatus} />}
     </div>
   );
 }
@@ -69,7 +60,7 @@ function Step({ n, done, title, children }) {
   );
 }
 
-function Setup({ st, reload, setSt }) {
+function Setup({ st, reload }) {
   const { t } = useLanguage();
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
@@ -120,23 +111,12 @@ function Setup({ st, reload, setSt }) {
     await api.post("/telegram/test");
     setMsg(`✅ ${t("tgBot.testSent")}`);
   });
-  const setAlert = async (k, v) => {
-    setSt((s) => ({ ...s, alerts: { ...s.alerts, [k]: v } }));
-    await api.put("/telegram/alerts", { [k]: v }).catch(() => {});
-  };
   const copy = (text) => {
     navigator.clipboard?.writeText(text).then(() => setMsg(`📋 ${t("tgBot.copied")}`)).catch(() => {});
   };
 
   const botUrl = st.bot ? `https://t.me/${st.bot.username}` : "";
-  const shopLink = st.bot ? `https://t.me/${st.bot.username}?start=shop` : "";
-  const ALERTS = [
-    ["orders", "🛒", t("tgBot.alertOrders"), t("tgBot.alertOrdersHelp")],
-    ["stock", "📦", t("tgBot.alertStock"), t("tgBot.alertStockHelp")],
-    ["debts", "💳", t("tgBot.alertDebts"), t("tgBot.alertDebtsHelp")],
-    ["owed", "🤝", t("tgBot.alertOwed"), t("tgBot.alertOwedHelp")],
-    ["daily", "📊", t("tgBot.alertDaily"), t("tgBot.alertDailyHelp")],
-  ];
+  const shopLink = botUrl; // the bot's address — players open it and press Start
 
   return (
     <div className="tg-setup">
@@ -178,7 +158,6 @@ function Setup({ st, reload, setSt }) {
               <button className="btn btn-outline" onClick={() => copy(shopLink)}>📋 {t("tgBot.copy")}</button>
               <a className="btn btn-outline" href={shopLink} target="_blank" rel="noreferrer">↗ {t("tgBot.open")}</a>
             </div>
-            <small className="mini-empty">{t("tgBot.shareHelp")}</small>
           </div>
         )}
       </Step>
@@ -201,32 +180,6 @@ function Setup({ st, reload, setSt }) {
         )}
       </Step>
 
-      <Step n={4} done={st.linked && Object.entries(st.alerts || {}).some(([k, v]) => k !== "dailyHour" && v)} title={t("tgBot.step4")}>
-        <p className="tg-private">🔒 {t("tgBot.privateNote")}</p>
-        <div className="tg-alerts">
-          {ALERTS.map(([k, icon, label, help]) => (
-            <label key={k} className={`tg-alert ${st.alerts?.[k] ? "on" : ""}`}>
-              <input type="checkbox" checked={!!st.alerts?.[k]} disabled={!st.linked} onChange={(e) => setAlert(k, e.target.checked)} />
-              <span>
-                <b>{icon} {label}</b>
-                <small>{help}</small>
-                {k === "daily" && st.alerts?.daily && (
-                  <span className="tg-hour" onClick={(e) => e.preventDefault()}>
-                    {t("tgBot.sendAt")}{" "}
-                    <select value={st.alerts.dailyHour ?? 20} onChange={(e) => setAlert("dailyHour", Number(e.target.value))}>
-                      {Array.from({ length: 24 }, (_, h) => (
-                        <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>
-                      ))}
-                    </select>
-                  </span>
-                )}
-              </span>
-            </label>
-          ))}
-        </div>
-        {!st.linked && <p className="mini-empty">{t("tgBot.linkFirst")}</p>}
-      </Step>
-
       {st.tickUrl && (
         <details className="card tg-awake">
           <summary>⏰ {t("tgBot.awakeTitle")}</summary>
@@ -238,151 +191,5 @@ function Setup({ st, reload, setSt }) {
         </details>
       )}
     </div>
-  );
-}
-
-const STATUS = {
-  pending: ["⏳", "pending"],
-  confirmed: ["✅", "verified"],
-  rejected: ["❌", "rejected"],
-  cancelled: ["🚫", "rejected"],
-};
-
-function Orders({ onChange }) {
-  const { t } = useLanguage();
-  const [status, setStatus] = useState("pending");
-  const [list, setList] = useState(null);
-  const [busy, setBusy] = useState(null);
-
-  const load = async () => {
-    try {
-      const { data } = await api.get(`/telegram/orders${status ? `?status=${status}` : ""}`);
-      setList(data);
-    } catch {
-      setList([]);
-    }
-  };
-  useEffect(() => {
-    setList(null);
-    load();
-  }, [status]);
-
-  const act = async (o, what) => {
-    if (what === "reject" && !confirm(t("tgBot.confirmReject").replace("{n}", o.orderNo))) return;
-    setBusy(o._id);
-    try {
-      await api.post(`/telegram/orders/${o._id}/${what}`);
-      await load();
-      onChange();
-    } catch (e) {
-      alert(e.response?.data?.message || t("tgBot.failed"));
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const checkPay = async (o) => {
-    setBusy(o._id);
-    try {
-      const { data } = await api.post(`/telegram/orders/${o._id}/check-payment`);
-      alert(data.message);
-      await load();
-      onChange();
-    } catch (e) {
-      alert(e.response?.data?.message || t("tgBot.failed"));
-    } finally {
-      setBusy(null);
-    }
-  };
-  const markPaid = async (o) => {
-    if (!confirm(t("khqr.confirmMarkPaid").replace("{n}", o.orderNo).replace("{amount}", formatUSD(o.total)))) return;
-    setBusy(o._id);
-    try {
-      await api.post(`/telegram/orders/${o._id}/mark-paid`);
-      await load();
-      onChange();
-    } catch (e) {
-      alert(e.response?.data?.message || t("tgBot.failed"));
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  return (
-    <>
-      <div className="tg-filter">
-        {[["pending", `⏳ ${t("tgBot.stPending")}`], ["confirmed", `✅ ${t("tgBot.stConfirmed")}`], ["rejected", `❌ ${t("tgBot.stRejected")}`], ["", t("tgBot.all")]].map(([k, label]) => (
-          <button key={k || "all"} className={`chip ${status === k ? "active" : ""}`} onClick={() => setStatus(k)}>{label}</button>
-        ))}
-      </div>
-      {list === null && <p>{t("common.loading")}</p>}
-      {list && list.length === 0 && <p className="mini-empty">{t("tgBot.noOrders")}</p>}
-      <div className="package-grid">
-        {(list || []).map((o) => (
-          <div key={o._id} className={`card tg-order ${o.status}`}>
-            <div className="package-card-head">
-              <h3>{o.orderNo}</h3>
-              <div className="package-price">
-                {formatUSD(o.total)}
-                <small className="price-khr">{approxKHR(o.total)}</small>
-              </div>
-            </div>
-            <div className="tg-order-meta">
-              <span className={`badge ${STATUS[o.status][1]}`}>{STATUS[o.status][0]} {t(`tgBot.st_${o.status}`)}</span>
-              {o.payment?.status && o.payment.status !== "none" && (
-                <span className={`badge ${o.payment.status === "paid" ? "verified" : o.payment.status === "unpaid" ? "pending" : "rejected"}`}>
-                  💳 {t(`khqr.pay_${o.payment.status}`)}
-                </span>
-              )}
-              <span className="mini-empty">{fmtDateTime(o.createdAt)}</span>
-            </div>
-            {o.payment?.status === "paid" && (o.payment.fromAccount || o.payment.hash) && (
-              <div className="mini-empty" style={{ fontSize: 13, overflowWrap: "anywhere" }}>
-                {o.payment.fromAccount && <>↪️ {o.payment.fromAccount} </>}
-                {o.payment.hash && <>#️⃣ {o.payment.hash.slice(0, 16)}…</>}
-              </div>
-            )}
-            <div className="tg-order-cust">
-              👤 <b>{o.customer?.name || "—"}</b>
-              {o.username && (
-                <> · <a href={`https://t.me/${o.username}`} target="_blank" rel="noreferrer">@{o.username}</a></>
-              )}
-              {o.customer?.phone && (
-                <div>📱 <a href={`tel:${o.customer.phone.replace(/\s/g, "")}`}>{o.customer.phone}</a></div>
-              )}
-              {o.note && <div>📝 {o.note}</div>}
-            </div>
-            <ul className="package-items">
-              {o.items.map((i, n) => (
-                <li key={n}>
-                  <span>{i.name} × {i.qty}</span>
-                  <span>{formatUSD(i.qty * i.unitPrice)}</span>
-                </li>
-              ))}
-            </ul>
-            {o.status === "pending" ? (
-              <div className="package-actions">
-                <button className="btn btn-primary" disabled={busy === o._id} onClick={() => act(o, "confirm")}>✅ {t("tgBot.confirm")}</button>
-                <button className="btn btn-outline" disabled={busy === o._id} onClick={() => act(o, "reject")}>❌ {t("tgBot.reject")}</button>
-                {o.payment?.status === "unpaid" && (
-                  <button className="link-btn" disabled={busy === o._id} onClick={() => checkPay(o)}>💳 {t("khqr.checkPay")}</button>
-                )}
-                {o.payment?.status !== "paid" && (
-                  <button className="link-btn" disabled={busy === o._id} onClick={() => markPaid(o)}>💰 {t("khqr.markPaid")}</button>
-                )}
-              </div>
-            ) : (
-              o.invoice && (
-                <p style={{ margin: "8px 0 0" }}>
-                  🧾 <a href={`${SHOP_URL}/admin/invoices/${o.invoice._id}`}>{o.invoice.invoiceNo}</a>
-                  {o.invoice.paidAmount < o.invoice.total && <span className="mini-empty"> · {t("tgBot.unpaid")}</span>}
-                </p>
-              )
-            )}
-          </div>
-        ))}
-      </div>
-      <p className="mini-empty" style={{ marginTop: 14 }}>{t("tgBot.confirmHelp")}</p>
-    </>
   );
 }

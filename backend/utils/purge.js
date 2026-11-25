@@ -19,7 +19,7 @@ const ScanLog = require("../models/ScanLog");
 const StartingXI = require("../models/StartingXI");
 const Team = require("../models/Team");
 const Tournament = require("../models/Tournament");
-const { FinanceSettings } = require("../models/Finance");
+const mongoose = require("mongoose");
 
 function destroyFiles(list) {
   const jobs = list
@@ -165,7 +165,8 @@ async function purgeTeam(team) {
       { team: { $ne: name } },
       { $pull: { registrations: { team: name }, allowedTeams: name, teamLineups: { team: name } } }
     ),
-    FinanceSettings.updateMany({ receivableTeams: name }, { $pull: { receivableTeams: name } }),
+    // the shop app's money settings (same database) may list this team
+    mongoose.connection.collection("financesettings").updateMany({ receivableTeams: name }, { $pull: { receivableTeams: name } }),
   ]);
 
   // 4. The team itself + its logo / KHQR image.

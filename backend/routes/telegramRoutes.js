@@ -3,29 +3,17 @@ const router = express.Router();
 const { requireAuth, requireRole } = require("../middleware/auth");
 const c = require("../controllers/telegramController");
 
-// Public: Telegram's webhook, the cron "tick", and the bot username.
+// ID Telegram bot (accounts). The shop bot, its orders, the Mini App and
+// KHQR settings are in the shop app now.
 router.post("/webhook/:secret", c.webhook);
 router.get("/tick", c.tick);
 router.get("/public", c.publicInfo);
-// Telegram Mini App (/tg-shop) — checked with Telegram's signed initData.
-router.post("/webapp/session", c.webAppSession);
-router.post("/webapp/order", c.webAppOrder);
-router.post("/webapp/payment", c.webAppPayment);
 
-// Admin only.
 router.use(requireAuth, requireRole("ADMIN"));
 router.get("/status", c.status);
 router.post("/setup", c.setup);
 router.post("/link", c.linkCode);
 router.delete("/link", c.unlink);
-router.put("/alerts", c.updateAlerts);
 router.post("/test", c.test);
-router.post("/run-now", c.runNow);
-router.get("/orders", c.listOrders);
-router.post("/orders/:id/confirm", c.confirmOrder);
-router.post("/orders/:id/reject", c.rejectOrder);
-router.post("/orders/:id/check-payment", c.checkOrderPayment);
-router.post("/orders/:id/mark-paid", c.markOrderPaid);
-// KHQR payment settings → moved to the shop app (/api/telegram/pay-settings there)
 
 module.exports = router;
