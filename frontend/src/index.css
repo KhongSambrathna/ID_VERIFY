@@ -3789,3 +3789,17 @@ tr.inv-excluded td:first-child { opacity: 1; }
 .role-editor .field { margin-bottom: 0; }
 .role-editor-actions { display: flex; gap: 10px; align-items: center; }
 .perms-banner { background: #fff6e0; border: 1px solid #f0d58a; color: #6b4e00; border-radius: 10px; padding: 10px 14px; margin: 12px 0; font-size: 14px; }
+
+/* Teams page: search / sort / filter toolbar (AdminTeams.jsx) */
+.team-tools { margin-bottom: 16px; display: flex; flex-direction: column; gap: 10px; }
+.team-tools-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.team-tools-row > select, .team-tools-row > input { flex: 1 1 160px; min-width: 0; padding: 8px 10px; border: 1px solid #d6dae3; border-radius: 10px; background: #fff; font: inherit; }
+.team-tools-row > .team-search { flex: 3 1 240px; }
+.team-tools-foot { justify-content: space-between; }
+.team-perm-filter { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.perm-chip { border: 1px solid #d6dae3; background: #fff; color: #475569; border-radius: 999px; padding: 4px 10px; font-size: 13px; cursor: pointer; }
+.perm-chip.on { background: #dcfce7; border-color: #22c55e; color: #166534; font-weight: 600; }
+.perm-chip.off { background: #fee2e2; border-color: #ef4444; color: #991b1b; font-weight: 600; }
+.team-bulk summary { cursor: pointer; font-size: 14px; color: #334155; }
+.team-bulk[open] summary { margin-bottom: 8px; }
+.btn-sm { padding: 5px 10px; font-size: 13px; }

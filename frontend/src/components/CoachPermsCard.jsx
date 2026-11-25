@@ -24,7 +24,7 @@ export default function CoachPermsCard({ team, coaches = [], onSaved }) {
       const { data } = await api.put(`/teams/${team._id}/coach-perms`, { [key]: next[key] }, { noCoachMode: true });
       setPerms({ ...DEFAULTS, ...data.coachPerms });
       setMsg(t("coachPerms.saved"));
-      onSaved?.();
+      onSaved?.(data.coachPerms);
     } catch (err) {
       setPerms(perms);
       setMsg(err.response?.data?.message || t("coachPerms.failed"));
