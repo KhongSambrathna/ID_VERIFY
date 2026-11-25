@@ -3,9 +3,11 @@
 // Read-only, behind a per-app key (middleware/linkKey.js).
 //
 // Only what those apps need is shared: team name + logo, and for each
-// APPROVED member: name (EN/KM), role, shirt number and the public verify ID
-// (which links to the public /verify page). No date of birth, address,
-// phone, photos, documents or fees ever leave this app.
+// APPROVED member: name (EN/KM), role, shirt number, the public verify ID
+// (which links to the public /verify page), the profile photo (already shown
+// on that public page) and the BIRTH YEAR only (to sort players into age
+// groups like U14/U16). No full date of birth, address, phone, documents or
+// fees ever leave this app.
 //
 // ទាញក្រុម និងកីឡាករពី ID ទៅកម្មវិធីផ្សេង (អានប៉ុណ្ណោះ)
 const Team = require("../models/Team");
@@ -72,7 +74,7 @@ exports.getTeam = async (req, res) => {
         $elemMatch: { team: team.name, approvalStatus: "approved", pendingRemoval: { $ne: true } },
       },
     })
-      .select("verifyId fullName khmerName assignments updatedAt")
+      .select("verifyId fullName khmerName assignments updatedAt photoUrl dateOfBirth gender")
       .lean();
 
     const base = publicBase();
@@ -88,6 +90,9 @@ exports.getTeam = async (req, res) => {
           role: as.role || "PLAYER",
           number: Number.isInteger(as.jerseyNumber) ? as.jerseyNumber : null,
           verifyUrl: base && a.verifyId ? `${base}/verify/${encodeURIComponent(a.verifyId)}` : null,
+          photoUrl: /^https:\/\//.test(a.photoUrl || "") ? a.photoUrl : null,
+          birthYear: a.dateOfBirth ? new Date(a.dateOfBirth).getUTCFullYear() : null,
+          gender: a.gender || null,
         });
       }
     }
