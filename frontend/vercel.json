@@ -4,6 +4,36 @@
       "source": "/shop",
       "destination": "https://shop.brathna.com/",
       "permanent": true
+    },
+    {
+      "source": "/admin/shop",
+      "destination": "https://shop.brathna.com/admin/shop",
+      "permanent": true
+    },
+    {
+      "source": "/admin/invoices",
+      "destination": "https://shop.brathna.com/admin/invoices",
+      "permanent": true
+    },
+    {
+      "source": "/admin/invoices/:id",
+      "destination": "https://shop.brathna.com/admin/invoices/:id",
+      "permanent": true
+    },
+    {
+      "source": "/admin/purchase-plans",
+      "destination": "https://shop.brathna.com/admin/purchase-plans",
+      "permanent": true
+    },
+    {
+      "source": "/admin/finance",
+      "destination": "https://shop.brathna.com/admin/finance",
+      "permanent": true
+    },
+    {
+      "source": "/admin/khqr",
+      "destination": "https://shop.brathna.com/admin/khqr",
+      "permanent": true
     }
   ],
   "headers": [

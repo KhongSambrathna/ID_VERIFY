@@ -5,6 +5,9 @@ import { useLanguage } from "../i18n/LanguageContext";
 import api from "../api/axios";
 import Avatar from "./Avatar";
 import NotificationBell from "./NotificationBell";
+
+// The shop (and money pages) are a separate site now.
+const SHOP_URL = (import.meta.env.VITE_SHOP_URL || "https://shop.brathna.com").replace(/\/$/, "");
 import ChatNavButton from "./ChatNavButton";
 
 // Is this link the page we're on? A link with "?tab=…" only matches that
@@ -116,11 +119,11 @@ export default function Navbar() {
 
   // "More" — the public pages, tucked away for signed-in users who mostly
   // live in their dashboard.
-  const publicLinks = ["/search", "/shop", "/pricing", "/about"];
+  const publicLinks = ["/search", "/pricing", "/about"];
   const morePublic = () => (
     <NavDropdown label={`☰ ${t("navbar.more")}`} active={anyActive(...publicLinks)}>
       <L to="/search">🔍 {t("navbar.findPlayer")}</L>
-      <L to="/shop">🛒 {t("navbar.shop")}</L>
+      <a href={`${SHOP_URL}/`} onClick={closeMenu}>🛒 {t("navbar.shop")} ↗</a>
       <L to="/pricing">💳 {t("navbar.pricing")}</L>
       <L to="/about">ℹ️ {t("navbar.about")}</L>
     </NavDropdown>
@@ -195,7 +198,7 @@ export default function Navbar() {
           {!isAuthed && (
             <>
               <L to="/search">{t("navbar.findPlayer")}</L>
-              <L to="/shop">{t("navbar.shop")}</L>
+              <a href={`${SHOP_URL}/`}>{t("navbar.shop")}</a>
               <L to="/pricing">{t("navbar.pricing")}</L>
               <L to="/about">{t("navbar.about")}</L>
             </>
@@ -225,30 +228,8 @@ export default function Navbar() {
                 <L to="/admin/matchday">⚽ {t("navbar.matchDay")}</L>
                 <L to="/admin/jersey-orders">👕 {t("navbar.jerseyOrders")}</L>
               </NavDropdown>
-              <NavDropdown
-                label={`🛒 ${t("navbar.shop")}`}
-                active={
-                  anyActive("/admin/shop", "/admin/shop?tab=stock", "/admin/shop?tab=report", "/admin/shop?tab=packages", "/admin/invoices", "/admin/purchase-plans", "/admin/telegram?tab=orders") ||
-                  location.pathname.startsWith("/admin/invoices/")
-                }
-              >
-                <Label>{t("navbar.sales")}</Label>
-                <L to="/admin/invoices">🧾 {t("navbar.invoices")}</L>
-                <L to="/admin/telegram?tab=orders">🤖 {t("navbar.botOrders")}</L>
-                <Label>{t("navbar.goods")}</Label>
-                <L to="/admin/shop">📦 {t("navbar.shopProducts")}</L>
-                <L to="/admin/shop?tab=stock">🔄 {t("navbar.shopStock")}</L>
-                <L to="/admin/shop?tab=packages">🎁 {t("navbar.packages")}</L>
-                <L to="/admin/purchase-plans">🛒 {t("navbar.purchasePlans")}</L>
-                <Label>{t("navbar.reports")}</Label>
-                <L to="/admin/shop?tab=report">📈 {t("navbar.shopReport")}</L>
-                <L to="/shop">👀 {t("navbar.viewPublicShop")}</L>
-              </NavDropdown>
-              <NavDropdown label={`💰 ${t("navbar.money")}`} active={anyActive("/admin/finance", "/admin/telegram?tab=khqr")}>
-                <L to="/admin/finance">💼 {t("navbar.myFinance")}</L>
-                <L to="/debt-report">📉 {t("navbar.studentDebts")}</L>
-                <L to="/admin/telegram?tab=khqr">💳 {t("navbar.khqrPayments")}</L>
-              </NavDropdown>
+              {/* Shop, stock, invoices, reports, money and KHQR live on the shop site now */}
+              <a href={`${SHOP_URL}/admin/shop`}>🛒 {t("navbar.shopAndMoney")} ↗</a>
               <NavDropdown
                 label={`⚙️ ${t("navbar.system")}`}
                 active={anyActive("/admin/users", "/admin/teams", "/admin/sponsors", "/admin/poster", "/admin/telegram", "/admin/analytics", ...publicLinks)}

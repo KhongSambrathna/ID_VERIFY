@@ -26,9 +26,6 @@ router.post("/orders/:id/confirm", c.confirmOrder);
 router.post("/orders/:id/reject", c.rejectOrder);
 router.post("/orders/:id/check-payment", c.checkOrderPayment);
 router.post("/orders/:id/mark-paid", c.markOrderPaid);
-// KHQR payment settings
-router.get("/pay-settings", c.getPaySettings);
-router.put("/pay-settings", c.updatePaySettings);
-router.post("/pay-settings/test", c.testPaySettings);
+// KHQR payment settings → moved to the shop app (/api/telegram/pay-settings there)
 
 module.exports = router;

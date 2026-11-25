@@ -20,7 +20,6 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminTeams from "./pages/AdminTeams";
 import AdminSponsors from "./pages/AdminSponsors";
 import AdminMatchDay from "./pages/AdminMatchDay";
-import AdminShop from "./pages/AdminShop";
 import DebtReportPage from "./pages/DebtReportPage";
 import StatsPage from "./pages/StatsPage";
 import PlayerDashboard from "./pages/PlayerDashboard";
@@ -40,12 +39,8 @@ import PaymentReturn from "./pages/PaymentReturn";
 import RefereeSchedulePage from "./pages/RefereeSchedulePage";
 import PlayerRegister from "./pages/PlayerRegister";
 import AdminAnalytics from "./pages/AdminAnalytics";
-import AdminInvoices from "./pages/AdminInvoices";
-import InvoiceView from "./pages/InvoiceView";
-import AdminPurchasePlans from "./pages/AdminPurchasePlans";
 import AdminTournamentPlans from "./pages/AdminTournamentPlans";
 import CoachModePicker from "./pages/CoachModePicker";
-import AdminFinance from "./pages/AdminFinance";
 import AdminTelegram from "./pages/AdminTelegram";
 import TgShop from "./pages/TgShop";
 import CoachModeBanner from "./components/CoachModeBanner";
@@ -54,13 +49,17 @@ import RouteMeta from "./components/RouteMeta";
 import UpdateBanner from "./components/UpdateBanner";
 import usePageTracking from "./hooks/usePageTracking";
 
-// The shop is its own app now (shop.brathna.com). In-app links to /shop
-// land here and leave for the shop site; direct visits are redirected by vercel.json.
-const SHOP_URL = import.meta.env.VITE_SHOP_URL || "https://shop.brathna.com/";
-function GoToShop() {
+// The shop is its own app now (shop.brathna.com): the public shop, products,
+// stock, invoices, purchase plans, reports, money (finance) and KHQR settings.
+// Links to those pages land here and leave for the same page on the shop site;
+// direct visits are redirected by vercel.json.
+const SHOP_URL = (import.meta.env.VITE_SHOP_URL || "https://shop.brathna.com").replace(/\/$/, "");
+function GoToShop({ path }) {
+  const location = useLocation();
   useEffect(() => {
-    window.location.replace(SHOP_URL);
-  }, []);
+    const target = path ?? location.pathname;
+    window.location.replace(`${SHOP_URL}${target === "/shop" ? "/" : target}${path ? "" : location.search}`);
+  }, [path, location.pathname, location.search]);
   return null;
 }
 
@@ -94,14 +93,9 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/admin/finance"
-          element={
-            <ProtectedRoute role="ADMIN">
-              <AdminFinance />
-            </ProtectedRoute>
-          }
-        />
+        {/* shop + money pages moved to shop.brathna.com */}
+        <Route path="/admin/finance" element={<GoToShop />} />
+        <Route path="/admin/khqr" element={<GoToShop />} />
         <Route
           path="/admin/coach-mode"
           element={
@@ -227,22 +221,8 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/admin/shop"
-          element={
-            <ProtectedRoute role="ADMIN">
-              <AdminShop />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/invoices"
-          element={
-            <ProtectedRoute role="ADMIN">
-              <AdminInvoices />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/admin/shop" element={<GoToShop />} />
+        <Route path="/admin/invoices" element={<GoToShop />} />
         <Route
           path="/admin/tournament-plans"
           element={
@@ -251,22 +231,8 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/admin/purchase-plans"
-          element={
-            <ProtectedRoute role="ADMIN">
-              <AdminPurchasePlans />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/invoices/:id"
-          element={
-            <ProtectedRoute role="ADMIN">
-              <InvoiceView />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/admin/purchase-plans" element={<GoToShop />} />
+        <Route path="/admin/invoices/:id" element={<GoToShop />} />
         <Route
           path="/admin/analytics"
           element={

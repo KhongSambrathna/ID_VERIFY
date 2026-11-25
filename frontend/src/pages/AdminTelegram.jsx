@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import KhqrSettings from "../components/KhqrSettings";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useLanguage } from "../i18n/LanguageContext";
+
+const SHOP_URL = (import.meta.env.VITE_SHOP_URL || "https://shop.brathna.com").replace(/\/$/, "");
 import { formatUSD, approxKHR } from "../utils/currency";
 
 // 🤖 Telegram bot — the shop bot customers order from, and the Admin's own
@@ -14,7 +15,9 @@ const fmtDateTime = (d) =>
 export default function AdminTelegram() {
   const { t } = useLanguage();
   const [params, setParams] = useSearchParams();
-  const tab = ["orders", "khqr"].includes(params.get("tab")) ? params.get("tab") : "setup";
+  // KHQR settings moved to the shop site (shop.brathna.com/admin/khqr)
+  if (params.get("tab") === "khqr") window.location.replace(`${SHOP_URL}/admin/khqr`);
+  const tab = params.get("tab") === "orders" ? "orders" : "setup";
   const setTab = (k) => setParams(k === "setup" ? {} : { tab: k }, { replace: true });
   const [st, setSt] = useState(null);
 
@@ -44,13 +47,12 @@ export default function AdminTelegram() {
           🛒 {t("tgBot.tabOrders")}
           {st && st.pendingOrders > 0 && <span className="tg-count">{st.pendingOrders}</span>}
         </button>
-        <button className={`tab-btn ${tab === "khqr" ? "active" : ""}`} onClick={() => setTab("khqr")}>💳 KHQR</button>
+        <a className="tab-btn" href={`${SHOP_URL}/admin/khqr`}>💳 KHQR ↗</a>
       </div>
       {st === null && <p>{t("common.loading")}</p>}
       {st === false && <p className="error-text">{t("tgBot.loadFailed")}</p>}
       {st && tab === "setup" && <Setup st={st} reload={loadStatus} setSt={setSt} />}
       {st && tab === "orders" && <Orders onChange={loadStatus} />}
-      {tab === "khqr" && <KhqrSettings />}
     </div>
   );
 }
@@ -372,7 +374,7 @@ function Orders({ onChange }) {
             ) : (
               o.invoice && (
                 <p style={{ margin: "8px 0 0" }}>
-                  🧾 <Link to={`/admin/invoices/${o.invoice._id}`}>{o.invoice.invoiceNo}</Link>
+                  🧾 <a href={`${SHOP_URL}/admin/invoices/${o.invoice._id}`}>{o.invoice.invoiceNo}</a>
                   {o.invoice.paidAmount < o.invoice.total && <span className="mini-empty"> · {t("tgBot.unpaid")}</span>}
                 </p>
               )

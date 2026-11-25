@@ -19,16 +19,14 @@ const bakongRoutes = require("./routes/bakongRoutes");
 const attendanceRoutes = require("./routes/attendanceRoutes");
 const registrationRoutes = require("./routes/registrationRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
-const invoiceRoutes = require("./routes/invoiceRoutes");
-const packageRoutes = require("./routes/packageRoutes");
-const purchasePlanRoutes = require("./routes/purchasePlanRoutes");
 const tournamentPlanRoutes = require("./routes/tournamentPlanRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const chatRoutes = require("./routes/chatRoutes");
-const financeRoutes = require("./routes/financeRoutes");
 const telegramRoutes = require("./routes/telegramRoutes");
 const geoRoutes = require("./routes/geoRoutes");
 const linkRoutes = require("./routes/linkRoutes");
+// Shop admin (invoices, packages, purchase plans) and money (finance) moved to
+// the shop app (shop-project). The Telegram bot here still uses their code.
 
 const app = express();
 
@@ -66,11 +64,8 @@ app.use("/api/registration", registrationRoutes);
 // Visitor analytics — public page-view tracking + the admin report.
 app.use("/api/analytics", analyticsRoutes);
 // Shop invoices (Admin) — stock lines cut stock automatically.
-app.use("/api/invoices", invoiceRoutes);
 // Shop packages/bundles (e.g. tournament package: trophy + medals + fees).
-app.use("/api/packages", packageRoutes);
 // Purchase planning — costs, delivery dates and expected profit before buying.
-app.use("/api/purchase-plans", purchasePlanRoutes);
 // Trophy / tournament planning calendar.
 app.use("/api/tournament-plans", tournamentPlanRoutes);
 // In-website notifications (🔔 in the top bar).
@@ -78,7 +73,6 @@ app.use("/api/notifications", notificationRoutes);
 // 💬 Chat between accounts.
 app.use("/api/chat", chatRoutes);
 // Personal finance (Admin): daily income/expenses, debts, monthly plan.
-app.use("/api/finance", financeRoutes);
 // Telegram shop bot (webhook) + private alerts for the Admin.
 app.use("/api/telegram", telegramRoutes);
 app.use("/api/geo", geoRoutes);

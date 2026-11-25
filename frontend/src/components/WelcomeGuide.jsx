@@ -16,7 +16,7 @@ const STEPS = {
     { icon: "🔗", k: "regLinks", to: "/admin?tab=registration" },
     { icon: "🏆", k: "competitions", to: "/admin/tournaments" },
     { icon: "🛒", k: "shop", to: "/admin/invoices" },
-    { icon: "💳", k: "khqrAdmin", to: "/admin/telegram?tab=khqr" },
+    { icon: "💳", k: "khqrAdmin", to: "/admin/khqr" },
     { icon: "📉", k: "debts", to: "/debt-report" },
     { icon: "🔔", k: "telegram", to: "/settings" },
   ],
