@@ -9,8 +9,13 @@ const crypto = require("crypto");
 // req.linkApp = "tournament" | "shop" … (which app is calling).
 //
 // ពិនិត្យ key សម្ងាត់ សម្រាប់កម្មវិធីផ្សេង (Tournament, Shop) ទាញទិន្នន័យ
+// The school-management app may also use its own variable, SCHOOL_LINK_KEY
+// (= that app's ID_VERIFY_LINK_KEY), so its key can be set or changed
+// without touching LINK_API_KEYS.
 function parseKeys() {
-  return String(process.env.LINK_API_KEYS || "")
+  const school = String(process.env.SCHOOL_LINK_KEY || "").trim();
+  return [String(process.env.LINK_API_KEYS || ""), school ? `school:${school}` : ""]
+    .join(",")
     .split(",")
     .map((p) => p.trim())
     .filter(Boolean)
