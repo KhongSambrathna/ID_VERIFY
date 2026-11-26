@@ -16,6 +16,8 @@ const serviceRoutes = require("./routes/serviceRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const bakongRoutes = require("./routes/bakongRoutes");
 const attendanceRoutes = require("./routes/attendanceRoutes");
+const trainingFeeRoutes = require("./routes/trainingFeeRoutes");
+const schoolImportRoutes = require("./routes/schoolImportRoutes");
 const registrationRoutes = require("./routes/registrationRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
 const tournamentPlanRoutes = require("./routes/tournamentPlanRoutes");
@@ -55,6 +57,10 @@ app.use("/api/services", serviceRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/bakong", bakongRoutes);
 app.use("/api/attendance", attendanceRoutes);
+// ថ្លៃហ្វឹកហាត់ — training fees (pay by day/week/month, charged per session attended).
+app.use("/api/training-fees", trainingFeeRoutes);
+// 🏫 Admin: import students from the school-management app (its database, read only).
+app.use("/api/school-import", schoolImportRoutes);
 // Player self-registration via a Head Coach's shared link — public token
 // routes (a brand-new player with no account submits their own details) plus
 // coach/admin routes to create & manage those links.
@@ -110,4 +116,16 @@ app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`)
 if (process.env.NODE_ENV !== "test") {
   const { runFeeChecks } = require("./utils/feePayments");
   setInterval(() => runFeeChecks().catch(() => {}), 20 * 1000);
+
+  // 🔄 Students imported from the school-management app follow its changes
+  // (name, date/place of birth, address, photo) — checked every hour.
+  if (process.env.SCHOOL_MONGO_URI) {
+    const { syncAll } = require("./controllers/schoolImportController");
+    const runSchoolSync = () =>
+      syncAll()
+        .then((r) => r.updated && console.log(`[school sync] updated ${r.updated} of ${r.checked} athletes`))
+        .catch((err) => console.warn(`[school sync] ${err.message}`));
+    setTimeout(runSchoolSync, 60 * 1000);
+    setInterval(runSchoolSync, 60 * 60 * 1000);
+  }
 }

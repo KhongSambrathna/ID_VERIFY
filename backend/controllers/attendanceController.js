@@ -1,6 +1,16 @@
 const Attendance = require("../models/Attendance");
 const Athlete = require("../models/Athlete");
 const flattenAssignments = require("../utils/flattenAssignments");
+const Team = require("../models/Team");
+
+// The training fee (riel) a newly saved training session costs each student
+// who attended — the team's current price if training fees are switched on,
+// else 0. Matches never cost anything.
+async function currentSessionFee(team, type) {
+  if (type !== "training") return 0;
+  const t = await Team.findOne({ name: team }).select("trainingFee").lean();
+  return t?.trainingFee?.enabled ? Math.max(0, Number(t.trainingFee.pricePerSession) || 0) : 0;
+}
 
 const VALID_STATUSES = ["present", "absent", "late", "excused"];
 
@@ -40,6 +50,7 @@ function summarize(session) {
     date: session.date,
     title: session.title,
     notes: session.notes,
+    feePerSession: session.feePerSession || 0,
     counts: statusCounts(session.records),
     recordedBy: session.recordedBy || null,
     createdAt: session.createdAt,
@@ -191,6 +202,7 @@ async function createAttendance(req, res) {
       records: await buildRecords(records, team),
       recordedBy: req.adminId,
     });
+    session.feePerSession = await currentSessionFee(team, session.type);
 
     await session.save();
     res.status(201).json(session);
@@ -215,6 +227,11 @@ async function updateAttendance(req, res) {
     if (title !== undefined) session.title = (title || "").trim();
     if (notes !== undefined) session.notes = (notes || "").trim();
     if (records !== undefined) session.records = await buildRecords(records, session.team);
+    // A match is never charged. A training session keeps the price it was
+    // first saved with; one saved before fees were switched on picks up the
+    // current price the next time it's saved.
+    if (session.type !== "training") session.feePerSession = 0;
+    else if (!session.feePerSession) session.feePerSession = await currentSessionFee(session.team, "training");
 
     await session.save();
     res.json(session);

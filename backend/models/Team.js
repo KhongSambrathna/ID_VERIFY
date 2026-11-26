@@ -136,6 +136,18 @@ const teamSchema = new mongoose.Schema(
     // ភ្ជាប់ជាមួយក្រុមក្នុងកម្មវិធី Tournament
     tournamentClubId: { type: String, default: null },
     nameKm: { type: String, trim: true, default: "" },
+    // ថ្លៃហ្វឹកហាត់ — training fees, all in riel. Students pay ahead (by the
+    // day, week or month) into a balance; every training session they
+    // actually attend (present / late) costs pricePerSession. Absent or
+    // excused = nothing is taken. So ៛10,000 a month with 4 sessions: come 3
+    // times → ៛2,500 is left → next month they only pay ៛7,500.
+    // See controllers/trainingFeeController.js.
+    trainingFee: {
+      enabled: { type: Boolean, default: false },
+      pricePerSession: { type: Number, default: 2500, min: 0 },
+      monthlyFee: { type: Number, default: 10000, min: 0 },
+      sessionsPerWeek: { type: Number, default: 1, min: 1 },
+    },
   },
   { timestamps: true }
 );

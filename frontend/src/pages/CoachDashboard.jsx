@@ -9,6 +9,7 @@ import FormationManager from "../components/FormationManager";
 import StartingXIManager from "../components/StartingXIManager";
 import JerseyOrderManager from "../components/JerseyOrderManager";
 import AttendanceManager from "../components/AttendanceManager";
+import TrainingFeeManager from "../components/TrainingFeeManager";
 import RegistrationInviteManager from "../components/RegistrationInviteManager";
 import { useLanguage } from "../i18n/LanguageContext";
 import TelegramLinkCode from "../components/TelegramLinkCode";
@@ -35,12 +36,22 @@ export default function CoachDashboard() {
       .catch(() => {});
   }, [inCoachMode]);
   const [athletes, setAthletes] = useState([]);
+  // 🏃 Training tab: shown only when the Admin switched training on for this
+  // team (Admin → 🏆 → 🏃 Training page).
+  const [trainingTab, setTrainingTab] = useState(false);
+  useEffect(() => {
+    if (!team) return;
+    api
+      .get("/training-fees/settings", { params: { team } })
+      .then(({ data }) => setTrainingTab(Boolean(data.enabled)))
+      .catch(() => setTrainingTab(false));
+  }, [team]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchParams] = useSearchParams();
   // Lets a link from elsewhere (e.g. a tournament's squad page) land
   // directly on a specific tab, e.g. /coach?tab=lineups.
-  const validTabs = ["athletes", "owing", "lineups", "formations", "startingxi", "jerseyorders", "accounts", "registration", "attendance"];
+  const validTabs = ["athletes", "owing", "lineups", "formations", "startingxi", "jerseyorders", "accounts", "registration", "attendance", "training"];
   const tabFromUrl = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState(validTabs.includes(tabFromUrl) ? tabFromUrl : "athletes");
 
@@ -424,6 +435,14 @@ export default function CoachDashboard() {
         >
           {t("attendance.title")}
         </button>
+        {trainingTab && (
+          <button
+            className={`tab-btn ${activeTab === "training" ? "active" : ""}`}
+            onClick={() => setActiveTab("training")}
+          >
+            {t("trainingFee.tab")}
+          </button>
+        )}
       </div>
 
       {/* ATHLETES TAB */}
@@ -838,6 +857,14 @@ export default function CoachDashboard() {
       {activeTab === "attendance" && (
         <div className="tab-content">
           <AttendanceManager team={team} athletes={athletes} />
+        </div>
+      )}
+
+      {/* 🏃 TRAINING TAB — training fees: pay by day/week/month, each
+          training session attended costs the per-session price. */}
+      {activeTab === "training" && (
+        <div className="tab-content">
+          <TrainingFeeManager team={team} />
         </div>
       )}
     </div>

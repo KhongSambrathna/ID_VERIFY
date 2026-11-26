@@ -19,6 +19,7 @@ const ScanLog = require("../models/ScanLog");
 const StartingXI = require("../models/StartingXI");
 const Team = require("../models/Team");
 const Tournament = require("../models/Tournament");
+const TrainingPayment = require("../models/TrainingPayment");
 const mongoose = require("mongoose");
 
 function destroyFiles(list) {
@@ -74,6 +75,7 @@ async function purgeAthlete(athlete) {
     Admin.deleteMany({ athleteId: id }),
     Attendance.deleteMany({ athlete: id }),
     Payment.deleteMany({ athlete: id }),
+    TrainingPayment.deleteMany({ athlete: id }),
     ScanLog.deleteMany({ athlete: id }),
     Tournament.updateMany({ "registrations.athlete": id }, { $pull: { registrations: { athlete: id } } }),
     Lineup.updateMany({ "athletes.athleteId": id }, { $pull: { athletes: { athleteId: id } } }),
@@ -156,6 +158,7 @@ async function purgeTeam(team) {
     Admin.deleteMany({ team: name, athleteId: null }),
     Attendance.deleteMany({ team: name }),
     Payment.deleteMany({ team: name }),
+    TrainingPayment.deleteMany({ team: name }),
     Lineup.deleteMany({ $or: [{ team: name }, { _id: { $in: tournamentLineupIds } }] }),
     Formation.deleteMany({ team: name }),
     StartingXI.deleteMany({ team: name }),

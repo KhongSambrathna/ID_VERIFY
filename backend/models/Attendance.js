@@ -47,6 +47,11 @@ const attendanceSchema = new mongoose.Schema(
     title: { type: String, default: "", trim: true },
     notes: { type: String, default: "", trim: true },
     records: { type: [attendanceRecordSchema], default: [] },
+    // Training fee (riel) taken from each student who attended (present or
+    // late) — copied from the team's trainingFee.pricePerSession when the
+    // session is saved, so changing the price later never re-prices old
+    // sessions. 0 = free session (fees off, a match, or recorded before fees).
+    feePerSession: { type: Number, default: 0, min: 0 },
     // Who recorded it — set from the authenticated Admin/Head Coach, never
     // from the request body.
     recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },

@@ -208,6 +208,18 @@ const athleteSchema = new mongoose.Schema(
     // (e.g. after they move up an age group).
     lastVerifiedAt: { type: Date, default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
+    // ទីកន្លែងកំណើត — place of birth (free text), e.g. copied from the
+    // school-management app when a student is imported.
+    placeOfBirth: { type: String, trim: true, default: "" },
+    // _id of the Student in the school-management database this athlete was
+    // imported from (see controllers/schoolImportController.js) — stops the
+    // same student being imported twice.
+    schoolStudentId: { type: String, default: null, index: true },
+    // What the school app had for this student at the last import/sync —
+    // a later sync only copies the fields the SCHOOL changed since then, so
+    // an edit made here in ID isn't overwritten unless the school edits it too.
+    schoolSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
+    schoolSyncedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

@@ -210,9 +210,10 @@ export default function Navbar() {
               <L to="/admin">🏠 {t("navbar.dashboard")}</L>
               <NavDropdown
                 label={`👥 ${t("navbar.athletes")}`}
-                active={anyActive("/admin/new", "/admin/cards", "/admin/cards/back", "/debt-report", "/admin/stats")}
+                active={anyActive("/admin/new", "/admin/school-import", "/admin/cards", "/admin/cards/back", "/debt-report", "/admin/stats")}
               >
                 <L to="/admin/new">➕ {t("navbar.addAthlete")}</L>
+                <L to="/admin/school-import">🏫 {t("schoolImport.navLink")}</L>
                 <L to="/debt-report">📉 {t("navbar.studentDebts")}</L>
                 <L to="/admin/stats">📊 {t("navbar.stats")}</L>
                 <Label>{t("navbar.cards")}</Label>
@@ -221,11 +222,12 @@ export default function Navbar() {
               </NavDropdown>
               <NavDropdown
                 label={`🏆 ${t("navbar.competitions")}`}
-                active={anyActive("/admin/tournaments", "/admin/tournament-plans", "/admin/matchday", "/admin/jersey-orders")}
+                active={anyActive("/admin/tournaments", "/admin/tournament-plans", "/admin/matchday", "/admin/training", "/admin/jersey-orders")}
               >
                 <L to="/admin/tournament-plans">📅 {t("navbar.tournamentPlans")}</L>
                 <L to="/admin/tournaments">🏆 {t("navbar.tournaments")}</L>
                 <L to="/admin/matchday">⚽ {t("navbar.matchDay")}</L>
+                <L to="/admin/training">🏃 {t("trainingFee.navLink")}</L>
                 <L to="/admin/jersey-orders">👕 {t("navbar.jerseyOrders")}</L>
               </NavDropdown>
               {/* Shop, stock, invoices, reports, money and KHQR live on the shop site now */}

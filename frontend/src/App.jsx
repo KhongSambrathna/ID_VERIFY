@@ -20,6 +20,8 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminTeams from "./pages/AdminTeams";
 import AdminSponsors from "./pages/AdminSponsors";
 import AdminMatchDay from "./pages/AdminMatchDay";
+import AdminTraining from "./pages/AdminTraining";
+import AdminSchoolImport from "./pages/AdminSchoolImport";
 import DebtReportPage from "./pages/DebtReportPage";
 import StatsPage from "./pages/StatsPage";
 import PlayerDashboard from "./pages/PlayerDashboard";
@@ -214,6 +216,22 @@ export default function App() {
           element={
             <ProtectedRoute role="ADMIN">
               <AdminMatchDay />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/school-import"
+          element={
+            <ProtectedRoute role="ADMIN">
+              <AdminSchoolImport />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/training"
+          element={
+            <ProtectedRoute role="ADMIN">
+              <AdminTraining />
             </ProtectedRoute>
           }
         />
